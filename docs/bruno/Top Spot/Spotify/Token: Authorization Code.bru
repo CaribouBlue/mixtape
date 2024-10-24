@@ -1,0 +1,23 @@
+meta {
+  name: Token: Authorization Code
+  type: http
+  seq: 1
+}
+
+post {
+  url: https://accounts.spotify.com/api/token
+  body: formUrlEncoded
+  auth: none
+}
+
+headers {
+  Authorization: 
+  Content-Type: application/x-www-form-urlencoded
+}
+
+body:form-urlencoded {
+  grant_type: authorization_code
+  redirect_uri: http%3A%2F%2Flocalhost
+  code: 
+  : 
+}
