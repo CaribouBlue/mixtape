@@ -2,6 +2,7 @@ package templates
 
 import (
 	"github.com/CaribouBlue/top-spot/db"
+	"github.com/CaribouBlue/top-spot/spotify"
 	"strconv"
 )
 
@@ -13,7 +14,7 @@ templ root(props RootProps) {
 	<html>
 		<head>
 			<title>Top Spot | { props.Title }</title>
-			<script src="/assets/js/htmx.min.js"></script>
+			<script src="https://unpkg.com/htmx.org@2.0.3" integrity="sha384-0895/pl2MU10Hqc6jd4RvrthNlDiE9U1tWmX7WRESftEDRosgxNsQG/Ze9YMRzHq" crossorigin="anonymous"></script>
 		</head>
 		<body>
 			{ children... }
@@ -54,5 +55,30 @@ templ Session(props SessionProps) {
 			}
 		</ul>
 		<h2>Add Submissions</h2>
+		@SpotifySearch()
+	}
+}
+
+templ SpotifySearch() {
+	<input
+		type="search"
+		name="query"
+		placeholder="Begin Typing To Search Tracks..."
+		hx-post="/app/spotify-search"
+		hx-trigger="input changed delay:500ms, search"
+		hx-target="#spotify-search-results"
+	/>
+	<div id="spotify-search-results"></div>
+}
+
+type SpotifySearchResultsProps struct {
+	Results spotify.SearchResult
+}
+
+templ SpotifySearchResults(props SpotifySearchResultsProps) {
+	for _, track := range  props.Results.Tracks.Items {
+		<div>
+			<p>{ track.Name } | { track.Artists[0].Name }</p>
+		</div>
 	}
 }

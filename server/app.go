@@ -72,6 +72,31 @@ func appSessionHandler(w http.ResponseWriter, r *http.Request) {
 	templates.Session(props).Render(r.Context(), w)
 }
 
+func appSpotifySearchHandler(w http.ResponseWriter, r *http.Request) {
+	spotifyClient, err := getSpotifyClientFromRequestContext(r)
+	if err != nil {
+		http.Error(w, "Spotify not found in context", http.StatusInternalServerError)
+		return
+	}
+
+	r.ParseForm()
+	query := r.Form.Get("query")
+
+	props := templates.SpotifySearchResultsProps{}
+
+	if query != "" {
+		searchResults, err := spotifyClient.SearchTracks(query)
+		if err != nil {
+			http.Error(w, "Failed to search Spotify", http.StatusInternalServerError)
+			return
+		}
+
+		props.Results = *searchResults
+	}
+
+	templates.SpotifySearchResults(props).Render(r.Context(), w)
+}
+
 func appProfileHandler(w http.ResponseWriter, r *http.Request) {
 	spotify, err := getSpotifyClientFromRequestContext(r)
 	if err != nil {
@@ -97,8 +122,12 @@ func registerAppMux(parentMux *http.ServeMux) {
 	appMux := http.NewServeMux()
 
 	appMux.Handle("GET /", http.HandlerFunc(appLandingHandler))
+
 	appMux.Handle("POST /session", http.HandlerFunc(createAppSessionHandler))
 	appMux.Handle("GET /session/{id}", http.HandlerFunc(appSessionHandler))
+
+	appMux.Handle("POST /spotify-search", handlerFuncWithMiddleware(appSpotifySearchHandler, withSpotify))
+
 	appMux.Handle("GET /profile", handlerFuncWithMiddleware(appProfileHandler, withSpotify))
 
 	appMuxWithMiddleware := applyMiddleware(appMux, enforceAuthentication)
