@@ -26,3 +26,6 @@ go.work.sum
 
 # tmp dir
 tmp/
+
+# templ
+*_templ.go

@@ -1,0 +1,23 @@
+package templates
+
+type RootProps struct {
+	Title string
+}
+
+templ root(props RootProps) {
+	<html>
+		<head>
+			<title>Top Spot | { props.Title }</title>
+			<script src="/assets/js/htmx.min.js"></script>
+		</head>
+		<body>
+			{ children... }
+		</body>
+	</html>
+}
+
+templ Landing() {
+	@root(RootProps{Title: "Landing"}) {
+		<h1>Landing</h1>
+	}
+}

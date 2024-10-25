@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"github.com/CaribouBlue/top-spot/app"
+	"github.com/CaribouBlue/top-spot/server"
 	"github.com/joho/godotenv"
 )
 
@@ -13,5 +13,5 @@ func main() {
 		log.Fatal("Error loading .env file")
 	}
 
-	app.StartServer()
+	server.StartServer()
 }
