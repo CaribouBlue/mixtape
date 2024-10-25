@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"database/sql"
 	"net/http"
 	"os"
 	"slices"
@@ -60,15 +61,11 @@ func withUser(next http.Handler) http.Handler {
 
 		user := db.NewUserDataModel()
 		user.SetId(userId)
-
-		isAuthenticated, err := user.IsAuthenticated()
-		if err != nil {
-			http.Error(w, "Failed to check authentication", http.StatusInternalServerError)
-			return
-		}
-
-		if !isAuthenticated {
-			http.Redirect(w, r, "/auth/user", http.StatusFound)
+		err = user.GetById()
+		if err == sql.ErrNoRows {
+			// if user does not exist, continue with empty user data model
+		} else if err != nil {
+			http.Error(w, "Failed to get user", http.StatusInternalServerError)
 			return
 		}
 
@@ -93,7 +90,7 @@ func enforceAuthentication(next http.Handler) http.Handler {
 		}
 
 		if !isAuthenticated {
-			http.Redirect(w, r, "/auth/user", http.StatusFound)
+			http.Redirect(w, r, authMuxPathPrefix+"/user", http.StatusFound)
 			return
 		}
 

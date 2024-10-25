@@ -14,7 +14,7 @@ type UserDataModel struct {
 }
 
 func (user *UserDataModel) GetTableName() string {
-	return "users"
+	return "user"
 }
 
 func (user *UserDataModel) SetId(id int64) {
@@ -34,16 +34,16 @@ func (user *UserDataModel) Value() (driver.Value, error) {
 }
 
 func (user *UserDataModel) Insert() error {
-	_, err := InsertJsonDataModel(user)
+	_, err := insertJsonDataModel(user)
 	return err
 }
 
 func (user *UserDataModel) Update() error {
-	return UpdateJsonDataModel(user)
+	return updateJsonDataModel(user)
 }
 
 func (user *UserDataModel) GetById() error {
-	_, err := GetJsonDataModelById(user)
+	_, err := getJsonDataModelById(user)
 	return err
 }
 

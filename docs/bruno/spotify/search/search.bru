@@ -1,0 +1,20 @@
+meta {
+  name: search
+  type: http
+  seq: 1
+}
+
+get {
+  url: https://api.spotify.com/v1/search?q=hello&type=track
+  body: none
+  auth: none
+}
+
+query {
+  q: hello
+  type: track
+}
+
+auth:bearer {
+  token: 
+}

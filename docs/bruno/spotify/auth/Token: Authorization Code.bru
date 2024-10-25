@@ -7,17 +7,21 @@ meta {
 post {
   url: https://accounts.spotify.com/api/token
   body: formUrlEncoded
-  auth: none
+  auth: basic
 }
 
 headers {
-  Authorization: 
   Content-Type: application/x-www-form-urlencoded
+}
+
+auth:basic {
+  username: {{spotifyClientId}}
+  password: {{spotifyClientSecret}}
 }
 
 body:form-urlencoded {
   grant_type: authorization_code
   redirect_uri: http%3A%2F%2Flocalhost
-  code: 
+  code: %7B%7BspotifyAuthCode%7D%7D
   : 
 }

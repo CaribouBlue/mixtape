@@ -30,6 +30,7 @@ func initDb() {
 	}
 
 	createJsonDataModelTable(NewUserDataModel())
+	createJsonDataModelTable(NewGameSessionDataModel())
 }
 
 func getDb() *sql.DB {
@@ -57,7 +58,7 @@ func createJsonDataModelTable(model JsonDataModel) error {
 	return err
 }
 
-func InsertJsonDataModel(model JsonDataModel) (JsonDataModel, error) {
+func insertJsonDataModel(model JsonDataModel) (JsonDataModel, error) {
 	stmt, err := getDb().Prepare(fmt.Sprintf("insert into %s(data) values(?)", model.GetTableName()))
 	if err != nil {
 		return model, err
@@ -69,22 +70,22 @@ func InsertJsonDataModel(model JsonDataModel) (JsonDataModel, error) {
 	}
 
 	defer stmt.Close()
-	result, err := stmt.Exec(value)
+	_, err = stmt.Exec(value)
 	if err != nil {
 		return model, err
 	}
 
-	id, err := result.LastInsertId()
-	if err != nil {
-		return model, err
-	}
+	// id, err := result.LastInsertId()
+	// if err != nil {
+	// 	return model, err
+	// }
 
-	model.SetId(id)
+	// model.SetId(id)
 
 	return model, nil
 }
 
-func UpdateJsonDataModel(model JsonDataModel) error {
+func updateJsonDataModel(model JsonDataModel) error {
 	stmt, err := getDb().Prepare(fmt.Sprintf("update %s set data = ? where data->>'id' = ?", model.GetTableName()))
 	if err != nil {
 		return err
@@ -103,7 +104,7 @@ func UpdateJsonDataModel(model JsonDataModel) error {
 	return nil
 }
 
-func GetJsonDataModelById(model JsonDataModel) (JsonDataModel, error) {
+func getJsonDataModelById(model JsonDataModel) (JsonDataModel, error) {
 	var data string
 	query := fmt.Sprintf("select data from %s where data->>'id' = %d", model.GetTableName(), model.GetId())
 	err := getDb().QueryRow(query).Scan(&data)

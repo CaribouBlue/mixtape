@@ -1,0 +1,21 @@
+meta {
+  name: session
+  type: http
+  seq: 1
+}
+
+post {
+  url: http://localhost:8080/app/session
+  body: json
+  auth: none
+}
+
+headers {
+  Content-Type: Application/json
+}
+
+body:json {
+  {
+    "id": 99
+  }
+}

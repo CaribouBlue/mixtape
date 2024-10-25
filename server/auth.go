@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	authPathPrefix       = "/auth"
-	userId         int64 = 666
+	authMuxPathPrefix       = "/auth"
+	userId            int64 = 6666
 )
 
 func authLoginHandler(w http.ResponseWriter, r *http.Request) {
@@ -28,7 +28,7 @@ func authLoginHandler(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/auth/spotify", http.StatusFound)
 		return
 	} else {
-		http.Redirect(w, r, "/app", http.StatusFound)
+		http.Redirect(w, r, appMuxPathPrefix, http.StatusFound)
 	}
 }
 
@@ -87,16 +87,16 @@ func authSpotifyRedirectHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	user.Update()
 
-	http.Redirect(w, r, "/auth/user", http.StatusFound)
+	http.Redirect(w, r, authMuxPathPrefix+"/user", http.StatusFound)
 }
 
 func registerAuthMux(parentMux *http.ServeMux) {
 	authMux := http.NewServeMux()
 	authMux.Handle("/user", http.HandlerFunc(authLoginHandler))
-	authMux.Handle("/spotify", http.HandlerFunc(authSpotifyHandler))
-	authMux.Handle("/spotify/redirect", http.HandlerFunc(authSpotifyRedirectHandler))
+	authMux.Handle("/spotify", handlerFuncWithMiddleware(authSpotifyHandler, withUser, withSpotify))
+	authMux.Handle("/spotify/redirect", handlerFuncWithMiddleware(authSpotifyRedirectHandler, withUser, withSpotify))
 
-	authMuxWithMiddleware := applyMiddleware(authMux, withUser, withSpotify)
+	authMuxWithMiddleware := applyMiddleware(authMux)
 
-	parentMux.Handle(authPathPrefix+"/", http.StripPrefix(authPathPrefix, authMuxWithMiddleware))
+	parentMux.Handle(authMuxPathPrefix+"/", http.StripPrefix(authMuxPathPrefix, authMuxWithMiddleware))
 }

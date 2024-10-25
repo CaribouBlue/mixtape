@@ -1,0 +1,37 @@
+meta {
+  name: Token: Refresh Token
+  type: http
+  seq: 2
+}
+
+post {
+  url: https://accounts.spotify.com/api/token
+  body: formUrlEncoded
+  auth: basic
+}
+
+headers {
+  Content-Type: application/x-www-form-urlencoded
+}
+
+auth:basic {
+  username: {{spotifyClientId}}
+  password: {{spotifyClientSecret}}
+}
+
+body:form-urlencoded {
+  grant_type: refresh_token
+  refresh_token: %7B%7BspotifyRefreshToken%7D%7D
+}
+
+script:post-response {
+  const {access_token, refresh_token} = res.body
+  
+  if (access_token) {
+    bru.setEnvVar("spotifyAccessToken",access_token)
+  }
+  
+  if (refresh_token) {
+    bru.setEnvVar("spotifyRefreshToken",refresh_token)
+  }
+}

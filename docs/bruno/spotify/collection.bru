@@ -1,0 +1,12 @@
+auth {
+  mode: bearer
+}
+
+auth:basic {
+  username: {{spotifyClientId}}
+  password: {{spotifyClientSecret}}
+}
+
+auth:bearer {
+  token: {{spotifyAccessToken}}
+}
