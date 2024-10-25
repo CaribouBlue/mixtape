@@ -1,0 +1,161 @@
+package templates
+
+import (
+	"encoding/json"
+	"fmt"
+	"github.com/CaribouBlue/top-spot/db"
+	"github.com/CaribouBlue/top-spot/spotify"
+	"github.com/CaribouBlue/top-spot/utils"
+	"strconv"
+)
+
+type SessionTemplateModel struct {
+	Session      db.GameSessionDataModel
+	User         db.UserDataModel
+	SearchResult spotify.SearchResult
+	SearchQuery  string
+}
+
+func (model SessionTemplateModel) Submissions() []db.SubmissionDataModel {
+	submissions := make([]db.SubmissionDataModel, 0)
+	for _, submission := range model.Session.Submissions {
+		if submission.UserId == model.User.GetId() {
+			submissions = append(submissions, submission)
+		}
+	}
+	return submissions
+}
+
+func (model SessionTemplateModel) SubmissionsLeft() int {
+	return model.Session.MaxSubmissions - len(model.Submissions())
+}
+
+func (model SessionTemplateModel) SearchResultJson() string {
+	json, _ := json.Marshal(model.SearchResult)
+	return string(json)
+}
+
+func NewSessionTemplateModel(session db.GameSessionDataModel, user db.UserDataModel) SessionTemplateModel {
+	return SessionTemplateModel{
+		Session: session,
+		User:    user,
+	}
+}
+
+templ Session(model SessionTemplateModel) {
+	@root(RootProps{Title: "About"}) {
+		<h1>Session #{ strconv.FormatInt(model.Session.Id, 10) }</h1>
+		<h2>Submit Your Shit</h2>
+		<h3>X days left</h3>
+		<h2>Your Submissions</h2>
+		<ul id="submission-list">
+			for _, submission := range model.Submissions() {
+				@SubmissionListItem(model, submission.Id)
+			}
+		</ul>
+		<div id="submission-adder">
+			@SubmissionAdder(model)
+		</div>
+	}
+}
+
+templ SubmissionListItem(model SessionTemplateModel, submissionId string) {
+	<li class="flex gap-5">
+		<button
+			hx-delete={ fmt.Sprintf("/app/session/%d/submission/%s", model.Session.Id, submissionId) }
+			hx-target="closest li"
+			hx-swap="delete"
+		>X</button>
+		<p>{ submissionId }</p>
+	</li>
+}
+
+templ SubmissionSearchResults(model SessionTemplateModel) {
+	for _, track := range  model.SearchResult.Tracks.Items {
+		<div class="flex gap-5">
+			<button
+				hx-post={ fmt.Sprintf("/app/session/%d/submission", model.Session.Id) }
+				hx-vals={ fmt.Sprintf(`{
+					"trackId": "%s"
+				}`, track.Id) }
+				hx-target="closest div"
+				hx-swap="delete"
+			>Add</button>
+			<div class="flex flex-col">
+				<p>{ track.Name }</p>
+				<p class="text-slate-400">{ utils.MapJoin(track.Artists, ", ", func(artist spotify.SearchResultArtist) string {return artist.Name} ) }</p>
+			</div>
+		</div>
+	}
+}
+
+templ SubmissionAdderHeader(model SessionTemplateModel) {
+	<h2 id="submission-adder-header">
+		if model.SubmissionsLeft() > 0 {
+			{ strconv.Itoa(model.SubmissionsLeft()) } submissions left
+		} else {
+			Submissions maxed out, nice
+		}
+	</h2>
+}
+
+templ SubmissionAdder(model SessionTemplateModel) {
+	@SubmissionAdderHeader(model)
+	if model.SubmissionsLeft() > 0 {
+		<div id="submission-search">
+			<input
+				type="search"
+				name="query"
+				placeholder="Begin Typing To Search Tracks..."
+				value={ model.SearchQuery }
+				hx-post={ fmt.Sprintf("/app/session/%d/tracks", model.Session.Id) }
+				hx-trigger="input changed delay:500ms, search"
+				hx-target="#submission-search-results"
+				class="w-full p-2"
+			/>
+			<div id="submission-search-results">
+				if model.SearchResult.Tracks.Total != 0 {
+					@SubmissionSearchResults(model)
+				}
+			</div>
+		</div>
+	}
+}
+
+templ NewSubmission(model SessionTemplateModel, submissionId string) {
+	<ul
+		hx-swap-oob="beforeend:#submission-list"
+	>
+		@SubmissionListItem(model, submissionId)
+	</ul>
+	<div
+		id="submission-adder-header"
+		hx-swap-oob="true"
+	>
+		@SubmissionAdderHeader(model)
+	</div>
+	if model.SubmissionsLeft() <= 0 {
+		<div
+			id="submission-search"
+			hx-swap-oob="true"
+		></div>
+	}
+}
+
+templ DeleteSubmission(model SessionTemplateModel) {
+	if model.SubmissionsLeft() == 1 {
+		<div
+			id="submission-adder"
+			hx-swap-oob="true"
+		>
+			@SubmissionAdder(model)
+		</div>
+	} else {
+		<div
+			id="submission-adder-header"
+			hx-swap-oob="true"
+		>
+			@SubmissionAdderHeader(model)
+		</div>
+	}
+}

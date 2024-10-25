@@ -1,11 +1,5 @@
 package templates
 
-import (
-	"github.com/CaribouBlue/top-spot/db"
-	"github.com/CaribouBlue/top-spot/spotify"
-	"strconv"
-)
-
 type RootProps struct {
 	Title string
 }
@@ -15,9 +9,12 @@ templ root(props RootProps) {
 		<head>
 			<title>Top Spot | { props.Title }</title>
 			<script src="https://unpkg.com/htmx.org@2.0.3" integrity="sha384-0895/pl2MU10Hqc6jd4RvrthNlDiE9U1tWmX7WRESftEDRosgxNsQG/Ze9YMRzHq" crossorigin="anonymous"></script>
+			<script src="https://cdn.tailwindcss.com"></script>
 		</head>
-		<body>
-			{ children... }
+		<body class="w-screen h-screen flex justify-center">
+			<div class="max-w-screen-lg w-full mx-10">
+				{ children... }
+			</div>
 		</body>
 	</html>
 }
@@ -25,60 +22,5 @@ templ root(props RootProps) {
 templ Landing() {
 	@root(RootProps{Title: "Landing"}) {
 		<h1>Landing</h1>
-	}
-}
-
-type SessionProps struct {
-	Session db.GameSessionDataModel
-	User    db.UserDataModel
-}
-
-func (props SessionProps) Submissions() []db.SubmissionDataModel {
-	submissions := make([]db.SubmissionDataModel, 0)
-	for _, submission := range props.Session.Submissions {
-		if submission.UserId == props.User.GetId() {
-			submissions = append(submissions, submission)
-		}
-	}
-	return submissions
-}
-
-templ Session(props SessionProps) {
-	@root(RootProps{Title: "About"}) {
-		<h1>Session #{ strconv.FormatInt(props.Session.Id, 10) }</h1>
-		<h2>Phase: Submit Your Shit</h2>
-		<h3>X days left</h3>
-		<h2>Your Submissions</h2>
-		<ul>
-			for _, submission := range props.Submissions() {
-				<li>{ submission.Id }</li>
-			}
-		</ul>
-		<h2>Add Submissions</h2>
-		@SpotifySearch()
-	}
-}
-
-templ SpotifySearch() {
-	<input
-		type="search"
-		name="query"
-		placeholder="Begin Typing To Search Tracks..."
-		hx-post="/app/spotify-search"
-		hx-trigger="input changed delay:500ms, search"
-		hx-target="#spotify-search-results"
-	/>
-	<div id="spotify-search-results"></div>
-}
-
-type SpotifySearchResultsProps struct {
-	Results spotify.SearchResult
-}
-
-templ SpotifySearchResults(props SpotifySearchResultsProps) {
-	for _, track := range  props.Results.Tracks.Items {
-		<div>
-			<p>{ track.Name } | { track.Artists[0].Name }</p>
-		</div>
 	}
 }

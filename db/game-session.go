@@ -3,9 +3,16 @@ package db
 import (
 	"database/sql/driver"
 	"encoding/json"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
+)
+
+var (
+	ErrSubmissionsMaxedOut          = errors.New("user has already submitted the maximum number of submissions")
+	ErrSubmissionNotFound           = errors.New("no submission found with the given ID")
+	ErrSubmissionUpdateUnauthorized = errors.New("user is unauthorized to update submission")
 )
 
 type SubmissionDataModel struct {
@@ -37,10 +44,11 @@ func NewVoteDataModel(userId, submissionId int64) *VoteDataModel {
 }
 
 type GameSessionDataModel struct {
-	Id          int64                 `json:"id"`
-	Submissions []SubmissionDataModel `json:"submissions"`
-	Votes       []VoteDataModel       `json:"votes"`
-	CreatedAt   time.Time             `json:"createdAt"`
+	Id             int64                 `json:"id"`
+	Submissions    []SubmissionDataModel `json:"submissions"`
+	Votes          []VoteDataModel       `json:"votes"`
+	CreatedAt      time.Time             `json:"createdAt"`
+	MaxSubmissions int                   `json:"maxSubmissions"`
 }
 
 func (gameSession *GameSessionDataModel) GetTableName() string {
@@ -77,10 +85,43 @@ func (gameSession *GameSessionDataModel) GetById() error {
 	return err
 }
 
+func (gameSession *GameSessionDataModel) AddSubmission(submission SubmissionDataModel) error {
+	submissionCount := 0
+	for _, existingSubmission := range gameSession.Submissions {
+		if existingSubmission.UserId == submission.UserId {
+			submissionCount++
+		}
+	}
+
+	if submissionCount >= gameSession.MaxSubmissions {
+		return ErrSubmissionsMaxedOut
+	}
+
+	gameSession.Submissions = append(gameSession.Submissions, submission)
+
+	return nil
+}
+
+func (gameSession *GameSessionDataModel) DeleteSubmission(submissionId string, userId int64) error {
+	for i, submission := range gameSession.Submissions {
+		if submission.Id == submissionId {
+			if submission.UserId != userId {
+				return ErrSubmissionUpdateUnauthorized
+			}
+
+			gameSession.Submissions = append(gameSession.Submissions[:i], gameSession.Submissions[i+1:]...)
+			return nil
+		}
+	}
+
+	return ErrSubmissionNotFound
+}
+
 func NewGameSessionDataModel() *GameSessionDataModel {
 	return &GameSessionDataModel{
-		Submissions: make([]SubmissionDataModel, 0),
-		Votes:       make([]VoteDataModel, 0),
-		CreatedAt:   time.Now(),
+		Submissions:    make([]SubmissionDataModel, 0),
+		Votes:          make([]VoteDataModel, 0),
+		CreatedAt:      time.Now(),
+		MaxSubmissions: 5,
 	}
 }

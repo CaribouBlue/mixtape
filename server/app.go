@@ -50,15 +50,19 @@ func createAppSessionHandler(w http.ResponseWriter, r *http.Request) {
 
 func appSessionHandler(w http.ResponseWriter, r *http.Request) {
 	user, err := getUserFromRequestContext(r)
+	if err != nil {
+		http.Error(w, "User not found in context", http.StatusInternalServerError)
+		return
+	}
 
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
 		http.Error(w, "Invalid session ID", http.StatusBadRequest)
 		return
 	}
 
 	session := db.NewGameSessionDataModel()
-	session.SetId(id)
+	session.SetId(sessionId)
 	err = session.GetById()
 	if err == sql.ErrNoRows {
 		http.Error(w, "Session not found", http.StatusNotFound)
@@ -68,21 +72,44 @@ func appSessionHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	props := templates.SessionProps{Session: *session, User: *user}
-	templates.Session(props).Render(r.Context(), w)
+	templateModel := templates.NewSessionTemplateModel(*session, *user)
+	templates.Session(templateModel).Render(r.Context(), w)
 }
 
-func appSpotifySearchHandler(w http.ResponseWriter, r *http.Request) {
+func appSessionTracksSearchHandler(w http.ResponseWriter, r *http.Request) {
+	user, err := getUserFromRequestContext(r)
+	if err != nil {
+		http.Error(w, "User not found in context", http.StatusInternalServerError)
+		return
+	}
+
 	spotifyClient, err := getSpotifyClientFromRequestContext(r)
 	if err != nil {
 		http.Error(w, "Spotify not found in context", http.StatusInternalServerError)
 		return
 	}
 
+	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid session ID", http.StatusBadRequest)
+		return
+	}
+
+	session := db.NewGameSessionDataModel()
+	session.SetId(sessionId)
+	err = session.GetById()
+	if err == sql.ErrNoRows {
+		http.Error(w, "Session not found", http.StatusNotFound)
+		return
+	} else if err != nil {
+		http.Error(w, "Failed to get session", http.StatusInternalServerError)
+		return
+	}
+
 	r.ParseForm()
 	query := r.Form.Get("query")
 
-	props := templates.SpotifySearchResultsProps{}
+	templateModel := templates.NewSessionTemplateModel(*session, *user)
 
 	if query != "" {
 		searchResults, err := spotifyClient.SearchTracks(query)
@@ -91,10 +118,104 @@ func appSpotifySearchHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		props.Results = *searchResults
+		templateModel.SearchResult = *searchResults
 	}
 
-	templates.SpotifySearchResults(props).Render(r.Context(), w)
+	templates.SubmissionSearchResults(templateModel).Render(r.Context(), w)
+}
+
+func appSessionSubmissionHandler(w http.ResponseWriter, r *http.Request) {
+	user, err := getUserFromRequestContext(r)
+	if err != nil {
+		http.Error(w, "User not found in context", http.StatusInternalServerError)
+		return
+	}
+
+	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid session ID", http.StatusBadRequest)
+		return
+	}
+
+	session := db.NewGameSessionDataModel()
+	session.SetId(sessionId)
+	err = session.GetById()
+	if err == sql.ErrNoRows {
+		http.Error(w, "Session not found", http.StatusNotFound)
+		return
+	} else if err != nil {
+		http.Error(w, "Failed to get session", http.StatusInternalServerError)
+		return
+	}
+
+	r.ParseForm()
+	trackId := r.Form.Get("trackId")
+	submission := db.NewSubmissionDataModel(user.GetId(), trackId)
+
+	err = session.AddSubmission(*submission)
+	if err != nil {
+		if err == db.ErrSubmissionsMaxedOut {
+			http.Error(w, "Max submissions reached", http.StatusConflict)
+			return
+		}
+		http.Error(w, "Failed to add submission", http.StatusInternalServerError)
+		return
+	}
+
+	err = session.Update()
+	if err != nil {
+		http.Error(w, "Failed to add submission", http.StatusInternalServerError)
+		return
+	}
+
+	templateModel := templates.NewSessionTemplateModel(*session, *user)
+	templates.NewSubmission(templateModel, submission.Id).Render(r.Context(), w)
+}
+
+func appSessionDeleteSubmissionHandler(w http.ResponseWriter, r *http.Request) {
+	user, err := getUserFromRequestContext(r)
+	if err != nil {
+		http.Error(w, "User not found in context", http.StatusInternalServerError)
+		return
+	}
+
+	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid session ID", http.StatusBadRequest)
+		return
+	}
+
+	submissionId := r.PathValue("submissionId")
+	if err != nil {
+		http.Error(w, "Invalid submission ID", http.StatusBadRequest)
+		return
+	}
+
+	session := db.NewGameSessionDataModel()
+	session.SetId(sessionId)
+	err = session.GetById()
+	if err == sql.ErrNoRows {
+		http.Error(w, "Session not found", http.StatusNotFound)
+		return
+	} else if err != nil {
+		http.Error(w, "Failed to get session", http.StatusInternalServerError)
+		return
+	}
+
+	err = session.DeleteSubmission(submissionId, user.GetId())
+	if err != nil {
+		http.Error(w, "Failed to delete submission", http.StatusInternalServerError)
+		return
+	}
+
+	err = session.Update()
+	if err != nil {
+		http.Error(w, "Failed to delete submission", http.StatusInternalServerError)
+		return
+	}
+
+	templateModel := templates.NewSessionTemplateModel(*session, *user)
+	templates.DeleteSubmission(templateModel).Render(r.Context(), w)
 }
 
 func appProfileHandler(w http.ResponseWriter, r *http.Request) {
@@ -124,9 +245,10 @@ func registerAppMux(parentMux *http.ServeMux) {
 	appMux.Handle("GET /", http.HandlerFunc(appLandingHandler))
 
 	appMux.Handle("POST /session", http.HandlerFunc(createAppSessionHandler))
-	appMux.Handle("GET /session/{id}", http.HandlerFunc(appSessionHandler))
-
-	appMux.Handle("POST /spotify-search", handlerFuncWithMiddleware(appSpotifySearchHandler, withSpotify))
+	appMux.Handle("GET /session/{sessionId}", http.HandlerFunc(appSessionHandler))
+	appMux.Handle("POST /session/{sessionId}/tracks", handlerFuncWithMiddleware(appSessionTracksSearchHandler, withSpotify))
+	appMux.Handle("POST /session/{sessionId}/submission", handlerFuncWithMiddleware(appSessionSubmissionHandler))
+	appMux.Handle("DELETE /session/{sessionId}/submission/{submissionId}", handlerFuncWithMiddleware(appSessionDeleteSubmissionHandler))
 
 	appMux.Handle("GET /profile", handlerFuncWithMiddleware(appProfileHandler, withSpotify))
 

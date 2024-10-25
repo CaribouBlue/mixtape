@@ -38,6 +38,17 @@ type GetSearchResultRequestOptions struct {
 	includeExternal includeExternalType
 }
 
+type SearchResultArtist struct {
+	ExternalUrls struct {
+		Spotify string `json:"spotify"`
+	} `json:"external_urls"`
+	Href string `json:"href"`
+	Id   string `json:"id"`
+	Name string `json:"name"`
+	Type string `json:"type"`
+	Uri  string `json:"uri"`
+}
+
 type SearchResult struct {
 	Tracks struct {
 		Href     string `json:"href"`
@@ -80,20 +91,11 @@ type SearchResult struct {
 					Uri  string `json:"uri"`
 				} `json:"artists"`
 			} `json:"album"`
-			Artists []struct {
-				ExternalUrls struct {
-					Spotify string `json:"spotify"`
-				} `json:"external_urls"`
-				Href string `json:"href"`
-				Id   string `json:"id"`
-				Name string `json:"name"`
-				Type string `json:"type"`
-				Uri  string `json:"uri"`
-			} `json:"artists"`
-			AvailableMarkets []string `json:"available_markets"`
-			DiscNumber       int      `json:"disc_number"`
-			DurationMs       int      `json:"duration_ms"`
-			Explicit         bool     `json:"explicit"`
+			Artists          []SearchResultArtist `json:"artists"`
+			AvailableMarkets []string             `json:"available_markets"`
+			DiscNumber       int                  `json:"disc_number"`
+			DurationMs       int                  `json:"duration_ms"`
+			Explicit         bool                 `json:"explicit"`
 			ExternalIds      struct {
 				Isrc string `json:"isrc"`
 				Ean  string `json:"ean"`
