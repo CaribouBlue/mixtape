@@ -50,7 +50,7 @@ templ Session(model SessionTemplateModel) {
 		<h2>Your Submissions</h2>
 		<ul id="submission-list">
 			for _, submission := range model.Submissions() {
-				@SubmissionListItem(model, submission.Id)
+				@LazyLoadSubmissionListItem(model, submission)
 			}
 		</ul>
 		<div id="submission-adder">
@@ -59,14 +59,25 @@ templ Session(model SessionTemplateModel) {
 	}
 }
 
-templ SubmissionListItem(model SessionTemplateModel, submissionId string) {
+templ LazyLoadSubmissionListItem(model SessionTemplateModel, submission db.SubmissionDataModel) {
+	<div
+		hx-get={ fmt.Sprintf("/app/session/%d/submission/%s", model.Session.Id, submission.Id) }
+		hx-trigger="load"
+		hx-swap="outerHTML"
+	></div>
+}
+
+templ SubmissionListItem(model SessionTemplateModel, submission db.SubmissionDataModel, track spotify.Track) {
 	<li class="flex gap-5">
 		<button
-			hx-delete={ fmt.Sprintf("/app/session/%d/submission/%s", model.Session.Id, submissionId) }
+			hx-delete={ fmt.Sprintf("/app/session/%d/submission/%s", model.Session.Id, submission.Id) }
 			hx-target="closest li"
 			hx-swap="delete"
 		>X</button>
-		<p>{ submissionId }</p>
+		<div class="flex flex-col">
+			<p>{ track.Name }</p>
+			<p class="text-slate-400">{ utils.MapJoin(track.Artists, ", ", func(artist spotify.TrackArtist) string {return artist.Name} ) }</p>
+		</div>
 	</li>
 }
 
@@ -122,11 +133,11 @@ templ SubmissionAdder(model SessionTemplateModel) {
 	}
 }
 
-templ NewSubmission(model SessionTemplateModel, submissionId string) {
+templ NewSubmission(model SessionTemplateModel, submission db.SubmissionDataModel) {
 	<ul
 		hx-swap-oob="beforeend:#submission-list"
 	>
-		@SubmissionListItem(model, submissionId)
+		@LazyLoadSubmissionListItem(model, submission)
 	</ul>
 	<div
 		id="submission-adder-header"

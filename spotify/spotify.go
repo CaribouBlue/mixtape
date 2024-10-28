@@ -102,6 +102,18 @@ func (s *SpotifyClient) SearchTracks(query string) (*SearchResult, error) {
 	})
 }
 
+func (s *SpotifyClient) GetTrack(id string) (*Track, error) {
+	accessToken, err := s.GetValidAccessToken()
+	if err != nil {
+		return nil, err
+	}
+
+	return getTrack(GetTrackRequestOptions{
+		accessToken: accessToken,
+		id:          id,
+	})
+}
+
 func NewSpotifyClient(clientId string, clientSecret string, redirectUri string, scope string) *SpotifyClient {
 	return &SpotifyClient{
 		ClientId:     clientId,

@@ -120,6 +120,20 @@ func (gameSession *GameSessionDataModel) DeleteSubmission(submissionId string, u
 	return ErrSubmissionNotFound
 }
 
+func (gameSession *GameSessionDataModel) GetSubmission(submissionId string, userId int64) (*SubmissionDataModel, error) {
+	for _, submission := range gameSession.Submissions {
+		if submission.Id == submissionId {
+			if submission.UserId != userId {
+				return nil, ErrSubmissionUpdateUnauthorized
+			}
+
+			return &submission, nil
+		}
+	}
+
+	return nil, ErrSubmissionNotFound
+}
+
 func (gameSession *GameSessionDataModel) SubmissionDaysLeft() int {
 	var daysLeft int
 	submissionDurationLeft := gameSession.SubmissionDuration - time.Since(gameSession.CreatedAt)
@@ -128,8 +142,6 @@ func (gameSession *GameSessionDataModel) SubmissionDaysLeft() int {
 	} else {
 		daysLeft = int(submissionDurationLeft.Hours() / 24)
 	}
-
-	println(daysLeft)
 
 	return daysLeft
 }
