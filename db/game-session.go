@@ -44,11 +44,14 @@ func NewVoteDataModel(userId, submissionId int64) *VoteDataModel {
 }
 
 type GameSessionDataModel struct {
-	Id             int64                 `json:"id"`
-	Submissions    []SubmissionDataModel `json:"submissions"`
-	Votes          []VoteDataModel       `json:"votes"`
-	CreatedAt      time.Time             `json:"createdAt"`
-	MaxSubmissions int                   `json:"maxSubmissions"`
+	Id                 int64                 `json:"id"`
+	Submissions        []SubmissionDataModel `json:"submissions"`
+	Votes              []VoteDataModel       `json:"votes"`
+	CreatedAt          time.Time             `json:"createdAt"`
+	MaxSubmissions     int                   `json:"maxSubmissions"`
+	StartAt            time.Time             `json:"startAt"`
+	SubmissionDuration time.Duration         `json:"submissionDuration"`
+	VoteDuration       time.Duration         `json:"voteDuration"`
 }
 
 func (gameSession *GameSessionDataModel) GetTableName() string {
@@ -117,11 +120,28 @@ func (gameSession *GameSessionDataModel) DeleteSubmission(submissionId string, u
 	return ErrSubmissionNotFound
 }
 
+func (gameSession *GameSessionDataModel) SubmissionDaysLeft() int {
+	var daysLeft int
+	submissionDurationLeft := gameSession.SubmissionDuration - time.Since(gameSession.CreatedAt)
+	if submissionDurationLeft < 0 {
+		daysLeft = 0
+	} else {
+		daysLeft = int(submissionDurationLeft.Hours() / 24)
+	}
+
+	println(daysLeft)
+
+	return daysLeft
+}
+
 func NewGameSessionDataModel() *GameSessionDataModel {
+	dayDuration := time.Hour * 24
 	return &GameSessionDataModel{
-		Submissions:    make([]SubmissionDataModel, 0),
-		Votes:          make([]VoteDataModel, 0),
-		CreatedAt:      time.Now(),
-		MaxSubmissions: 5,
+		Submissions:        make([]SubmissionDataModel, 0),
+		Votes:              make([]VoteDataModel, 0),
+		CreatedAt:          time.Now(),
+		MaxSubmissions:     5,
+		SubmissionDuration: 5 * dayDuration,
+		VoteDuration:       14 * dayDuration,
 	}
 }

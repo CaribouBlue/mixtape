@@ -46,7 +46,7 @@ templ Session(model SessionTemplateModel) {
 	@root(RootProps{Title: "About"}) {
 		<h1>Session #{ strconv.FormatInt(model.Session.Id, 10) }</h1>
 		<h2>Submit Your Shit</h2>
-		<h3>X days left</h3>
+		<h3>{ strconv.Itoa(model.Session.SubmissionDaysLeft()) } days left</h3>
 		<h2>Your Submissions</h2>
 		<ul id="submission-list">
 			for _, submission := range model.Submissions() {
