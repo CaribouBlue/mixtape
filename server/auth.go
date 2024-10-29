@@ -24,7 +24,13 @@ func authLoginHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "Failed to get user", http.StatusInternalServerError)
 	}
 
-	if user.SpotifyAccessToken.AccessToken == "" {
+	isAuthenticated, err := user.IsAuthenticated()
+	if err != nil {
+		http.Error(w, "Failed to check authentication", http.StatusInternalServerError)
+		return
+	}
+
+	if !isAuthenticated {
 		http.Redirect(w, r, "/auth/spotify", http.StatusFound)
 		return
 	} else {

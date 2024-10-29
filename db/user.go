@@ -4,6 +4,8 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
+	"os"
+	"strings"
 
 	"github.com/CaribouBlue/top-spot/spotify"
 )
@@ -57,6 +59,12 @@ func (user *UserDataModel) IsAuthenticated() (bool, error) {
 
 	if user.SpotifyAccessToken.AccessToken == "" {
 		return false, nil
+	}
+
+	for _, scope := range strings.Split(os.Getenv("SPOTIFY_SCOPE"), " ") {
+		if !strings.Contains(user.SpotifyAccessToken.Scope, scope) {
+			return false, nil
+		}
 	}
 
 	return true, nil
