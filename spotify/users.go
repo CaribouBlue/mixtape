@@ -25,7 +25,7 @@ type UserProfile struct {
 		Total int    `json:"total"`
 	} `json:"followers"`
 	Href   string `json:"href"`
-	ID     string `json:"id"`
+	Id     string `json:"id"`
 	Images []struct {
 		Url    string `json:"url"`
 		Height int    `json:"height"`

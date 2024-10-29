@@ -3,6 +3,7 @@ package spotify
 import (
 	"net/http"
 
+	"github.com/CaribouBlue/top-spot/utils"
 	"github.com/google/uuid"
 )
 
@@ -12,6 +13,7 @@ type SpotifyClient struct {
 	ClientSecret string
 	RedirectUri  string
 	Scope        string
+	currentUser  *UserProfile
 }
 
 func (s *SpotifyClient) GetUserAuthUrl() (string, error) {
@@ -89,6 +91,16 @@ func (s *SpotifyClient) GetCurrentUserProfile() (*UserProfile, error) {
 	})
 }
 
+func (s *SpotifyClient) CurrentUser() *UserProfile {
+	if s.currentUser == nil {
+		userProfile, err := s.GetCurrentUserProfile()
+		if err == nil {
+			s.currentUser = userProfile
+		}
+	}
+	return s.currentUser
+}
+
 func (s *SpotifyClient) SearchTracks(query string) (*SearchResult, error) {
 	accessToken, err := s.GetValidAccessToken()
 	if err != nil {
@@ -111,6 +123,36 @@ func (s *SpotifyClient) GetTrack(id string) (*Track, error) {
 	return getTrack(GetTrackRequestOptions{
 		accessToken: accessToken,
 		id:          id,
+	})
+}
+
+func (s *SpotifyClient) CreatePlaylist(name string) (*Playlist, error) {
+	accessToken, err := s.GetValidAccessToken()
+	if err != nil {
+		return nil, err
+	}
+
+	return createPlaylist(CreatePlaylistRequestOptions{
+		accessToken: accessToken,
+		userId:      s.CurrentUser().Id,
+		name:        name,
+	})
+}
+
+func (s *SpotifyClient) AddTracksToPlaylist(playlistId string, trackIds []string) error {
+	accessToken, err := s.GetValidAccessToken()
+	if err != nil {
+		return err
+	}
+
+	uris := utils.Map(trackIds, func(id string) string {
+		return "spotify:track:" + id
+	})
+
+	return addItemsToPlaylist(AddItemsToPlaylistRequestOptions{
+		accessToken: accessToken,
+		playlistId:  playlistId,
+		uris:        uris,
 	})
 }
 
