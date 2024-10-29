@@ -1,12 +1,18 @@
 package templates
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/CaribouBlue/top-spot/db"
 	"github.com/CaribouBlue/top-spot/spotify"
 	"github.com/CaribouBlue/top-spot/utils"
 	"strconv"
+)
+
+const (
+	SubmissionListId             string = "submission-list"
+	SubmissionCounterId          string = "submission-counter"
+	SubmissionSearchBarId        string = "submission-search-bar"
+	SubmissionSearchBarResultsId string = "submission-search-bar-results"
 )
 
 type SessionTemplateModel struct {
@@ -30,9 +36,8 @@ func (model SessionTemplateModel) SubmissionsLeft() int {
 	return model.Session.MaxSubmissions - len(model.Submissions())
 }
 
-func (model SessionTemplateModel) SearchResultJson() string {
-	json, _ := json.Marshal(model.SearchResult)
-	return string(json)
+func (model SessionTemplateModel) SessionId() string {
+	return strconv.FormatInt(model.Session.Id, 10)
 }
 
 func NewSessionTemplateModel(session db.GameSessionDataModel, user db.UserDataModel) SessionTemplateModel {
@@ -43,20 +48,25 @@ func NewSessionTemplateModel(session db.GameSessionDataModel, user db.UserDataMo
 }
 
 templ Session(model SessionTemplateModel) {
-	@root(RootProps{Title: "About"}) {
-		<h1>Session #{ strconv.FormatInt(model.Session.Id, 10) }</h1>
-		<h2>Submit Your Shit</h2>
-		<h3>{ strconv.Itoa(model.Session.SubmissionDaysLeft()) } days left</h3>
-		<h2>Your Submissions</h2>
-		<ul id="submission-list">
-			for _, submission := range model.Submissions() {
-				@LazyLoadSubmissionListItem(model, submission)
-			}
-		</ul>
-		<div id="submission-adder">
-			@SubmissionAdder(model)
-		</div>
+	@root(RootProps{Title: "Session " + model.SessionId()}) {
+		<h1>Session { model.SessionId() }</h1>
+		@SubmissionForm(model)
 	}
+}
+
+templ SubmissionForm(model SessionTemplateModel) {
+	<h2>Submit Your Shit</h2>
+	<h3>{ strconv.Itoa(model.Session.SubmissionDaysLeft()) } days left</h3>
+	<h2>Your Submissions</h2>
+	<ul
+		id={ SubmissionListId }
+	>
+		for _, submission := range model.Submissions() {
+			@LazyLoadSubmissionListItem(model, submission)
+		}
+	</ul>
+	@SubmissionCounter(model, "")
+	@SubmissionSearchBar(model, "")
 }
 
 templ LazyLoadSubmissionListItem(model SessionTemplateModel, submission db.SubmissionDataModel) {
@@ -81,27 +91,11 @@ templ SubmissionListItem(model SessionTemplateModel, submission db.SubmissionDat
 	</li>
 }
 
-templ SubmissionSearchResults(model SessionTemplateModel) {
-	for _, track := range  model.SearchResult.Tracks.Items {
-		<div class="flex gap-5">
-			<button
-				hx-post={ fmt.Sprintf("/app/session/%d/submission", model.Session.Id) }
-				hx-vals={ fmt.Sprintf(`{
-					"trackId": "%s"
-				}`, track.Id) }
-				hx-target="closest div"
-				hx-swap="delete"
-			>Add</button>
-			<div class="flex flex-col">
-				<p>{ track.Name }</p>
-				<p class="text-slate-400">{ utils.MapJoin(track.Artists, ", ", func(artist spotify.SearchResultArtist) string {return artist.Name} ) }</p>
-			</div>
-		</div>
-	}
-}
-
-templ SubmissionAdderHeader(model SessionTemplateModel) {
-	<h2 id="submission-adder-header">
+templ SubmissionCounter(model SessionTemplateModel, swapOob string) {
+	<h2
+		id={ SubmissionCounterId }
+		hx-swap-oob={ swapOob }
+	>
 		if model.SubmissionsLeft() > 0 {
 			{ strconv.Itoa(model.SubmissionsLeft()) } submissions left
 		} else {
@@ -110,44 +104,55 @@ templ SubmissionAdderHeader(model SessionTemplateModel) {
 	</h2>
 }
 
-templ SubmissionAdder(model SessionTemplateModel) {
-	@SubmissionAdderHeader(model)
-	if model.SubmissionsLeft() > 0 {
-		<div id="submission-search">
+templ SubmissionSearchBar(model SessionTemplateModel, swapOob string) {
+	<div
+		id={ SubmissionSearchBarId }
+		hx-swap-oob={ swapOob }
+	>
+		if model.SubmissionsLeft() > 0 {
 			<input
+				hx-post={ fmt.Sprintf("/app/session/%d/tracks", model.Session.Id) }
+				hx-trigger="input changed delay:500ms, search"
+				hx-target={ fmt.Sprintf("#%s", SubmissionSearchBarResultsId) }
+				hx-select={ "#" + SubmissionSearchBarResultsId }
+				hx-swap="outerHTML"
 				type="search"
 				name="query"
 				placeholder="Begin Typing To Search Tracks..."
-				value={ model.SearchQuery }
-				hx-post={ fmt.Sprintf("/app/session/%d/tracks", model.Session.Id) }
-				hx-trigger="input changed delay:500ms, search"
-				hx-target="#submission-search-results"
 				class="w-full p-2"
 			/>
-			<div id="submission-search-results">
-				if model.SearchResult.Tracks.Total != 0 {
-					@SubmissionSearchResults(model)
+			<div
+				id={ SubmissionSearchBarResultsId }
+			>
+				for _, track := range  model.SearchResult.Tracks.Items {
+					<div class="flex gap-5">
+						<button
+							hx-post={ fmt.Sprintf("/app/session/%d/submission", model.Session.Id) }
+							hx-vals={ fmt.Sprintf(`{"trackId": "%s"}`, track.Id) }
+							hx-target="closest div"
+							hx-swap="delete"
+						>Add</button>
+						<div class="flex flex-col">
+							<p>{ track.Name }</p>
+							<p class="text-slate-400">{ utils.MapJoin(track.Artists, ", ", func(artist spotify.SearchResultArtist) string {return artist.Name} ) }</p>
+						</div>
+					</div>
 				}
 			</div>
-		</div>
-	}
+		}
+	</div>
 }
 
 templ NewSubmission(model SessionTemplateModel, submission db.SubmissionDataModel) {
 	<ul
-		hx-swap-oob="beforeend:#submission-list"
+		hx-swap-oob={ fmt.Sprintf("beforeend:#%s", SubmissionListId) }
 	>
 		@LazyLoadSubmissionListItem(model, submission)
 	</ul>
-	<div
-		id="submission-adder-header"
-		hx-swap-oob="true"
-	>
-		@SubmissionAdderHeader(model)
-	</div>
+	@SubmissionCounter(model, "true")
 	if model.SubmissionsLeft() <= 0 {
 		<div
-			id="submission-search"
+			id={ SubmissionSearchBarId }
 			hx-swap-oob="true"
 		></div>
 	}
@@ -155,18 +160,7 @@ templ NewSubmission(model SessionTemplateModel, submission db.SubmissionDataMode
 
 templ DeleteSubmission(model SessionTemplateModel) {
 	if model.SubmissionsLeft() == 1 {
-		<div
-			id="submission-adder"
-			hx-swap-oob="true"
-		>
-			@SubmissionAdder(model)
-		</div>
-	} else {
-		<div
-			id="submission-adder-header"
-			hx-swap-oob="true"
-		>
-			@SubmissionAdderHeader(model)
-		</div>
+		@SubmissionSearchBar(model, "true")
 	}
+	@SubmissionCounter(model, "true")
 }

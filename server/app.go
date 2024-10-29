@@ -121,7 +121,7 @@ func appSessionTracksSearchHandler(w http.ResponseWriter, r *http.Request) {
 		templateModel.SearchResult = *searchResults
 	}
 
-	templates.SubmissionSearchResults(templateModel).Render(r.Context(), w)
+	templates.SubmissionSearchBar(templateModel, "").Render(r.Context(), w)
 }
 
 func appSessionSubmissionHandler(w http.ResponseWriter, r *http.Request) {
