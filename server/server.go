@@ -8,11 +8,7 @@ import (
 
 func StartServer() {
 	rootMux := http.NewServeMux()
-
-	// /auth
 	registerAuthMux(rootMux)
-
-	// /app
 	registerAppMux(rootMux)
 
 	port := os.Getenv("PORT")
@@ -20,8 +16,14 @@ func StartServer() {
 		port = "8080"
 	}
 	serverAddr := fmt.Sprintf("localhost:%s", port)
-	fmt.Println("Starting server at ", serverAddr)
-	if err := http.ListenAndServe(serverAddr, rootMux); err != nil {
+
+	server := &http.Server{
+		Addr:    serverAddr,
+		Handler: applyMiddleware(rootMux, withRequestLogging),
+	}
+
+	fmt.Println("Starting server at", serverAddr)
+	if err := server.ListenAndServe(); err != nil {
 		fmt.Println("Error starting server:", err)
 	}
 }

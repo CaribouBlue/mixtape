@@ -3,6 +3,7 @@ package server
 import (
 	"context"
 	"database/sql"
+	"log"
 	"net/http"
 	"os"
 	"slices"
@@ -23,6 +24,29 @@ func applyMiddleware(handler http.Handler, middlewares ...middleware) http.Handl
 
 func handlerFuncWithMiddleware(handler http.HandlerFunc, middlewares ...middleware) http.Handler {
 	return applyMiddleware(http.HandlerFunc(handler), middlewares...)
+}
+
+type WrappedWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (w *WrappedWriter) WriteHeader(statusCode int) {
+	w.statusCode = statusCode
+	w.ResponseWriter.WriteHeader(statusCode)
+}
+
+func withRequestLogging(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		wrappedWriter := &WrappedWriter{w, http.StatusOK}
+
+		path := r.URL.Path
+		method := r.Method
+
+		next.ServeHTTP(wrappedWriter, r)
+
+		log.Println(wrappedWriter.statusCode, method, path)
+	})
 }
 
 func withSpotify(next http.Handler) http.Handler {
