@@ -73,8 +73,16 @@ func appSessionHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	templateModel := templates.NewSessionTemplateModel(*session, *user)
-	templates.Session(templateModel, "").Render(r.Context(), w)
+	acceptHeader := r.Header.Get("Accept")
+	switch strings.ToLower(acceptHeader) {
+	case "application/json":
+		handleJsonResponse(w, session)
+	case "text/html":
+	default:
+		templateModel := templates.NewSessionTemplateModel(*session, *user)
+		component := templates.Session(templateModel, "")
+		handleHtmlResponse(r, w, component)
+	}
 }
 
 func appSessionTracksSearchHandler(w http.ResponseWriter, r *http.Request) {
@@ -310,6 +318,149 @@ func appSessionDeleteSubmissionHandler(w http.ResponseWriter, r *http.Request) {
 	templates.DeleteSubmission(templateModel).Render(r.Context(), w)
 }
 
+func appSessionSubmissionCandidateHandler(w http.ResponseWriter, r *http.Request) {
+	user, err := getUserFromRequestContext(r)
+	if err != nil {
+		http.Error(w, "User not found in context", http.StatusInternalServerError)
+		return
+	}
+
+	spotifyClient, err := getSpotifyClientFromRequestContext(r)
+	if err != nil {
+		http.Error(w, "Spotify not found in context", http.StatusInternalServerError)
+		return
+	}
+
+	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid session ID", http.StatusBadRequest)
+		return
+	}
+
+	submissionId := r.PathValue("submissionId")
+	if submissionId == "" {
+		http.Error(w, "Invalid submission ID", http.StatusBadRequest)
+		return
+	}
+
+	session := db.NewGameSessionDataModel()
+	session.SetId(sessionId)
+	err = session.GetById()
+	if err == sql.ErrNoRows {
+		http.Error(w, "Session not found", http.StatusNotFound)
+		return
+	} else if err != nil {
+		http.Error(w, "Failed to get session", http.StatusInternalServerError)
+		return
+	}
+
+	submission, err := session.GetSubmission(submissionId, user.GetId())
+	if err != nil {
+		http.Error(w, "Failed to get submission", http.StatusInternalServerError)
+		return
+	}
+
+	track, err := spotifyClient.GetTrack(submission.TrackId)
+	if err != nil {
+		http.Error(w, "Failed to get track", http.StatusInternalServerError)
+		return
+	}
+
+	templateModel := templates.NewSessionTemplateModel(*session, *user)
+	templates.VoteListCandidate(templateModel, *submission, *track).Render(r.Context(), w)
+}
+
+func appSessionVoteHandler(w http.ResponseWriter, r *http.Request) {
+	user, err := getUserFromRequestContext(r)
+	if err != nil {
+		http.Error(w, "User not found in context", http.StatusInternalServerError)
+		return
+	}
+
+	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid session ID", http.StatusBadRequest)
+		return
+	}
+
+	session := db.NewGameSessionDataModel()
+	session.SetId(sessionId)
+	err = session.GetById()
+	if err == sql.ErrNoRows {
+		http.Error(w, "Session not found", http.StatusNotFound)
+		return
+	} else if err != nil {
+		http.Error(w, "Failed to get session", http.StatusInternalServerError)
+		return
+	}
+
+	r.ParseForm()
+	submissionId := r.Form.Get("submissionId")
+
+	session.AddVote(*db.NewVoteDataModel(user.GetId(), submissionId))
+
+	err = session.Update()
+	if err != nil {
+		http.Error(w, "Failed to add vote", http.StatusInternalServerError)
+		return
+	}
+
+	templateModel := templates.NewSessionTemplateModel(*session, *user)
+	templates.LazyLoadVoteCandidate(templateModel, submissionId).Render(r.Context(), w)
+}
+
+func appSessionDeleteVoteHandler(w http.ResponseWriter, r *http.Request) {
+	user, err := getUserFromRequestContext(r)
+	if err != nil {
+		http.Error(w, "User not found in context", http.StatusInternalServerError)
+		return
+	}
+
+	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid session ID", http.StatusBadRequest)
+		return
+	}
+
+	voteId := r.PathValue("voteId")
+	if voteId == "" {
+		http.Error(w, "Invalid vote ID", http.StatusBadRequest)
+		return
+	}
+
+	session := db.NewGameSessionDataModel()
+	session.SetId(sessionId)
+	err = session.GetById()
+	if err == sql.ErrNoRows {
+		http.Error(w, "Session not found", http.StatusNotFound)
+		return
+	} else if err != nil {
+		http.Error(w, "Failed to get session", http.StatusInternalServerError)
+		return
+	}
+
+	vote, err := session.GetVote(voteId, user.GetId())
+	if err != nil {
+		http.Error(w, "Failed to get vote", http.StatusInternalServerError)
+		return
+	}
+
+	err = session.DeleteVote(voteId, user.GetId())
+	if err != nil {
+		http.Error(w, "Failed to delete vote", http.StatusInternalServerError)
+		return
+	}
+
+	err = session.Update()
+	if err != nil {
+		http.Error(w, "Failed to delete vote", http.StatusInternalServerError)
+		return
+	}
+
+	templateModel := templates.NewSessionTemplateModel(*session, *user)
+	templates.LazyLoadVoteCandidate(templateModel, vote.SubmissionId).Render(r.Context(), w)
+}
+
 func appProfileHandler(w http.ResponseWriter, r *http.Request) {
 	spotify, err := getSpotifyClientFromRequestContext(r)
 	if err != nil {
@@ -344,7 +495,10 @@ func registerAppMux(parentMux *http.ServeMux) {
 	appMux.Handle("GET /session/{sessionId}/submission/time-left", handlerFuncWithMiddleware(appSessionTimeLeftHandler))
 	appMux.Handle("GET /session/{sessionId}/submission/{submissionId}", handlerFuncWithMiddleware(appSessionSubmissionDetailsHandler, withSpotify))
 	appMux.Handle("DELETE /session/{sessionId}/submission/{submissionId}", handlerFuncWithMiddleware(appSessionDeleteSubmissionHandler))
+	appMux.Handle("GET /session/{sessionId}/submission/{submissionId}/candidate", handlerFuncWithMiddleware(appSessionSubmissionCandidateHandler, withSpotify))
 
+	appMux.Handle("POST /session/{sessionId}/vote", handlerFuncWithMiddleware(appSessionVoteHandler))
+	appMux.Handle("DELETE /session/{sessionId}/vote/{voteId}", handlerFuncWithMiddleware(appSessionDeleteVoteHandler))
 	appMux.Handle("GET /session/{sessionId}/vote/time-left", handlerFuncWithMiddleware(appSessionTimeLeftHandler))
 
 	appMux.Handle("GET /profile", handlerFuncWithMiddleware(appProfileHandler, withSpotify))

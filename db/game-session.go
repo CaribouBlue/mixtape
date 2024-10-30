@@ -13,6 +13,9 @@ var (
 	ErrSubmissionsMaxedOut          = errors.New("user has already submitted the maximum number of submissions")
 	ErrSubmissionNotFound           = errors.New("no submission found with the given ID")
 	ErrSubmissionUpdateUnauthorized = errors.New("user is unauthorized to update submission")
+
+	ErrVoteNotFound           = errors.New("no vote found with the given ID")
+	ErrVoteUpdateUnauthorized = errors.New("user is unauthorized to update vote")
 )
 
 type SubmissionDataModel struct {
@@ -32,10 +35,10 @@ func NewSubmissionDataModel(userId int64, trackId string) *SubmissionDataModel {
 type VoteDataModel struct {
 	Id           string `json:"id"`
 	UserId       int64  `json:"userId"`
-	SubmissionId int64  `json:"submissionId"`
+	SubmissionId string `json:"submissionId"`
 }
 
-func NewVoteDataModel(userId, submissionId int64) *VoteDataModel {
+func NewVoteDataModel(userId int64, submissionId string) *VoteDataModel {
 	return &VoteDataModel{
 		Id:           uuid.New().String(),
 		UserId:       userId,
@@ -137,6 +140,39 @@ func (gameSession *GameSessionDataModel) GetSubmission(submissionId string, user
 func (gameSession *GameSessionDataModel) SubmissionDurationLeft() time.Duration {
 	durationLeft := gameSession.SubmissionDuration - time.Since(gameSession.StartAt)
 	return durationLeft
+}
+
+func (gameSession *GameSessionDataModel) AddVote(vote VoteDataModel) {
+	gameSession.Votes = append(gameSession.Votes, vote)
+}
+
+func (gameSession *GameSessionDataModel) DeleteVote(voteId string, userId int64) error {
+	for i, vote := range gameSession.Votes {
+		if vote.Id == voteId {
+			if vote.UserId != userId {
+				return ErrVoteUpdateUnauthorized
+			}
+
+			gameSession.Votes = append(gameSession.Votes[:i], gameSession.Votes[i+1:]...)
+			return nil
+		}
+	}
+
+	return ErrVoteNotFound
+}
+
+func (gameSession *GameSessionDataModel) GetVote(voteId string, userId int64) (*VoteDataModel, error) {
+	for _, vote := range gameSession.Votes {
+		if vote.Id == voteId {
+			if vote.UserId != userId {
+				return nil, ErrVoteUpdateUnauthorized
+			}
+
+			return &vote, nil
+		}
+	}
+
+	return nil, ErrVoteNotFound
 }
 
 func (gameSession *GameSessionDataModel) VoteDurationLeft() time.Duration {
