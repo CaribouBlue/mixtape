@@ -256,7 +256,7 @@ func appSessionSubmissionDetailsHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	submission, err := session.GetSubmission(submissionId, user.GetId())
+	submission, err := session.GetUserSubmission(submissionId, user.GetId())
 	if err != nil {
 		http.Error(w, "Failed to get submission", http.StatusInternalServerError)
 		return
@@ -354,7 +354,7 @@ func appSessionSubmissionCandidateHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	submission, err := session.GetSubmission(submissionId, user.GetId())
+	submission, err := session.GetSubmission(submissionId)
 	if err != nil {
 		http.Error(w, "Failed to get submission", http.StatusInternalServerError)
 		return

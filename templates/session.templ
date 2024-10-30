@@ -91,6 +91,15 @@ func (model SessionTemplateModel) GetSubmissionVoteId(submissionId string) strin
 	return ""
 }
 
+func (model SessionTemplateModel) IsUserSubmission(submissionId string) bool {
+	for _, submission := range model.Session.Submissions {
+		if submission.Id == submissionId && submission.UserId == model.User.GetId() {
+			return true
+		}
+	}
+	return false
+}
+
 func NewSessionTemplateModel(session db.GameSessionDataModel, user db.UserDataModel) SessionTemplateModel {
 	return SessionTemplateModel{
 		Session: session,
@@ -147,7 +156,11 @@ templ LazyLoadVoteCandidate(model SessionTemplateModel, submissionId string) {
 }
 
 templ VoteListCandidate(model SessionTemplateModel, submission db.SubmissionDataModel, track spotify.Track) {
-	if model.GetSubmissionVoteId(submission.Id) != "" {
+	if model.IsUserSubmission(submission.Id) {
+		<button
+			disabled
+		></button>
+	} else if model.GetSubmissionVoteId(submission.Id) != "" {
 		<button
 			hx-delete={ fmt.Sprintf("/app/session/%d/vote/%s", model.Session.Id, model.GetSubmissionVoteId(submission.Id)) }
 			hx-target="closest li"
