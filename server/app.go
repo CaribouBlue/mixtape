@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/CaribouBlue/top-spot/db"
 	"github.com/CaribouBlue/top-spot/templates"
@@ -73,7 +74,7 @@ func appSessionHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	templateModel := templates.NewSessionTemplateModel(*session, *user)
-	templates.Session(templateModel).Render(r.Context(), w)
+	templates.Session(templateModel, "").Render(r.Context(), w)
 }
 
 func appSessionTracksSearchHandler(w http.ResponseWriter, r *http.Request) {
@@ -170,6 +171,45 @@ func appSessionSubmissionHandler(w http.ResponseWriter, r *http.Request) {
 
 	templateModel := templates.NewSessionTemplateModel(*session, *user)
 	templates.NewSubmission(templateModel, *submission).Render(r.Context(), w)
+}
+
+func appSessionTimeLeftHandler(w http.ResponseWriter, r *http.Request) {
+	user, err := getUserFromRequestContext(r)
+	if err != nil {
+		http.Error(w, "User not found in context", http.StatusInternalServerError)
+		return
+	}
+
+	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid session ID", http.StatusBadRequest)
+		return
+	}
+
+	session := db.NewGameSessionDataModel()
+	session.SetId(sessionId)
+	err = session.GetById()
+	if err == sql.ErrNoRows {
+		http.Error(w, "Session not found", http.StatusNotFound)
+		return
+	} else if err != nil {
+		http.Error(w, "Failed to get session", http.StatusInternalServerError)
+		return
+	}
+
+	var phase templates.SessionPhase
+	path := r.URL.Path
+	if strings.Contains(path, "submission") {
+		phase = templates.SubmissionPhase
+	} else if strings.Contains(path, "vote") {
+		phase = templates.VotePhase
+	} else {
+		http.Error(w, "Invalid phase", http.StatusBadRequest)
+		return
+	}
+
+	templateModel := templates.NewSessionTemplateModel(*session, *user)
+	templates.SessionPhaseTimeLeft(templateModel, phase).Render(r.Context(), w)
 }
 
 func appSessionSubmissionDetailsHandler(w http.ResponseWriter, r *http.Request) {
@@ -299,9 +339,13 @@ func registerAppMux(parentMux *http.ServeMux) {
 	appMux.Handle("POST /session", http.HandlerFunc(createAppSessionHandler))
 	appMux.Handle("GET /session/{sessionId}", http.HandlerFunc(appSessionHandler))
 	appMux.Handle("POST /session/{sessionId}/tracks", handlerFuncWithMiddleware(appSessionTracksSearchHandler, withSpotify))
+
 	appMux.Handle("POST /session/{sessionId}/submission", handlerFuncWithMiddleware(appSessionSubmissionHandler))
+	appMux.Handle("GET /session/{sessionId}/submission/time-left", handlerFuncWithMiddleware(appSessionTimeLeftHandler))
 	appMux.Handle("GET /session/{sessionId}/submission/{submissionId}", handlerFuncWithMiddleware(appSessionSubmissionDetailsHandler, withSpotify))
 	appMux.Handle("DELETE /session/{sessionId}/submission/{submissionId}", handlerFuncWithMiddleware(appSessionDeleteSubmissionHandler))
+
+	appMux.Handle("GET /session/{sessionId}/vote/time-left", handlerFuncWithMiddleware(appSessionTimeLeftHandler))
 
 	appMux.Handle("GET /profile", handlerFuncWithMiddleware(appProfileHandler, withSpotify))
 

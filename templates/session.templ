@@ -6,13 +6,23 @@ import (
 	"github.com/CaribouBlue/top-spot/spotify"
 	"github.com/CaribouBlue/top-spot/utils"
 	"strconv"
+	"time"
 )
 
 const (
+	SessionDetailsId             string = "session-details"
 	SubmissionListId             string = "submission-list"
 	SubmissionCounterId          string = "submission-counter"
 	SubmissionSearchBarId        string = "submission-search-bar"
 	SubmissionSearchBarResultsId string = "submission-search-bar-results"
+)
+
+type SessionPhase string
+
+const (
+	SubmissionPhase SessionPhase = "Submission"
+	VotePhase       SessionPhase = "Vote"
+	ResultsPhase    SessionPhase = "Results"
 )
 
 type SessionTemplateModel struct {
@@ -40,6 +50,38 @@ func (model SessionTemplateModel) SessionId() string {
 	return strconv.FormatInt(model.Session.Id, 10)
 }
 
+func (model SessionTemplateModel) SessionPhase() SessionPhase {
+	if model.Session.SubmissionDurationLeft().Seconds() > 0 {
+		return SubmissionPhase
+	} else if model.Session.VoteDurationLeft().Seconds() > 0 {
+		return VotePhase
+	} else {
+		return ResultsPhase
+	}
+}
+
+func (model SessionTemplateModel) TimeLeft(phase SessionPhase) string {
+	var duration time.Duration
+	switch phase {
+	case SubmissionPhase:
+		duration = model.Session.SubmissionDurationLeft()
+	case VotePhase:
+		duration = model.Session.VoteDurationLeft()
+	default:
+		return ""
+	}
+
+	days := int(duration.Hours()) / 24
+	hours := int(duration.Hours()) % 24
+	minutes := int(duration.Minutes()) % 60
+	_ = int(duration.Seconds()) % 60
+
+	if duration.Seconds() <= 0 {
+		return ""
+	}
+	return fmt.Sprintf("%02dd %02dh %02dm", days, hours, minutes)
+}
+
 func NewSessionTemplateModel(session db.GameSessionDataModel, user db.UserDataModel) SessionTemplateModel {
 	return SessionTemplateModel{
 		Session: session,
@@ -47,16 +89,47 @@ func NewSessionTemplateModel(session db.GameSessionDataModel, user db.UserDataMo
 	}
 }
 
-templ Session(model SessionTemplateModel) {
+templ Session(model SessionTemplateModel, swapOob string) {
 	@root(RootProps{Title: "Session " + model.SessionId()}) {
-		<h1>Session { model.SessionId() }</h1>
-		@SubmissionForm(model)
+		<div
+			id={ SessionDetailsId }
+			hx-swap-oob={ swapOob }
+		>
+			<h1>Session { model.SessionId() }</h1>
+			switch model.SessionPhase() {
+				case SubmissionPhase:
+					@SubmissionForm(model)
+				case VotePhase:
+					@VoteForm(model)
+				case ResultsPhase:
+					<h2>Results</h2>
+			}
+		</div>
 	}
+}
+
+templ SessionPhaseTimeLeft(model SessionTemplateModel, phase SessionPhase) {
+	if model.TimeLeft(phase) != "" {
+		<p>{ model.TimeLeft(phase) } left</p>
+	} else {
+		@Session(model, "true")
+	}
+}
+
+templ VoteForm(model SessionTemplateModel) {
+	<h2>Vote</h2>
+	<h3
+		hx-get={ fmt.Sprintf("/app/session/%s/vote/time-left", model.SessionId()) }
+		hx-trigger="load, every 1m"
+	></h3>
 }
 
 templ SubmissionForm(model SessionTemplateModel) {
 	<h2>Submit Your Shit</h2>
-	<h3>{ strconv.Itoa(model.Session.SubmissionDaysLeft()) } days left</h3>
+	<h3
+		hx-get={ fmt.Sprintf("/app/session/%s/submission/time-left", model.SessionId()) }
+		hx-trigger="load, every 1m"
+	></h3>
 	<h2>Your Submissions</h2>
 	<ul
 		id={ SubmissionListId }

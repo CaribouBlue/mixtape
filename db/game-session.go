@@ -134,16 +134,14 @@ func (gameSession *GameSessionDataModel) GetSubmission(submissionId string, user
 	return nil, ErrSubmissionNotFound
 }
 
-func (gameSession *GameSessionDataModel) SubmissionDaysLeft() int {
-	var daysLeft int
-	submissionDurationLeft := gameSession.SubmissionDuration - time.Since(gameSession.CreatedAt)
-	if submissionDurationLeft < 0 {
-		daysLeft = 0
-	} else {
-		daysLeft = int(submissionDurationLeft.Hours() / 24)
-	}
+func (gameSession *GameSessionDataModel) SubmissionDurationLeft() time.Duration {
+	durationLeft := gameSession.SubmissionDuration - time.Since(gameSession.StartAt)
+	return durationLeft
+}
 
-	return daysLeft
+func (gameSession *GameSessionDataModel) VoteDurationLeft() time.Duration {
+	durationLeft := gameSession.VoteDuration - time.Since(gameSession.StartAt.Add(gameSession.SubmissionDuration))
+	return durationLeft
 }
 
 func NewGameSessionDataModel() *GameSessionDataModel {
@@ -152,6 +150,7 @@ func NewGameSessionDataModel() *GameSessionDataModel {
 		Submissions:        make([]SubmissionDataModel, 0),
 		Votes:              make([]VoteDataModel, 0),
 		CreatedAt:          time.Now(),
+		StartAt:            time.Now(),
 		MaxSubmissions:     5,
 		SubmissionDuration: 5 * dayDuration,
 		VoteDuration:       14 * dayDuration,
