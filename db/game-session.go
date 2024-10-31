@@ -4,6 +4,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -48,6 +49,7 @@ func NewVoteDataModel(userId int64, submissionId string) *VoteDataModel {
 
 type GameSessionDataModel struct {
 	Id                 int64                 `json:"id"`
+	Name               string                `json:"name"`
 	Submissions        []SubmissionDataModel `json:"submissions"`
 	Votes              []VoteDataModel       `json:"votes"`
 	CreatedAt          time.Time             `json:"createdAt"`
@@ -187,6 +189,10 @@ func (gameSession *GameSessionDataModel) GetVote(voteId string, userId int64) (*
 func (gameSession *GameSessionDataModel) VoteDurationLeft() time.Duration {
 	durationLeft := gameSession.VoteDuration - time.Since(gameSession.StartAt.Add(gameSession.SubmissionDuration))
 	return durationLeft
+}
+
+func (gameSession *GameSessionDataModel) PlaylistName() string {
+	return fmt.Sprintf("%s %s", gameSession.Name, gameSession.StartAt.Format("2006-01-02"))
 }
 
 func NewGameSessionDataModel() *GameSessionDataModel {

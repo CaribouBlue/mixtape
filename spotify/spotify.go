@@ -156,6 +156,30 @@ func (s *SpotifyClient) AddTracksToPlaylist(playlistId string, trackIds []string
 	})
 }
 
+func (s *SpotifyClient) GetPlaylist(playlistId string) (*Playlist, error) {
+	accessToken, err := s.GetValidAccessToken()
+	if err != nil {
+		return nil, err
+	}
+
+	return getPlaylist(GetPlaylistRequestOptions{
+		accessToken: accessToken,
+		playlistId:  playlistId,
+	})
+}
+
+func (s *SpotifyClient) UnfollowPlaylist(playlistId string) error {
+	accessToken, err := s.GetValidAccessToken()
+	if err != nil {
+		return err
+	}
+
+	return unfollowPlaylist(UnfollowPlaylistRequestOptions{
+		accessToken: accessToken,
+		playlistId:  playlistId,
+	})
+}
+
 func NewSpotifyClient(clientId string, clientSecret string, redirectUri string, scope string) *SpotifyClient {
 	return &SpotifyClient{
 		ClientId:     clientId,

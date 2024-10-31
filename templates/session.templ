@@ -140,11 +140,37 @@ templ VoteForm(model SessionTemplateModel) {
 		hx-get={ fmt.Sprintf("/app/session/%s/vote/time-left", model.SessionId()) }
 		hx-trigger="load, every 1m"
 	></h3>
+	@LazyLoadVotePlaylistButton(model)
 	<ul>
 		for _, submission := range model.Session.Submissions {
 			@LazyLoadVoteCandidate(model, submission.Id)
 		}
 	</ul>
+}
+
+templ LazyLoadVotePlaylistButton(model SessionTemplateModel) {
+	<div
+		hx-get={ fmt.Sprintf("/app/session/%d/playlist", model.Session.Id) }
+		hx-trigger="load"
+		hx-swap="outerHTML"
+	></div>
+}
+
+templ VotePlaylistButton(model SessionTemplateModel, playlistUrl string) {
+	if playlistUrl != "" {
+		<a
+			href={ templ.SafeURL(playlistUrl) }
+			target="_blank"
+		>
+			Open Playlist
+		</a>
+	} else {
+		<button
+			hx-post={ fmt.Sprintf("/app/session/%d/playlist", model.Session.Id) }
+		>
+			Create Playlist
+		</button>
+	}
 }
 
 templ LazyLoadVoteCandidate(model SessionTemplateModel, submissionId string) {

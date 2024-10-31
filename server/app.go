@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/CaribouBlue/top-spot/db"
+	"github.com/CaribouBlue/top-spot/spotify"
 	"github.com/CaribouBlue/top-spot/templates"
 )
 
@@ -131,6 +132,122 @@ func appSessionTracksSearchHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	templates.SubmissionSearchBar(templateModel, "").Render(r.Context(), w)
+}
+
+func appSessionCreatePlaylistHandler(w http.ResponseWriter, r *http.Request) {
+	user, err := getUserFromRequestContext(r)
+	if err != nil {
+		http.Error(w, "User not found in context", http.StatusInternalServerError)
+		return
+	}
+
+	spotifyClient, err := getSpotifyClientFromRequestContext(r)
+	if err != nil {
+		http.Error(w, "Spotify not found in context", http.StatusInternalServerError)
+		return
+	}
+
+	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid session ID", http.StatusBadRequest)
+		return
+	}
+
+	session := db.NewGameSessionDataModel()
+	session.SetId(sessionId)
+	err = session.GetById()
+	if err == sql.ErrNoRows {
+		http.Error(w, "Session not found", http.StatusNotFound)
+		return
+	} else if err != nil {
+		http.Error(w, "Failed to get session", http.StatusInternalServerError)
+		return
+	}
+
+	playlist, err := spotifyClient.CreatePlaylist(session.PlaylistName())
+	if err != nil {
+		fmt.Printf("%s\n", err)
+		http.Error(w, "Failed to create playlist", http.StatusInternalServerError)
+		return
+	}
+
+	trackIds := make([]string, len(session.Submissions))
+	for i, submission := range session.Submissions {
+		trackIds[i] = submission.TrackId
+	}
+	err = spotifyClient.AddTracksToPlaylist(playlist.Id, trackIds)
+	if err != nil {
+		spotifyClient.UnfollowPlaylist(playlist.Id)
+		http.Error(w, "Failed to add tracks to playlist", http.StatusInternalServerError)
+		return
+	}
+
+	err = user.AddPlaylist(playlist.Id, session.Id)
+	if err != nil {
+		spotifyClient.UnfollowPlaylist(playlist.Id)
+		http.Error(w, "Failed to add playlist to user", http.StatusInternalServerError)
+		return
+	}
+
+	err = user.Update()
+	if err != nil {
+		spotifyClient.UnfollowPlaylist(playlist.Id)
+		http.Error(w, "Failed to update user", http.StatusInternalServerError)
+		return
+	}
+
+	templateModel := templates.NewSessionTemplateModel(*session, db.UserDataModel{})
+	handleHtmlResponse(r, w, templates.VotePlaylistButton(templateModel, playlist.ExternalUrls.Spotify))
+}
+
+func appSessionPlaylistHandler(w http.ResponseWriter, r *http.Request) {
+	user, err := getUserFromRequestContext(r)
+	if err != nil {
+		http.Error(w, "User not found in context", http.StatusInternalServerError)
+		return
+	}
+
+	spotifyClient, err := getSpotifyClientFromRequestContext(r)
+	if err != nil {
+		http.Error(w, "Spotify not found in context", http.StatusInternalServerError)
+		return
+	}
+
+	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid session ID", http.StatusBadRequest)
+		return
+	}
+
+	session := db.NewGameSessionDataModel()
+	session.SetId(sessionId)
+	err = session.GetById()
+	if err == sql.ErrNoRows {
+		http.Error(w, "Session not found", http.StatusNotFound)
+		return
+	} else if err != nil {
+		http.Error(w, "Failed to get session", http.StatusInternalServerError)
+		return
+	}
+
+	var playlist *spotify.Playlist
+	userPlaylist, err := user.GetPlaylistBySessionId(session.Id)
+	if err == db.ErrUserPlaylistNotFound {
+		playlist = &spotify.Playlist{}
+	} else if err != nil {
+		http.Error(w, "Failed to get playlist", http.StatusInternalServerError)
+		return
+	} else {
+		playlist, err = spotifyClient.GetPlaylist(userPlaylist.Id)
+		if err != nil {
+			http.Error(w, "Failed to get playlist", http.StatusInternalServerError)
+			return
+		}
+	}
+
+	templateModel := templates.NewSessionTemplateModel(*session, db.UserDataModel{})
+	templates.VotePlaylistButton(templateModel, playlist.Uri)
+	handleHtmlResponse(r, w, templates.VotePlaylistButton(templateModel, playlist.ExternalUrls.Spotify))
 }
 
 func appSessionSubmissionHandler(w http.ResponseWriter, r *http.Request) {
@@ -490,6 +607,8 @@ func registerAppMux(parentMux *http.ServeMux) {
 	appMux.Handle("POST /session", http.HandlerFunc(createAppSessionHandler))
 	appMux.Handle("GET /session/{sessionId}", http.HandlerFunc(appSessionHandler))
 	appMux.Handle("POST /session/{sessionId}/tracks", handlerFuncWithMiddleware(appSessionTracksSearchHandler, withSpotify))
+	appMux.Handle("POST /session/{sessionId}/playlist", handlerFuncWithMiddleware(appSessionCreatePlaylistHandler, withSpotify))
+	appMux.Handle("GET /session/{sessionId}/playlist", handlerFuncWithMiddleware(appSessionPlaylistHandler, withSpotify))
 
 	appMux.Handle("POST /session/{sessionId}/submission", handlerFuncWithMiddleware(appSessionSubmissionHandler))
 	appMux.Handle("GET /session/{sessionId}/submission/time-left", handlerFuncWithMiddleware(appSessionTimeLeftHandler))

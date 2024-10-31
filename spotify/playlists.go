@@ -189,8 +189,8 @@ func createPlaylist(opts CreatePlaylistRequestOptions) (*Playlist, error) {
 		return &playlist, err
 	}
 
-	if resp.StatusCode != http.StatusOK {
-		return &playlist, fmt.Errorf("failed to search Spotify")
+	if resp.StatusCode != http.StatusCreated {
+		return &playlist, fmt.Errorf("failed to create playlist")
 	}
 
 	defer resp.Body.Close()
@@ -248,8 +248,81 @@ func addItemsToPlaylist(opts AddItemsToPlaylistRequestOptions) error {
 		return err
 	}
 
-	if resp.StatusCode != http.StatusOK {
+	if resp.StatusCode != http.StatusCreated {
 		return fmt.Errorf("failed to add items to playlist")
+	}
+
+	return nil
+}
+
+type GetPlaylistRequestOptions struct {
+	accessToken AccessToken
+	playlistId  string
+}
+
+func getPlaylist(opts GetPlaylistRequestOptions) (*Playlist, error) {
+	var playlist Playlist
+
+	if opts.playlistId == "" {
+		return &playlist, errors.New("playlist ID is required")
+	}
+
+	req, err := newRequest(SpotifyRequestOptions{
+		method:      "GET",
+		path:        fmt.Sprintf("/playlists/%s", opts.playlistId),
+		accessToken: opts.accessToken,
+	})
+
+	if err != nil {
+		return &playlist, err
+	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return &playlist, err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return &playlist, fmt.Errorf("failed to get playlist")
+	}
+
+	defer resp.Body.Close()
+	err = json.NewDecoder(resp.Body).Decode(&playlist)
+	if err != nil {
+		return &playlist, err
+	}
+
+	return &playlist, nil
+}
+
+type UnfollowPlaylistRequestOptions struct {
+	accessToken AccessToken
+	playlistId  string
+}
+
+func unfollowPlaylist(opts UnfollowPlaylistRequestOptions) error {
+	if opts.playlistId == "" {
+		return errors.New("playlist ID is required")
+	}
+
+	req, err := newRequest(SpotifyRequestOptions{
+		method:      "DELETE",
+		path:        fmt.Sprintf("/playlists/%s/followers", opts.playlistId),
+		accessToken: opts.accessToken,
+	})
+	if err != nil {
+		return err
+	}
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("failed to unfollow playlist")
 	}
 
 	return nil

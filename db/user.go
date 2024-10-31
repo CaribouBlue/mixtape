@@ -4,15 +4,27 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
+	"errors"
 	"os"
 	"strings"
 
 	"github.com/CaribouBlue/top-spot/spotify"
 )
 
+var (
+	ErrUserPlaylistNotFound = errors.New("no playlist found with the given ID")
+	ErrUserPlaylistExists   = errors.New("playlist already exists")
+)
+
+type UserPlaylist struct {
+	Id        string `json:"id"`
+	SessionId int64  `json:"sessionId"`
+}
+
 type UserDataModel struct {
 	Id                 int64               `json:"id"`
 	SpotifyAccessToken spotify.AccessToken `json:"spotifyAccessToken"`
+	Playlists          []UserPlaylist      `json:"playlists"`
 }
 
 func (user *UserDataModel) GetTableName() string {
@@ -68,6 +80,38 @@ func (user *UserDataModel) IsAuthenticated() (bool, error) {
 	}
 
 	return true, nil
+}
+
+func (user *UserDataModel) GetPlaylist(playlistId string) (UserPlaylist, error) {
+	for _, playlist := range user.Playlists {
+		if playlist.Id == playlistId {
+			return playlist, nil
+		}
+	}
+
+	return UserPlaylist{}, ErrUserPlaylistNotFound
+}
+
+func (user *UserDataModel) GetPlaylistBySessionId(sessionId int64) (UserPlaylist, error) {
+	for _, playlist := range user.Playlists {
+		if playlist.SessionId == sessionId {
+			return playlist, nil
+		}
+	}
+
+	return UserPlaylist{}, ErrUserPlaylistNotFound
+}
+
+func (user *UserDataModel) AddPlaylist(playlistId string, sessionId int64) error {
+	_, err := user.GetPlaylist(playlistId)
+	if err == nil {
+		return ErrUserPlaylistExists
+	} else if err != ErrUserPlaylistNotFound {
+		return err
+	}
+
+	user.Playlists = append(user.Playlists, UserPlaylist{Id: playlistId, SessionId: sessionId})
+	return nil
 }
 
 func NewUserDataModel() *UserDataModel {
