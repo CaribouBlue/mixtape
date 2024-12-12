@@ -11,6 +11,8 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+const DbName = "top-spot.db"
+
 var _db *sql.DB
 
 func initDb() {
@@ -19,7 +21,7 @@ func initDb() {
 		log.Fatal(err)
 	}
 
-	dbPath := path.Join(appDataDir, "top-spot.db")
+	dbPath := path.Join(appDataDir, DbName)
 	_db, err = sql.Open("sqlite3", dbPath)
 	if err != nil {
 		log.Fatal(err)
@@ -33,7 +35,7 @@ func initDb() {
 	createJsonDataModelTable(NewGameSessionDataModel())
 }
 
-func getDb() *sql.DB {
+func GetDb() *sql.DB {
 	if _db == nil {
 		initDb()
 	}
@@ -54,12 +56,12 @@ func createJsonDataModelTable(model JsonDataModel) error {
 		data jsonb
 	);`, model.GetTableName())
 
-	_, err := getDb().Exec(query)
+	_, err := GetDb().Exec(query)
 	return err
 }
 
 func insertJsonDataModel(model JsonDataModel) (JsonDataModel, error) {
-	stmt, err := getDb().Prepare(fmt.Sprintf("insert into %s(data) values(?)", model.GetTableName()))
+	stmt, err := GetDb().Prepare(fmt.Sprintf("insert into %s(data) values(?)", model.GetTableName()))
 	if err != nil {
 		return model, err
 	}
@@ -86,7 +88,7 @@ func insertJsonDataModel(model JsonDataModel) (JsonDataModel, error) {
 }
 
 func updateJsonDataModel(model JsonDataModel) error {
-	stmt, err := getDb().Prepare(fmt.Sprintf("update %s set data = ? where data->>'id' = ?", model.GetTableName()))
+	stmt, err := GetDb().Prepare(fmt.Sprintf("update %s set data = ? where data->>'id' = ?", model.GetTableName()))
 	if err != nil {
 		return err
 	}
@@ -107,7 +109,7 @@ func updateJsonDataModel(model JsonDataModel) error {
 func getJsonDataModelById(model JsonDataModel) (JsonDataModel, error) {
 	var data string
 	query := fmt.Sprintf("select data from %s where data->>'id' = %d", model.GetTableName(), model.GetId())
-	err := getDb().QueryRow(query).Scan(&data)
+	err := GetDb().QueryRow(query).Scan(&data)
 	if err != nil {
 		return model, err
 	}
