@@ -13,82 +13,128 @@ import (
 
 const DbName = "top-spot.db"
 
-var _db *sql.DB
-
-func initDb() {
-	appDataDir, err := appdata.GetAppDataDir()
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	dbPath := path.Join(appDataDir, DbName)
-	_db, err = sql.Open("sqlite3", dbPath)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	if err = _db.Ping(); err != nil {
-		log.Fatal(err)
-	}
-
-	createJsonDataModelTable(NewUserDataModel())
-	createJsonDataModelTable(NewGameSessionDataModel())
-}
-
-func GetDb() *sql.DB {
-	if _db == nil {
-		initDb()
-	}
-	return _db
-}
-
-type JsonDataModel interface {
+type Model interface {
+	Name() string
+	Id() int64
 	Scan(value interface{}) error
 	Value() (driver.Value, error)
-	GetTableName() string
-	SetId(id int64)
-	GetId() int64
 }
 
-func createJsonDataModelTable(model JsonDataModel) error {
+type Db interface {
+	Close() error
+	NewCollection(Model) error
+	CreateRecord(Model) error
+	UpdateRecord(Model) error
+	DeleteRecord(Model) error
+	ReadRecord(Model) error
+	ReadRecords(Model) ([]interface{}, error)
+}
+
+type SqliteJsonDb struct {
+	name string
+	db   *sql.DB
+}
+
+func NewSqliteJsonDb(name string) *SqliteJsonDb {
+	sqlite := &SqliteJsonDb{
+		name: name,
+	}
+	sqlite.Db()
+	return sqlite
+}
+
+func (sqlite *SqliteJsonDb) Db() *sql.DB {
+	if sqlite.db == nil {
+		appDataDir, err := appdata.GetAppDataDir()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		dbPath := path.Join(appDataDir, sqlite.name)
+		sqlite.db, err = sql.Open("sqlite3", dbPath)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		if err = sqlite.db.Ping(); err != nil {
+			log.Fatal(err)
+		}
+	}
+	return sqlite.db
+}
+
+func (sqlite *SqliteJsonDb) Close() error {
+	return sqlite.Db().Close()
+}
+
+func (sqlite *SqliteJsonDb) NewCollection(model Model) error {
 	query := fmt.Sprintf(`
 	CREATE TABLE IF NOT EXISTS %s (
 		data jsonb
-	);`, model.GetTableName())
+	);`, model.Name())
 
-	_, err := GetDb().Exec(query)
+	_, err := sqlite.Db().Exec(query)
 	return err
 }
 
-func insertJsonDataModel(model JsonDataModel) (JsonDataModel, error) {
-	stmt, err := GetDb().Prepare(fmt.Sprintf("insert into %s(data) values(?)", model.GetTableName()))
+func (sqlite *SqliteJsonDb) CreateRecord(model Model) error {
+	stmt, err := sqlite.Db().Prepare(fmt.Sprintf("insert into %s(data) values(?)", model.Name()))
 	if err != nil {
-		return model, err
+		return err
 	}
 
 	value, err := model.Value()
 	if err != nil {
-		return model, err
+		return err
 	}
 
 	defer stmt.Close()
 	_, err = stmt.Exec(value)
 	if err != nil {
-		return model, err
+		return err
 	}
 
-	// id, err := result.LastInsertId()
-	// if err != nil {
-	// 	return model, err
-	// }
-
-	// model.SetId(id)
-
-	return model, nil
+	return nil
 }
 
-func updateJsonDataModel(model JsonDataModel) error {
-	stmt, err := GetDb().Prepare(fmt.Sprintf("update %s set data = ? where data->>'id' = ?", model.GetTableName()))
+func (sqlite *SqliteJsonDb) ReadRecords(model Model) ([]interface{}, error) {
+	var records []interface{} = make([]interface{}, 0)
+
+	query := fmt.Sprintf("select data from %s", model.Name())
+	rows, err := sqlite.Db().Query(query)
+	if err != nil {
+		return records, err
+	}
+
+	defer rows.Close()
+
+	var data string
+	for rows.Next() {
+		err = rows.Scan(&data)
+		if err != nil {
+			return records, err
+		}
+
+		records = append(records, data)
+	}
+
+	return records, nil
+}
+
+func (sqlite *SqliteJsonDb) ReadRecord(model Model) error {
+	var data string
+	query := fmt.Sprintf("select data from %s where data->>'id' = %d", model.Name(), model.Id())
+	err := sqlite.Db().QueryRow(query).Scan(&data)
+	if err != nil {
+		return err
+	}
+
+	err = model.Scan(data)
+	return err
+}
+
+func (sqlite *SqliteJsonDb) UpdateRecord(model Model) error {
+	stmt, err := sqlite.Db().Prepare(fmt.Sprintf("update %s set data = ? where data->>'id' = ?", model.Name()))
 	if err != nil {
 		return err
 	}
@@ -98,7 +144,7 @@ func updateJsonDataModel(model JsonDataModel) error {
 	}
 
 	defer stmt.Close()
-	_, err = stmt.Exec(userValue, model.GetId())
+	_, err = stmt.Exec(userValue, model.Id())
 	if err != nil {
 		return err
 	}
@@ -106,14 +152,6 @@ func updateJsonDataModel(model JsonDataModel) error {
 	return nil
 }
 
-func getJsonDataModelById(model JsonDataModel) (JsonDataModel, error) {
-	var data string
-	query := fmt.Sprintf("select data from %s where data->>'id' = %d", model.GetTableName(), model.GetId())
-	err := GetDb().QueryRow(query).Scan(&data)
-	if err != nil {
-		return model, err
-	}
-
-	err = model.Scan(data)
-	return model, err
+func (sqlite *SqliteJsonDb) DeleteRecord(model Model) error {
+	return nil
 }

@@ -8,7 +8,7 @@ import (
 	"os"
 	"slices"
 
-	"github.com/CaribouBlue/top-spot/db"
+	"github.com/CaribouBlue/top-spot/model"
 	"github.com/CaribouBlue/top-spot/spotify"
 )
 
@@ -34,6 +34,21 @@ type WrappedWriter struct {
 func (w *WrappedWriter) WriteHeader(statusCode int) {
 	w.statusCode = statusCode
 	w.ResponseWriter.WriteHeader(statusCode)
+}
+
+// TODO: find better way to use server context
+func withServerContext(serverCtx context.Context) middleware {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			dbValue := serverCtx.Value(DbContextKey)
+			if dbValue == nil {
+				http.Error(w, "Database context value is nil", http.StatusInternalServerError)
+				return
+			}
+			ctx := context.WithValue(r.Context(), DbContextKey, dbValue)
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
 }
 
 func withRequestLogging(next http.Handler) http.Handler {
@@ -66,10 +81,10 @@ func withSpotify(next http.Handler) http.Handler {
 
 		user, err := getUserFromRequestContext(r)
 		if err == nil {
-			spotifyClient.SetAccessToken(user.SpotifyAccessToken)
+			spotifyClient.SetAccessToken(user.Data.SpotifyAccessToken)
 		}
 
-		ctx := context.WithValue(r.Context(), SpotifyClientRequestContextKey, spotifyClient)
+		ctx := context.WithValue(r.Context(), SpotifyClientContextKey, spotifyClient)
 
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
@@ -83,9 +98,14 @@ func withUser(next http.Handler) http.Handler {
 			return
 		}
 
-		user := db.NewUserDataModel()
-		user.SetId(userId)
-		err = user.GetById()
+		db, err := getDbFromRequestContext(r)
+		if err != nil {
+			http.Error(w, "Database not found in context", http.StatusInternalServerError)
+			return
+		}
+
+		user := model.NewUserModel(db, model.WithId(userId))
+		err = user.Read()
 		if err == sql.ErrNoRows {
 			// if user does not exist, continue with empty user data model
 		} else if err != nil {
@@ -93,7 +113,7 @@ func withUser(next http.Handler) http.Handler {
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), UserRequestContextKey, user)
+		ctx := context.WithValue(r.Context(), UserContextKey, user)
 
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})

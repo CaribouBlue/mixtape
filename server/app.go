@@ -8,7 +8,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/CaribouBlue/top-spot/db"
+	"github.com/CaribouBlue/top-spot/model"
 	"github.com/CaribouBlue/top-spot/spotify"
 	"github.com/CaribouBlue/top-spot/templates"
 )
@@ -17,22 +17,51 @@ const (
 	appMuxPathPrefix string = "/app"
 )
 
-func appLandingHandler(w http.ResponseWriter, r *http.Request) {
-	templates.Landing().Render(r.Context(), w)
+func appHomeHandler(w http.ResponseWriter, r *http.Request) {
+	user, err := getUserFromRequestContext(r)
+	if err != nil {
+		http.Error(w, "User not found in context", http.StatusInternalServerError)
+		return
+	}
+
+	db, err := getDbFromRequestContext(r)
+	if err != nil {
+		http.Error(w, "Database not found in context", http.StatusInternalServerError)
+		return
+	}
+
+	session := model.NewSessionModel(db)
+
+	sessions, err := session.ReadAll()
+	if err != nil {
+		http.Error(w, "Failed to get sessions", http.StatusInternalServerError)
+		return
+	}
+
+	templateModel := templates.NewHomeTemplateModel(user, sessions)
+	component := templates.Home(templateModel)
+	handleHtmlResponse(r, w, component)
 }
 
 func createAppSessionHandler(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 
-	var session *db.GameSessionDataModel = db.NewGameSessionDataModel()
-	if err := json.NewDecoder(r.Body).Decode(session); err != nil {
+	db, err := getDbFromRequestContext(r)
+	if err != nil {
+		http.Error(w, "Database not found in context", http.StatusInternalServerError)
+		return
+	}
+
+	session := model.NewSessionModel(db)
+
+	if err := session.Scan(r.Body); err != nil {
 		http.Error(w, "Failed to decode request body", http.StatusBadRequest)
 		return
 	}
 
-	err := session.GetById()
+	err = session.Read()
 	if err == sql.ErrNoRows {
-		err = session.Insert()
+		err = session.Create()
 	} else if err == nil {
 		http.Error(w, "Session already exists", http.StatusConflict)
 		return
@@ -57,15 +86,20 @@ func appSessionHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	db, err := getDbFromRequestContext(r)
+	if err != nil {
+		http.Error(w, "Database not found in context", http.StatusInternalServerError)
+		return
+	}
+
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
 		http.Error(w, "Invalid session ID", http.StatusBadRequest)
 		return
 	}
 
-	session := db.NewGameSessionDataModel()
-	session.SetId(sessionId)
-	err = session.GetById()
+	session := model.NewSessionModel(db, model.WithId(sessionId))
+	err = session.Read()
 	if err == sql.ErrNoRows {
 		http.Error(w, "Session not found", http.StatusNotFound)
 		return
@@ -99,15 +133,20 @@ func appSessionTracksSearchHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	db, err := getDbFromRequestContext(r)
+	if err != nil {
+		http.Error(w, "Database not found in context", http.StatusInternalServerError)
+		return
+	}
+
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
 		http.Error(w, "Invalid session ID", http.StatusBadRequest)
 		return
 	}
 
-	session := db.NewGameSessionDataModel()
-	session.SetId(sessionId)
-	err = session.GetById()
+	session := model.NewSessionModel(db, model.WithId(sessionId))
+	err = session.Read()
 	if err == sql.ErrNoRows {
 		http.Error(w, "Session not found", http.StatusNotFound)
 		return
@@ -147,15 +186,20 @@ func appSessionCreatePlaylistHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	db, err := getDbFromRequestContext(r)
+	if err != nil {
+		http.Error(w, "Database not found in context", http.StatusInternalServerError)
+		return
+	}
+
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
 		http.Error(w, "Invalid session ID", http.StatusBadRequest)
 		return
 	}
 
-	session := db.NewGameSessionDataModel()
-	session.SetId(sessionId)
-	err = session.GetById()
+	session := model.NewSessionModel(db, model.WithId(sessionId))
+	err = session.Read()
 	if err == sql.ErrNoRows {
 		http.Error(w, "Session not found", http.StatusNotFound)
 		return
@@ -171,8 +215,8 @@ func appSessionCreatePlaylistHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	trackIds := make([]string, len(session.Submissions))
-	for i, submission := range session.Submissions {
+	trackIds := make([]string, len(session.Data.Submissions))
+	for i, submission := range session.Data.Submissions {
 		trackIds[i] = submission.TrackId
 	}
 	err = spotifyClient.AddTracksToPlaylist(playlist.Id, trackIds)
@@ -182,7 +226,7 @@ func appSessionCreatePlaylistHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = user.AddPlaylist(playlist.Id, session.Id)
+	err = user.AddPlaylist(playlist.Id, session.Id())
 	if err != nil {
 		spotifyClient.UnfollowPlaylist(playlist.Id)
 		http.Error(w, "Failed to add playlist to user", http.StatusInternalServerError)
@@ -196,7 +240,7 @@ func appSessionCreatePlaylistHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	templateModel := templates.NewSessionTemplateModel(*session, db.UserDataModel{})
+	templateModel := templates.NewSessionTemplateModel(*session, model.UserModel{})
 	handleHtmlResponse(r, w, templates.VotePlaylistButton(templateModel, playlist.ExternalUrls.Spotify))
 }
 
@@ -213,15 +257,20 @@ func appSessionPlaylistHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	db, err := getDbFromRequestContext(r)
+	if err != nil {
+		http.Error(w, "Database not found in context", http.StatusInternalServerError)
+		return
+	}
+
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
 		http.Error(w, "Invalid session ID", http.StatusBadRequest)
 		return
 	}
 
-	session := db.NewGameSessionDataModel()
-	session.SetId(sessionId)
-	err = session.GetById()
+	session := model.NewSessionModel(db, model.WithId(sessionId))
+	err = session.Read()
 	if err == sql.ErrNoRows {
 		http.Error(w, "Session not found", http.StatusNotFound)
 		return
@@ -231,8 +280,8 @@ func appSessionPlaylistHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var playlist *spotify.Playlist
-	userPlaylist, err := user.GetPlaylistBySessionId(session.Id)
-	if err == db.ErrUserPlaylistNotFound {
+	userPlaylist, err := user.GetSessionPlaylist(session.Id())
+	if err == model.ErrUserPlaylistNotFound {
 		playlist = &spotify.Playlist{}
 	} else if err != nil {
 		http.Error(w, "Failed to get playlist", http.StatusInternalServerError)
@@ -245,7 +294,7 @@ func appSessionPlaylistHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	templateModel := templates.NewSessionTemplateModel(*session, db.UserDataModel{})
+	templateModel := templates.NewSessionTemplateModel(*session, model.UserModel{})
 	templates.VotePlaylistButton(templateModel, playlist.Uri)
 	handleHtmlResponse(r, w, templates.VotePlaylistButton(templateModel, playlist.ExternalUrls.Spotify))
 }
@@ -257,15 +306,20 @@ func appSessionSubmissionHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	db, err := getDbFromRequestContext(r)
+	if err != nil {
+		http.Error(w, "Database not found in context", http.StatusInternalServerError)
+		return
+	}
+
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
 		http.Error(w, "Invalid session ID", http.StatusBadRequest)
 		return
 	}
 
-	session := db.NewGameSessionDataModel()
-	session.SetId(sessionId)
-	err = session.GetById()
+	session := model.NewSessionModel(db, model.WithId(sessionId))
+	err = session.Read()
 	if err == sql.ErrNoRows {
 		http.Error(w, "Session not found", http.StatusNotFound)
 		return
@@ -276,11 +330,11 @@ func appSessionSubmissionHandler(w http.ResponseWriter, r *http.Request) {
 
 	r.ParseForm()
 	trackId := r.Form.Get("trackId")
-	submission := db.NewSubmissionDataModel(user.GetId(), trackId)
+	submission := model.NewSubmissionData(user.Id(), trackId)
 
 	err = session.AddSubmission(*submission)
 	if err != nil {
-		if err == db.ErrSubmissionsMaxedOut {
+		if err == model.ErrSubmissionsMaxedOut {
 			http.Error(w, "Max submissions reached", http.StatusConflict)
 			return
 		}
@@ -305,15 +359,20 @@ func appSessionTimeLeftHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	db, err := getDbFromRequestContext(r)
+	if err != nil {
+		http.Error(w, "Database not found in context", http.StatusInternalServerError)
+		return
+	}
+
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
 		http.Error(w, "Invalid session ID", http.StatusBadRequest)
 		return
 	}
 
-	session := db.NewGameSessionDataModel()
-	session.SetId(sessionId)
-	err = session.GetById()
+	session := model.NewSessionModel(db, model.WithId(sessionId))
+	err = session.Read()
 	if err == sql.ErrNoRows {
 		http.Error(w, "Session not found", http.StatusNotFound)
 		return
@@ -322,19 +381,8 @@ func appSessionTimeLeftHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var phase templates.SessionPhase
-	path := r.URL.Path
-	if strings.Contains(path, "submission") {
-		phase = templates.SubmissionPhase
-	} else if strings.Contains(path, "vote") {
-		phase = templates.VotePhase
-	} else {
-		http.Error(w, "Invalid phase", http.StatusBadRequest)
-		return
-	}
-
 	templateModel := templates.NewSessionTemplateModel(*session, *user)
-	templates.SessionPhaseTimeLeft(templateModel, phase).Render(r.Context(), w)
+	templates.SessionPhaseTimeLeft(templateModel).Render(r.Context(), w)
 }
 
 func appSessionSubmissionDetailsHandler(w http.ResponseWriter, r *http.Request) {
@@ -350,6 +398,12 @@ func appSessionSubmissionDetailsHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	db, err := getDbFromRequestContext(r)
+	if err != nil {
+		http.Error(w, "Database not found in context", http.StatusInternalServerError)
+		return
+	}
+
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
 		http.Error(w, "Invalid session ID", http.StatusBadRequest)
@@ -362,9 +416,8 @@ func appSessionSubmissionDetailsHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	session := db.NewGameSessionDataModel()
-	session.SetId(sessionId)
-	err = session.GetById()
+	session := model.NewSessionModel(db, model.WithId(sessionId))
+	err = session.Read()
 	if err == sql.ErrNoRows {
 		http.Error(w, "Session not found", http.StatusNotFound)
 		return
@@ -373,7 +426,7 @@ func appSessionSubmissionDetailsHandler(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	submission, err := session.GetUserSubmission(submissionId, user.GetId())
+	submission, err := session.GetSubmission(submissionId)
 	if err != nil {
 		http.Error(w, "Failed to get submission", http.StatusInternalServerError)
 		return
@@ -396,6 +449,12 @@ func appSessionDeleteSubmissionHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	db, err := getDbFromRequestContext(r)
+	if err != nil {
+		http.Error(w, "Database not found in context", http.StatusInternalServerError)
+		return
+	}
+
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
 		http.Error(w, "Invalid session ID", http.StatusBadRequest)
@@ -408,9 +467,8 @@ func appSessionDeleteSubmissionHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	session := db.NewGameSessionDataModel()
-	session.SetId(sessionId)
-	err = session.GetById()
+	session := model.NewSessionModel(db, model.WithId(sessionId))
+	err = session.Read()
 	if err == sql.ErrNoRows {
 		http.Error(w, "Session not found", http.StatusNotFound)
 		return
@@ -419,7 +477,7 @@ func appSessionDeleteSubmissionHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = session.DeleteSubmission(submissionId, user.GetId())
+	err = session.DeleteSubmission(submissionId, user.Id())
 	if err != nil {
 		http.Error(w, "Failed to delete submission", http.StatusInternalServerError)
 		return
@@ -442,6 +500,12 @@ func appSessionSubmissionCandidateHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	db, err := getDbFromRequestContext(r)
+	if err != nil {
+		http.Error(w, "Database not found in context", http.StatusInternalServerError)
+		return
+	}
+
 	spotifyClient, err := getSpotifyClientFromRequestContext(r)
 	if err != nil {
 		http.Error(w, "Spotify not found in context", http.StatusInternalServerError)
@@ -460,9 +524,8 @@ func appSessionSubmissionCandidateHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	session := db.NewGameSessionDataModel()
-	session.SetId(sessionId)
-	err = session.GetById()
+	session := model.NewSessionModel(db, model.WithId(sessionId))
+	err = session.Read()
 	if err == sql.ErrNoRows {
 		http.Error(w, "Session not found", http.StatusNotFound)
 		return
@@ -494,15 +557,20 @@ func appSessionVoteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	db, err := getDbFromRequestContext(r)
+	if err != nil {
+		http.Error(w, "Database not found in context", http.StatusInternalServerError)
+		return
+	}
+
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
 		http.Error(w, "Invalid session ID", http.StatusBadRequest)
 		return
 	}
 
-	session := db.NewGameSessionDataModel()
-	session.SetId(sessionId)
-	err = session.GetById()
+	session := model.NewSessionModel(db, model.WithId(sessionId))
+	err = session.Read()
 	if err == sql.ErrNoRows {
 		http.Error(w, "Session not found", http.StatusNotFound)
 		return
@@ -514,7 +582,7 @@ func appSessionVoteHandler(w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 	submissionId := r.Form.Get("submissionId")
 
-	session.AddVote(*db.NewVoteDataModel(user.GetId(), submissionId))
+	session.AddVote(*model.NewVoteModel(user.Id(), submissionId))
 
 	err = session.Update()
 	if err != nil {
@@ -533,6 +601,12 @@ func appSessionDeleteVoteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	db, err := getDbFromRequestContext(r)
+	if err != nil {
+		http.Error(w, "Database not found in context", http.StatusInternalServerError)
+		return
+	}
+
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
 		http.Error(w, "Invalid session ID", http.StatusBadRequest)
@@ -545,9 +619,8 @@ func appSessionDeleteVoteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	session := db.NewGameSessionDataModel()
-	session.SetId(sessionId)
-	err = session.GetById()
+	session := model.NewSessionModel(db, model.WithId(sessionId))
+	err = session.Read()
 	if err == sql.ErrNoRows {
 		http.Error(w, "Session not found", http.StatusNotFound)
 		return
@@ -556,13 +629,13 @@ func appSessionDeleteVoteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	vote, err := session.GetVote(voteId, user.GetId())
+	vote, err := session.GetVote(voteId, user.Id())
 	if err != nil {
 		http.Error(w, "Failed to get vote", http.StatusInternalServerError)
 		return
 	}
 
-	err = session.DeleteVote(voteId, user.GetId())
+	err = session.DeleteVote(voteId, user.Id())
 	if err != nil {
 		http.Error(w, "Failed to delete vote", http.StatusInternalServerError)
 		return
@@ -602,7 +675,7 @@ func appProfileHandler(w http.ResponseWriter, r *http.Request) {
 func registerAppMux(parentMux *http.ServeMux) {
 	appMux := http.NewServeMux()
 
-	appMux.Handle("GET /", http.HandlerFunc(appLandingHandler))
+	appMux.Handle("GET /", http.HandlerFunc(appHomeHandler))
 
 	appMux.Handle("POST /session", http.HandlerFunc(createAppSessionHandler))
 	appMux.Handle("GET /session/{sessionId}", http.HandlerFunc(appSessionHandler))

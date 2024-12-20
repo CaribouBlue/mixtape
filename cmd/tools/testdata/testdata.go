@@ -7,9 +7,10 @@ import (
 
 	"github.com/CaribouBlue/top-spot/appdata"
 	"github.com/CaribouBlue/top-spot/db"
+	"github.com/CaribouBlue/top-spot/model"
 )
 
-var MockSubmissions = []db.SubmissionDataModel{
+var MockSubmissions = []model.SubmissionData{
 	{
 		Id:      "f9b7dc17-081f-428f-80ff-b27db0bbe5f5",
 		UserId:  6666,
@@ -74,7 +75,29 @@ func main() {
 		log.Fatal(e)
 	}
 
-	err = addTestSessions()
+	database := db.NewSqliteJsonDb(db.DbName)
+
+	for _, collection := range []db.Model{
+		&model.SessionModel{},
+		&model.UserModel{},
+	} {
+		err = database.NewCollection(collection)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	err = database.NewCollection(&model.SessionModel{})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = database.NewCollection(&model.UserModel{})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = addTestSessions(database)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -82,28 +105,28 @@ func main() {
 	log.Println("Test data setup successfully")
 }
 
-func addTestSessions() error {
-	newSession := db.NewGameSessionDataModel()
-	newSession.SetId(0)
-	err := newSession.Insert()
+func addTestSessions(database db.Db) error {
+	newSession := model.NewSessionModel(database, model.WithId(0))
+	newSession.Data.Name = "New Session"
+	err := newSession.Create()
 	if err != nil {
 		return err
 	}
 
-	voteSession := db.NewGameSessionDataModel()
-	voteSession.SetId(1)
-	voteSession.Submissions = MockSubmissions
-	voteSession.StartAt = voteSession.StartAt.Add(-voteSession.SubmissionDuration)
-	err = voteSession.Insert()
+	voteSession := model.NewSessionModel(database, model.WithId(1))
+	voteSession.Data.Name = "Vote Session"
+	voteSession.Data.Submissions = MockSubmissions
+	voteSession.Data.StartAt = voteSession.Data.StartAt.Add(-voteSession.Data.SubmissionDuration)
+	err = voteSession.Create()
 	if err != nil {
 		return err
 	}
 
-	resultsSession := db.NewGameSessionDataModel()
-	resultsSession.SetId(2)
-	resultsSession.Submissions = MockSubmissions
-	resultsSession.StartAt = resultsSession.StartAt.Add(-resultsSession.SubmissionDuration - resultsSession.VoteDuration)
-	err = resultsSession.Insert()
+	resultsSession := model.NewSessionModel(database, model.WithId(2))
+	resultsSession.Data.Name = "Results Session"
+	resultsSession.Data.Submissions = MockSubmissions
+	resultsSession.Data.StartAt = resultsSession.Data.StartAt.Add(-resultsSession.Data.SubmissionDuration - resultsSession.Data.VoteDuration)
+	err = resultsSession.Create()
 	if err != nil {
 		return err
 	}

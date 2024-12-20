@@ -1,11 +1,11 @@
 .PHONY: start
 start:
-	go run .
+	go run ./cmd/main.go
 
 .PHONY: start-dev
 start-dev:
-	wgo -file=.go -file=.templ -xfile=_templ.go templ generate :: go run main.go
+	wgo -file=.go -file=.templ -xfile=_templ.go templ generate :: go run ./cmd/main.go
 
 .PHONY: setup
 setup:
-	go run ./test/testdata/testdata.go
+	go run ./cmd/tools/testdata

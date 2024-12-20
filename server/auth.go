@@ -5,7 +5,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/CaribouBlue/top-spot/db"
+	"github.com/CaribouBlue/top-spot/model"
 )
 
 const (
@@ -14,12 +14,16 @@ const (
 )
 
 func authLoginHandler(w http.ResponseWriter, r *http.Request) {
-	user := db.NewUserDataModel()
-	user.SetId(userId)
+	db, err := getDbFromRequestContext(r)
+	if err != nil {
+		http.Error(w, "Database not found in context", http.StatusInternalServerError)
+		return
+	}
 
-	err := user.GetById()
+	user := model.NewUserModel(db, model.WithId(userId))
+	err = user.Read()
 	if err == sql.ErrNoRows {
-		user.Insert()
+		user.Create()
 	} else if err != nil {
 		http.Error(w, "Failed to get user", http.StatusInternalServerError)
 	}
@@ -60,6 +64,12 @@ func authSpotifyRedirectHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	db, err := getDbFromRequestContext(r)
+	if err != nil {
+		http.Error(w, "Database not found in context", http.StatusInternalServerError)
+		return
+	}
+
 	code := r.URL.Query().Get("code")
 	if code == "" {
 		http.Error(w, "Code not found in request", http.StatusBadRequest)
@@ -78,15 +88,13 @@ func authSpotifyRedirectHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	user := db.NewUserDataModel()
-	user.SetId(userId)
-
-	err = user.GetById()
+	user := model.NewUserModel(db, model.WithId(userId))
+	err = user.Read()
 	if err != nil {
 		http.Error(w, "Failed to get user", http.StatusInternalServerError)
 	}
 
-	user.SpotifyAccessToken, err = spotify.GetValidAccessToken()
+	user.Data.SpotifyAccessToken, err = spotify.GetValidAccessToken()
 	if err != nil {
 		http.Error(w, "Failed to get valid access token", http.StatusInternalServerError)
 		return

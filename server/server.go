@@ -1,12 +1,13 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
 )
 
-func StartServer() {
+func StartServer(ctx context.Context) {
 	rootMux := http.NewServeMux()
 	registerAuthMux(rootMux)
 	registerAppMux(rootMux)
@@ -19,7 +20,7 @@ func StartServer() {
 
 	server := &http.Server{
 		Addr:    serverAddr,
-		Handler: applyMiddleware(rootMux, withRequestLogging),
+		Handler: applyMiddleware(rootMux, withServerContext(ctx), withRequestLogging),
 	}
 
 	fmt.Println("Starting server at", serverAddr)
