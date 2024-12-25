@@ -5,11 +5,10 @@ import (
 	"database/sql"
 	"log"
 	"net/http"
-	"os"
 	"slices"
 
+	"github.com/CaribouBlue/top-spot/db"
 	"github.com/CaribouBlue/top-spot/model"
-	"github.com/CaribouBlue/top-spot/spotify"
 )
 
 type middleware func(http.Handler) http.Handler
@@ -36,21 +35,6 @@ func (w *WrappedWriter) WriteHeader(statusCode int) {
 	w.ResponseWriter.WriteHeader(statusCode)
 }
 
-// TODO: find better way to use server context
-func withServerContext(serverCtx context.Context) middleware {
-	return func(next http.Handler) http.Handler {
-		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			dbValue := serverCtx.Value(DbContextKey)
-			if dbValue == nil {
-				http.Error(w, "Database context value is nil", http.StatusInternalServerError)
-				return
-			}
-			ctx := context.WithValue(r.Context(), DbContextKey, dbValue)
-			next.ServeHTTP(w, r.WithContext(ctx))
-		})
-	}
-}
-
 func withRequestLogging(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		wrappedWriter := &WrappedWriter{w, http.StatusOK}
@@ -64,48 +48,20 @@ func withRequestLogging(next http.Handler) http.Handler {
 	})
 }
 
-func withSpotify(next http.Handler) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, err := getSpotifyClientFromRequestContext(r)
-		if err == nil {
-			next.ServeHTTP(w, r)
-			return
-		}
-
-		clientID := os.Getenv("SPOTIFY_CLIENT_ID")
-		clientSecret := os.Getenv("SPOTIFY_CLIENT_SECRET")
-		redirectUri := os.Getenv("SPOTIFY_REDIRECT_URI")
-		scope := os.Getenv("SPOTIFY_SCOPE")
-
-		spotifyClient := spotify.NewSpotifyClient(clientID, clientSecret, redirectUri, scope)
-
-		user, err := getUserFromRequestContext(r)
-		if err == nil {
-			spotifyClient.SetAccessToken(user.Data.SpotifyAccessToken)
-		}
-
-		ctx := context.WithValue(r.Context(), SpotifyClientContextKey, spotifyClient)
-
-		next.ServeHTTP(w, r.WithContext(ctx))
-	})
-}
-
 func withUser(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, err := getUserFromRequestContext(r)
-		if err == nil {
+		ctx := r.Context()
+
+		_, ok := ctx.Value(UserCtxKey).(*model.UserModel)
+		if ok {
 			next.ServeHTTP(w, r)
 			return
 		}
 
-		db, err := getDbFromRequestContext(r)
-		if err != nil {
-			http.Error(w, "Database not found in context", http.StatusInternalServerError)
-			return
-		}
+		db := db.Global()
 
 		user := model.NewUserModel(db, model.WithId(userId))
-		err = user.Read()
+		err := user.Read()
 		if err == sql.ErrNoRows {
 			// if user does not exist, continue with empty user data model
 		} else if err != nil {
@@ -113,7 +69,7 @@ func withUser(next http.Handler) http.Handler {
 			return
 		}
 
-		ctx := context.WithValue(r.Context(), UserContextKey, user)
+		ctx = context.WithValue(ctx, UserCtxKey, user)
 
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
@@ -121,8 +77,10 @@ func withUser(next http.Handler) http.Handler {
 
 func enforceAuthentication(next http.Handler) http.Handler {
 	enforceAuthenticationHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		user, err := getUserFromRequestContext(r)
-		if err != nil {
+		ctx := r.Context()
+
+		user := ctx.Value(UserCtxKey).(*model.UserModel)
+		if user == nil {
 			http.Error(w, "User not found in context", http.StatusInternalServerError)
 			return
 		}

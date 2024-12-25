@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/CaribouBlue/top-spot/db"
 	"github.com/CaribouBlue/top-spot/model"
 	"github.com/CaribouBlue/top-spot/spotify"
 	"github.com/CaribouBlue/top-spot/templates"
@@ -18,17 +19,8 @@ const (
 )
 
 func appHomeHandler(w http.ResponseWriter, r *http.Request) {
-	user, err := getUserFromRequestContext(r)
-	if err != nil {
-		http.Error(w, "User not found in context", http.StatusInternalServerError)
-		return
-	}
-
-	db, err := getDbFromRequestContext(r)
-	if err != nil {
-		http.Error(w, "Database not found in context", http.StatusInternalServerError)
-		return
-	}
+	user := r.Context().Value(UserCtxKey).(*model.UserModel)
+	db := db.Global()
 
 	session := model.NewSessionModel(db)
 
@@ -44,22 +36,17 @@ func appHomeHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func createAppSessionHandler(w http.ResponseWriter, r *http.Request) {
-	defer r.Body.Close()
-
-	db, err := getDbFromRequestContext(r)
-	if err != nil {
-		http.Error(w, "Database not found in context", http.StatusInternalServerError)
-		return
-	}
+	db := db.Global()
 
 	session := model.NewSessionModel(db)
 
+	defer r.Body.Close()
 	if err := session.Scan(r.Body); err != nil {
 		http.Error(w, "Failed to decode request body", http.StatusBadRequest)
 		return
 	}
 
-	err = session.Read()
+	err := session.Read()
 	if err == sql.ErrNoRows {
 		err = session.Create()
 	} else if err == nil {
@@ -80,17 +67,8 @@ func createAppSessionHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func appSessionHandler(w http.ResponseWriter, r *http.Request) {
-	user, err := getUserFromRequestContext(r)
-	if err != nil {
-		http.Error(w, "User not found in context", http.StatusInternalServerError)
-		return
-	}
-
-	db, err := getDbFromRequestContext(r)
-	if err != nil {
-		http.Error(w, "Database not found in context", http.StatusInternalServerError)
-		return
-	}
+	user := r.Context().Value(UserCtxKey).(*model.UserModel)
+	db := db.Global()
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -121,23 +99,9 @@ func appSessionHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func appSessionTracksSearchHandler(w http.ResponseWriter, r *http.Request) {
-	user, err := getUserFromRequestContext(r)
-	if err != nil {
-		http.Error(w, "User not found in context", http.StatusInternalServerError)
-		return
-	}
-
-	spotifyClient, err := getSpotifyClientFromRequestContext(r)
-	if err != nil {
-		http.Error(w, "Spotify not found in context", http.StatusInternalServerError)
-		return
-	}
-
-	db, err := getDbFromRequestContext(r)
-	if err != nil {
-		http.Error(w, "Database not found in context", http.StatusInternalServerError)
-		return
-	}
+	user := r.Context().Value(UserCtxKey).(*model.UserModel)
+	db := db.Global()
+	spotifyClient := authorizedSpotifyClient(user)
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -174,23 +138,9 @@ func appSessionTracksSearchHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func appSessionCreatePlaylistHandler(w http.ResponseWriter, r *http.Request) {
-	user, err := getUserFromRequestContext(r)
-	if err != nil {
-		http.Error(w, "User not found in context", http.StatusInternalServerError)
-		return
-	}
-
-	spotifyClient, err := getSpotifyClientFromRequestContext(r)
-	if err != nil {
-		http.Error(w, "Spotify not found in context", http.StatusInternalServerError)
-		return
-	}
-
-	db, err := getDbFromRequestContext(r)
-	if err != nil {
-		http.Error(w, "Database not found in context", http.StatusInternalServerError)
-		return
-	}
+	user := r.Context().Value(UserCtxKey).(*model.UserModel)
+	db := db.Global()
+	spotifyClient := authorizedSpotifyClient(user)
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -245,23 +195,9 @@ func appSessionCreatePlaylistHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func appSessionPlaylistHandler(w http.ResponseWriter, r *http.Request) {
-	user, err := getUserFromRequestContext(r)
-	if err != nil {
-		http.Error(w, "User not found in context", http.StatusInternalServerError)
-		return
-	}
-
-	spotifyClient, err := getSpotifyClientFromRequestContext(r)
-	if err != nil {
-		http.Error(w, "Spotify not found in context", http.StatusInternalServerError)
-		return
-	}
-
-	db, err := getDbFromRequestContext(r)
-	if err != nil {
-		http.Error(w, "Database not found in context", http.StatusInternalServerError)
-		return
-	}
+	user := r.Context().Value(UserCtxKey).(*model.UserModel)
+	db := db.Global()
+	spotifyClient := authorizedSpotifyClient(user)
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -300,17 +236,8 @@ func appSessionPlaylistHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func appSessionSubmissionHandler(w http.ResponseWriter, r *http.Request) {
-	user, err := getUserFromRequestContext(r)
-	if err != nil {
-		http.Error(w, "User not found in context", http.StatusInternalServerError)
-		return
-	}
-
-	db, err := getDbFromRequestContext(r)
-	if err != nil {
-		http.Error(w, "Database not found in context", http.StatusInternalServerError)
-		return
-	}
+	user := r.Context().Value(UserCtxKey).(*model.UserModel)
+	db := db.Global()
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -353,17 +280,8 @@ func appSessionSubmissionHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func appSessionTimeLeftHandler(w http.ResponseWriter, r *http.Request) {
-	user, err := getUserFromRequestContext(r)
-	if err != nil {
-		http.Error(w, "User not found in context", http.StatusInternalServerError)
-		return
-	}
-
-	db, err := getDbFromRequestContext(r)
-	if err != nil {
-		http.Error(w, "Database not found in context", http.StatusInternalServerError)
-		return
-	}
+	user := r.Context().Value(UserCtxKey).(*model.UserModel)
+	db := db.Global()
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -386,23 +304,9 @@ func appSessionTimeLeftHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func appSessionSubmissionDetailsHandler(w http.ResponseWriter, r *http.Request) {
-	user, err := getUserFromRequestContext(r)
-	if err != nil {
-		http.Error(w, "User not found in context", http.StatusInternalServerError)
-		return
-	}
-
-	spotifyClient, err := getSpotifyClientFromRequestContext(r)
-	if err != nil {
-		http.Error(w, "Spotify not found in context", http.StatusInternalServerError)
-		return
-	}
-
-	db, err := getDbFromRequestContext(r)
-	if err != nil {
-		http.Error(w, "Database not found in context", http.StatusInternalServerError)
-		return
-	}
+	user := r.Context().Value(UserCtxKey).(*model.UserModel)
+	db := db.Global()
+	spotifyClient := authorizedSpotifyClient(user)
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -443,17 +347,8 @@ func appSessionSubmissionDetailsHandler(w http.ResponseWriter, r *http.Request) 
 }
 
 func appSessionDeleteSubmissionHandler(w http.ResponseWriter, r *http.Request) {
-	user, err := getUserFromRequestContext(r)
-	if err != nil {
-		http.Error(w, "User not found in context", http.StatusInternalServerError)
-		return
-	}
-
-	db, err := getDbFromRequestContext(r)
-	if err != nil {
-		http.Error(w, "Database not found in context", http.StatusInternalServerError)
-		return
-	}
+	user := r.Context().Value(UserCtxKey).(*model.UserModel)
+	db := db.Global()
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -494,23 +389,9 @@ func appSessionDeleteSubmissionHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func appSessionSubmissionCandidateHandler(w http.ResponseWriter, r *http.Request) {
-	user, err := getUserFromRequestContext(r)
-	if err != nil {
-		http.Error(w, "User not found in context", http.StatusInternalServerError)
-		return
-	}
-
-	db, err := getDbFromRequestContext(r)
-	if err != nil {
-		http.Error(w, "Database not found in context", http.StatusInternalServerError)
-		return
-	}
-
-	spotifyClient, err := getSpotifyClientFromRequestContext(r)
-	if err != nil {
-		http.Error(w, "Spotify not found in context", http.StatusInternalServerError)
-		return
-	}
+	user := r.Context().Value(UserCtxKey).(*model.UserModel)
+	db := db.Global()
+	spotifyClient := authorizedSpotifyClient(user)
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -551,17 +432,8 @@ func appSessionSubmissionCandidateHandler(w http.ResponseWriter, r *http.Request
 }
 
 func appSessionVoteHandler(w http.ResponseWriter, r *http.Request) {
-	user, err := getUserFromRequestContext(r)
-	if err != nil {
-		http.Error(w, "User not found in context", http.StatusInternalServerError)
-		return
-	}
-
-	db, err := getDbFromRequestContext(r)
-	if err != nil {
-		http.Error(w, "Database not found in context", http.StatusInternalServerError)
-		return
-	}
+	user := r.Context().Value(UserCtxKey).(*model.UserModel)
+	db := db.Global()
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -595,17 +467,8 @@ func appSessionVoteHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func appSessionDeleteVoteHandler(w http.ResponseWriter, r *http.Request) {
-	user, err := getUserFromRequestContext(r)
-	if err != nil {
-		http.Error(w, "User not found in context", http.StatusInternalServerError)
-		return
-	}
-
-	db, err := getDbFromRequestContext(r)
-	if err != nil {
-		http.Error(w, "Database not found in context", http.StatusInternalServerError)
-		return
-	}
+	user := r.Context().Value(UserCtxKey).(*model.UserModel)
+	db := db.Global()
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -652,11 +515,8 @@ func appSessionDeleteVoteHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func appProfileHandler(w http.ResponseWriter, r *http.Request) {
-	spotify, err := getSpotifyClientFromRequestContext(r)
-	if err != nil {
-		http.Error(w, "Spotify not found in context", http.StatusInternalServerError)
-		return
-	}
+	user := r.Context().Value(UserCtxKey).(*model.UserModel)
+	spotify := authorizedSpotifyClient(user)
 
 	profile, err := spotify.GetCurrentUserProfile()
 	if err != nil {
@@ -679,21 +539,21 @@ func registerAppMux(parentMux *http.ServeMux) {
 
 	appMux.Handle("POST /session", http.HandlerFunc(createAppSessionHandler))
 	appMux.Handle("GET /session/{sessionId}", http.HandlerFunc(appSessionHandler))
-	appMux.Handle("POST /session/{sessionId}/tracks", handlerFuncWithMiddleware(appSessionTracksSearchHandler, withSpotify))
-	appMux.Handle("POST /session/{sessionId}/playlist", handlerFuncWithMiddleware(appSessionCreatePlaylistHandler, withSpotify))
-	appMux.Handle("GET /session/{sessionId}/playlist", handlerFuncWithMiddleware(appSessionPlaylistHandler, withSpotify))
+	appMux.Handle("POST /session/{sessionId}/tracks", http.HandlerFunc(appSessionTracksSearchHandler))
+	appMux.Handle("POST /session/{sessionId}/playlist", http.HandlerFunc(appSessionCreatePlaylistHandler))
+	appMux.Handle("GET /session/{sessionId}/playlist", http.HandlerFunc(appSessionPlaylistHandler))
 
-	appMux.Handle("POST /session/{sessionId}/submission", handlerFuncWithMiddleware(appSessionSubmissionHandler))
-	appMux.Handle("GET /session/{sessionId}/submission/time-left", handlerFuncWithMiddleware(appSessionTimeLeftHandler))
-	appMux.Handle("GET /session/{sessionId}/submission/{submissionId}", handlerFuncWithMiddleware(appSessionSubmissionDetailsHandler, withSpotify))
-	appMux.Handle("DELETE /session/{sessionId}/submission/{submissionId}", handlerFuncWithMiddleware(appSessionDeleteSubmissionHandler))
-	appMux.Handle("GET /session/{sessionId}/submission/{submissionId}/candidate", handlerFuncWithMiddleware(appSessionSubmissionCandidateHandler, withSpotify))
+	appMux.Handle("POST /session/{sessionId}/submission", http.HandlerFunc(appSessionSubmissionHandler))
+	appMux.Handle("GET /session/{sessionId}/submission/time-left", http.HandlerFunc(appSessionTimeLeftHandler))
+	appMux.Handle("GET /session/{sessionId}/submission/{submissionId}", http.HandlerFunc(appSessionSubmissionDetailsHandler))
+	appMux.Handle("DELETE /session/{sessionId}/submission/{submissionId}", http.HandlerFunc(appSessionDeleteSubmissionHandler))
+	appMux.Handle("GET /session/{sessionId}/submission/{submissionId}/candidate", http.HandlerFunc(appSessionSubmissionCandidateHandler))
 
-	appMux.Handle("POST /session/{sessionId}/vote", handlerFuncWithMiddleware(appSessionVoteHandler))
-	appMux.Handle("DELETE /session/{sessionId}/vote/{voteId}", handlerFuncWithMiddleware(appSessionDeleteVoteHandler))
-	appMux.Handle("GET /session/{sessionId}/vote/time-left", handlerFuncWithMiddleware(appSessionTimeLeftHandler))
+	appMux.Handle("POST /session/{sessionId}/vote", http.HandlerFunc(appSessionVoteHandler))
+	appMux.Handle("DELETE /session/{sessionId}/vote/{voteId}", http.HandlerFunc(appSessionDeleteVoteHandler))
+	appMux.Handle("GET /session/{sessionId}/vote/time-left", http.HandlerFunc(appSessionTimeLeftHandler))
 
-	appMux.Handle("GET /profile", handlerFuncWithMiddleware(appProfileHandler, withSpotify))
+	appMux.Handle("GET /profile", http.HandlerFunc(appProfileHandler))
 
 	appMuxWithMiddleware := applyMiddleware(appMux, enforceAuthentication)
 

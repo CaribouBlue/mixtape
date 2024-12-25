@@ -14,14 +14,8 @@ const (
 )
 
 func authLoginHandler(w http.ResponseWriter, r *http.Request) {
-	db, err := getDbFromRequestContext(r)
-	if err != nil {
-		http.Error(w, "Database not found in context", http.StatusInternalServerError)
-		return
-	}
-
-	user := model.NewUserModel(db, model.WithId(userId))
-	err = user.Read()
+	user := r.Context().Value(UserCtxKey).(*model.UserModel)
+	err := user.Read()
 	if err == sql.ErrNoRows {
 		user.Create()
 	} else if err != nil {
@@ -43,11 +37,8 @@ func authLoginHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func authSpotifyHandler(w http.ResponseWriter, r *http.Request) {
-	spotify, err := getSpotifyClientFromRequestContext(r)
-	if err != nil {
-		http.Error(w, "Spotify client not found in context", http.StatusInternalServerError)
-		return
-	}
+	user := r.Context().Value(UserCtxKey).(*model.UserModel)
+	spotify := authorizedSpotifyClient(user)
 
 	userAuthUrl, err := spotify.GetUserAuthUrl()
 	if err != nil {
@@ -58,17 +49,8 @@ func authSpotifyHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func authSpotifyRedirectHandler(w http.ResponseWriter, r *http.Request) {
-	spotify, err := getSpotifyClientFromRequestContext(r)
-	if err != nil {
-		http.Error(w, "Spotify client not found in context", http.StatusInternalServerError)
-		return
-	}
-
-	db, err := getDbFromRequestContext(r)
-	if err != nil {
-		http.Error(w, "Database not found in context", http.StatusInternalServerError)
-		return
-	}
+	user := r.Context().Value(UserCtxKey).(*model.UserModel)
+	spotify := authorizedSpotifyClient(user)
 
 	code := r.URL.Query().Get("code")
 	if code == "" {
@@ -82,13 +64,12 @@ func authSpotifyRedirectHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = spotify.GetNewAccessToken(code)
+	err := spotify.GetNewAccessToken(code)
 	if err != nil {
 		http.Error(w, "Failed to get new access token", http.StatusBadRequest)
 		return
 	}
 
-	user := model.NewUserModel(db, model.WithId(userId))
 	err = user.Read()
 	if err != nil {
 		http.Error(w, "Failed to get user", http.StatusInternalServerError)
@@ -106,11 +87,11 @@ func authSpotifyRedirectHandler(w http.ResponseWriter, r *http.Request) {
 
 func registerAuthMux(parentMux *http.ServeMux) {
 	authMux := http.NewServeMux()
-	authMux.Handle("/user", http.HandlerFunc(authLoginHandler))
-	authMux.Handle("/spotify", handlerFuncWithMiddleware(authSpotifyHandler, withUser, withSpotify))
-	authMux.Handle("/spotify/redirect", handlerFuncWithMiddleware(authSpotifyRedirectHandler, withUser, withSpotify))
+	authMux.Handle("/user", handlerFuncWithMiddleware(authLoginHandler))
+	authMux.Handle("/spotify", handlerFuncWithMiddleware(authSpotifyHandler))
+	authMux.Handle("/spotify/redirect", handlerFuncWithMiddleware(authSpotifyRedirectHandler))
 
-	authMuxWithMiddleware := applyMiddleware(authMux)
+	authMuxWithMiddleware := applyMiddleware(authMux, withUser)
 
 	parentMux.Handle(authMuxPathPrefix+"/", http.StripPrefix(authMuxPathPrefix, authMuxWithMiddleware))
 }

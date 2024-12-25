@@ -14,11 +14,6 @@ func main() {
 		log.Fatal("Error loading .env file")
 	}
 
-	db := initDb()
-	ctx := server.NewDefaultContext(db)
-	server.StartServer(ctx)
-}
-
-func initDb() db.Db {
-	return db.NewSqliteJsonDb(db.DbName)
+	db.InitGlobal()
+	server.StartServer()
 }

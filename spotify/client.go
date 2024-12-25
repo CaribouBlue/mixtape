@@ -2,12 +2,13 @@ package spotify
 
 import (
 	"net/http"
+	"os"
 
 	"github.com/CaribouBlue/top-spot/utils"
 	"github.com/google/uuid"
 )
 
-type SpotifyClient struct {
+type Client struct {
 	accessToken  AccessToken
 	ClientId     string
 	ClientSecret string
@@ -16,7 +17,27 @@ type SpotifyClient struct {
 	currentUser  *UserProfile
 }
 
-func (s *SpotifyClient) GetUserAuthUrl() (string, error) {
+func NewClient(clientId string, clientSecret string, redirectUri string, scope string) *Client {
+	return &Client{
+		ClientId:     clientId,
+		ClientSecret: clientSecret,
+		RedirectUri:  redirectUri,
+		Scope:        scope,
+	}
+}
+
+func DefaultClient() *Client {
+	clientId := os.Getenv("SPOTIFY_CLIENT_ID")
+	clientSecret := os.Getenv("SPOTIFY_CLIENT_SECRET")
+	redirectUri := os.Getenv("SPOTIFY_REDIRECT_URI")
+	scope := os.Getenv("SPOTIFY_SCOPE")
+
+	spotifyClient := NewClient(clientId, clientSecret, redirectUri, scope)
+
+	return spotifyClient
+}
+
+func (s *Client) GetUserAuthUrl() (string, error) {
 	return GetUserAuthUrl(UserAuthRequestOptions{
 		ClientId:    s.ClientId,
 		RedirectUri: s.RedirectUri,
@@ -25,7 +46,7 @@ func (s *SpotifyClient) GetUserAuthUrl() (string, error) {
 	})
 }
 
-func (s *SpotifyClient) GetNewAccessToken(code string) error {
+func (s *Client) GetNewAccessToken(code string) error {
 	newAccessToken, err := GetAccessToken(AccessTokenRequestOptions{
 		Code:         code,
 		ClientId:     s.ClientId,
@@ -40,7 +61,7 @@ func (s *SpotifyClient) GetNewAccessToken(code string) error {
 	return nil
 }
 
-func (s *SpotifyClient) refreshAccessToken() error {
+func (s *Client) refreshAccessToken() error {
 	newAccessToken, err := GetAccessToken(AccessTokenRequestOptions{
 		RefreshToken: s.accessToken.RefreshToken,
 		ClientId:     s.ClientId,
@@ -54,7 +75,7 @@ func (s *SpotifyClient) refreshAccessToken() error {
 	return nil
 }
 
-func (s *SpotifyClient) GetValidAccessToken() (AccessToken, error) {
+func (s *Client) GetValidAccessToken() (AccessToken, error) {
 	if s.accessToken.IsExpired() {
 		err := s.refreshAccessToken()
 		if err != nil {
@@ -65,11 +86,11 @@ func (s *SpotifyClient) GetValidAccessToken() (AccessToken, error) {
 	return s.accessToken, nil
 }
 
-func (s *SpotifyClient) SetAccessToken(accessToken AccessToken) {
+func (s *Client) SetAccessToken(accessToken AccessToken) {
 	s.accessToken = accessToken
 }
 
-func (s *SpotifyClient) NewRequest(opts SpotifyRequestOptions) (*http.Request, error) {
+func (s *Client) NewRequest(opts SpotifyRequestOptions) (*http.Request, error) {
 	accessToken, err := s.GetValidAccessToken()
 	if err != nil {
 		return nil, err
@@ -80,7 +101,7 @@ func (s *SpotifyClient) NewRequest(opts SpotifyRequestOptions) (*http.Request, e
 	})
 }
 
-func (s *SpotifyClient) GetCurrentUserProfile() (*UserProfile, error) {
+func (s *Client) GetCurrentUserProfile() (*UserProfile, error) {
 	accessToken, err := s.GetValidAccessToken()
 	if err != nil {
 		return nil, err
@@ -91,7 +112,7 @@ func (s *SpotifyClient) GetCurrentUserProfile() (*UserProfile, error) {
 	})
 }
 
-func (s *SpotifyClient) CurrentUser() *UserProfile {
+func (s *Client) CurrentUser() *UserProfile {
 	if s.currentUser == nil {
 		userProfile, err := s.GetCurrentUserProfile()
 		if err == nil {
@@ -101,7 +122,7 @@ func (s *SpotifyClient) CurrentUser() *UserProfile {
 	return s.currentUser
 }
 
-func (s *SpotifyClient) SearchTracks(query string) (*SearchResult, error) {
+func (s *Client) SearchTracks(query string) (*SearchResult, error) {
 	accessToken, err := s.GetValidAccessToken()
 	if err != nil {
 		return nil, err
@@ -114,7 +135,7 @@ func (s *SpotifyClient) SearchTracks(query string) (*SearchResult, error) {
 	})
 }
 
-func (s *SpotifyClient) GetTrack(id string) (*Track, error) {
+func (s *Client) GetTrack(id string) (*Track, error) {
 	accessToken, err := s.GetValidAccessToken()
 	if err != nil {
 		return nil, err
@@ -126,7 +147,7 @@ func (s *SpotifyClient) GetTrack(id string) (*Track, error) {
 	})
 }
 
-func (s *SpotifyClient) CreatePlaylist(name string) (*Playlist, error) {
+func (s *Client) CreatePlaylist(name string) (*Playlist, error) {
 	accessToken, err := s.GetValidAccessToken()
 	if err != nil {
 		return nil, err
@@ -139,7 +160,7 @@ func (s *SpotifyClient) CreatePlaylist(name string) (*Playlist, error) {
 	})
 }
 
-func (s *SpotifyClient) AddTracksToPlaylist(playlistId string, trackIds []string) error {
+func (s *Client) AddTracksToPlaylist(playlistId string, trackIds []string) error {
 	accessToken, err := s.GetValidAccessToken()
 	if err != nil {
 		return err
@@ -156,7 +177,7 @@ func (s *SpotifyClient) AddTracksToPlaylist(playlistId string, trackIds []string
 	})
 }
 
-func (s *SpotifyClient) GetPlaylist(playlistId string) (*Playlist, error) {
+func (s *Client) GetPlaylist(playlistId string) (*Playlist, error) {
 	accessToken, err := s.GetValidAccessToken()
 	if err != nil {
 		return nil, err
@@ -168,7 +189,7 @@ func (s *SpotifyClient) GetPlaylist(playlistId string) (*Playlist, error) {
 	})
 }
 
-func (s *SpotifyClient) UnfollowPlaylist(playlistId string) error {
+func (s *Client) UnfollowPlaylist(playlistId string) error {
 	accessToken, err := s.GetValidAccessToken()
 	if err != nil {
 		return err
@@ -178,13 +199,4 @@ func (s *SpotifyClient) UnfollowPlaylist(playlistId string) error {
 		accessToken: accessToken,
 		playlistId:  playlistId,
 	})
-}
-
-func NewSpotifyClient(clientId string, clientSecret string, redirectUri string, scope string) *SpotifyClient {
-	return &SpotifyClient{
-		ClientId:     clientId,
-		ClientSecret: clientSecret,
-		RedirectUri:  redirectUri,
-		Scope:        scope,
-	}
 }

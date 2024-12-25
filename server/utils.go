@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"github.com/CaribouBlue/top-spot/model"
+	"github.com/CaribouBlue/top-spot/spotify"
 	"github.com/a-h/templ"
 )
 
@@ -19,4 +21,10 @@ func handleHtmlResponse(r *http.Request, w http.ResponseWriter, component templ.
 	w.Header().Set("Content-Type", "text/html")
 	w.WriteHeader(http.StatusOK)
 	component.Render(r.Context(), w)
+}
+
+func authorizedSpotifyClient(user *model.UserModel) *spotify.Client {
+	spotify := spotify.DefaultClient()
+	spotify.SetAccessToken(user.Data.SpotifyAccessToken)
+	return spotify
 }
