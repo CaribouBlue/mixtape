@@ -7,9 +7,26 @@ import (
 
 	"github.com/CaribouBlue/top-spot/internal/model"
 	"github.com/CaribouBlue/top-spot/internal/server/middleware"
+	"github.com/CaribouBlue/top-spot/internal/server/utils"
 )
 
-func handleUserLogin(w http.ResponseWriter, r *http.Request) {
+type AuthMux struct {
+	*http.ServeMux
+}
+
+func NewAuthMux() *AuthMux {
+	mux := &AuthMux{http.NewServeMux()}
+	mux.RegisterHandlers()
+	return mux
+}
+
+func (mux *AuthMux) RegisterHandlers() {
+	mux.Handle("/user", http.HandlerFunc(mux.handleUserLogin))
+	mux.Handle("/spotify", http.HandlerFunc(mux.handleSpotifyAuth))
+	mux.Handle("/spotify/redirect", http.HandlerFunc(mux.handleSpotifyAuthRedirect))
+}
+
+func (mux *AuthMux) handleUserLogin(w http.ResponseWriter, r *http.Request) {
 	user := r.Context().Value(middleware.UserCtxKey).(*model.UserModel)
 	err := user.Read()
 	if err == sql.ErrNoRows {
@@ -32,9 +49,9 @@ func handleUserLogin(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func handleSpotifyAuth(w http.ResponseWriter, r *http.Request) {
+func (mux *AuthMux) handleSpotifyAuth(w http.ResponseWriter, r *http.Request) {
 	user := r.Context().Value(middleware.UserCtxKey).(*model.UserModel)
-	spotify := authorizedSpotifyClient(user)
+	spotify := utils.AuthorizedSpotifyClient(user)
 
 	userAuthUrl, err := spotify.GetUserAuthUrl()
 	if err != nil {
@@ -44,9 +61,9 @@ func handleSpotifyAuth(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, userAuthUrl, http.StatusFound)
 }
 
-func handleSpotifyAuthRedirect(w http.ResponseWriter, r *http.Request) {
+func (mux *AuthMux) handleSpotifyAuthRedirect(w http.ResponseWriter, r *http.Request) {
 	user := r.Context().Value(middleware.UserCtxKey).(*model.UserModel)
-	spotify := authorizedSpotifyClient(user)
+	spotify := utils.AuthorizedSpotifyClient(user)
 
 	code := r.URL.Query().Get("code")
 	if code == "" {
@@ -79,20 +96,4 @@ func handleSpotifyAuthRedirect(w http.ResponseWriter, r *http.Request) {
 	user.Update()
 
 	http.Redirect(w, r, authPathPrefix+"/user", http.StatusFound)
-}
-
-type AuthMux struct {
-	*http.ServeMux
-}
-
-func NewAuthMux() *AuthMux {
-	mux := &AuthMux{http.NewServeMux()}
-	mux.RegisterHandlers()
-	return mux
-}
-
-func (mux *AuthMux) RegisterHandlers() {
-	mux.Handle("/user", http.HandlerFunc(handleUserLogin))
-	mux.Handle("/spotify", http.HandlerFunc(handleSpotifyAuth))
-	mux.Handle("/spotify/redirect", http.HandlerFunc(handleSpotifyAuthRedirect))
 }

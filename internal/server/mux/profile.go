@@ -7,6 +7,7 @@ import (
 
 	"github.com/CaribouBlue/top-spot/internal/model"
 	"github.com/CaribouBlue/top-spot/internal/server/middleware"
+	"github.com/CaribouBlue/top-spot/internal/server/utils"
 )
 
 type ProfileMux struct {
@@ -20,12 +21,12 @@ func NewProfileMux() *ProfileMux {
 }
 
 func (mux *ProfileMux) RegisterHandlers() {
-	mux.Handle("GET /", http.HandlerFunc(mux.handleProfile))
+	mux.Handle("GET /", http.HandlerFunc(mux.handleProfilePage))
 }
 
-func (mux *ProfileMux) handleProfile(w http.ResponseWriter, r *http.Request) {
+func (mux *ProfileMux) handleProfilePage(w http.ResponseWriter, r *http.Request) {
 	user := r.Context().Value(middleware.UserCtxKey).(*model.UserModel)
-	spotify := authorizedSpotifyClient(user)
+	spotify := utils.AuthorizedSpotifyClient(user)
 
 	profile, err := spotify.GetCurrentUserProfile()
 	if err != nil {

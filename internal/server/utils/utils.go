@@ -1,4 +1,4 @@
-package mux
+package utils
 
 import (
 	"encoding/json"
@@ -9,7 +9,7 @@ import (
 	"github.com/a-h/templ"
 )
 
-func handleJsonResponse(w http.ResponseWriter, data interface{}) {
+func HandleJsonResponse(w http.ResponseWriter, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	if err := json.NewEncoder(w).Encode(data); err != nil {
@@ -17,13 +17,13 @@ func handleJsonResponse(w http.ResponseWriter, data interface{}) {
 	}
 }
 
-func handleHtmlResponse(r *http.Request, w http.ResponseWriter, component templ.Component) {
+func HandleHtmlResponse(r *http.Request, w http.ResponseWriter, component templ.Component) {
 	w.Header().Set("Content-Type", "text/html")
 	w.WriteHeader(http.StatusOK)
 	component.Render(r.Context(), w)
 }
 
-func authorizedSpotifyClient(user *model.UserModel) *spotify.Client {
+func AuthorizedSpotifyClient(user *model.UserModel) *spotify.Client {
 	spotify := spotify.DefaultClient()
 	spotify.SetAccessToken(user.Data.SpotifyAccessToken)
 	return spotify

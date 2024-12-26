@@ -11,11 +11,42 @@ import (
 	"github.com/CaribouBlue/top-spot/internal/db"
 	"github.com/CaribouBlue/top-spot/internal/model"
 	"github.com/CaribouBlue/top-spot/internal/server/middleware"
+	"github.com/CaribouBlue/top-spot/internal/server/utils"
 	"github.com/CaribouBlue/top-spot/internal/spotify"
 	"github.com/CaribouBlue/top-spot/internal/templates"
 )
 
-func appHomeHandler(w http.ResponseWriter, r *http.Request) {
+type SessionMux struct {
+	*http.ServeMux
+}
+
+func NewSessionMux() *SessionMux {
+	mux := &SessionMux{http.NewServeMux()}
+	mux.RegisterHandlers()
+	return mux
+}
+
+func (mux *SessionMux) RegisterHandlers() {
+	mux.Handle("GET /", http.HandlerFunc(mux.handleSessionListPage))
+	mux.Handle("POST /", http.HandlerFunc(mux.handleCreateSession))
+
+	mux.Handle("GET /{sessionId}", http.HandlerFunc(mux.handleSessionPage))
+	mux.Handle("POST /{sessionId}/tracks", http.HandlerFunc(mux.handleCreateSessionTrack))
+	mux.Handle("POST /{sessionId}/playlist", http.HandlerFunc(mux.handleCreateSessionPlaylist))
+	mux.Handle("GET /{sessionId}/playlist", http.HandlerFunc(mux.handleGetSessionPlaylist))
+
+	mux.Handle("POST /{sessionId}/submission", http.HandlerFunc(mux.handleCreateSessionSubmission))
+	mux.Handle("GET /{sessionId}/submission/time-left", http.HandlerFunc(mux.handleGetSessionTimeLeft))
+	mux.Handle("GET /{sessionId}/submission/{submissionId}", http.HandlerFunc(mux.handleGetSessionSubmission))
+	mux.Handle("DELETE /{sessionId}/submission/{submissionId}", http.HandlerFunc(mux.handleDeleteSessionSubmission))
+	mux.Handle("GET /{sessionId}/submission/{submissionId}/candidate", http.HandlerFunc(mux.handleGetSessionSubmissionCandidate))
+
+	mux.Handle("POST /{sessionId}/vote", http.HandlerFunc(mux.handleCreateSessionVote))
+	mux.Handle("DELETE /{sessionId}/vote/{voteId}", http.HandlerFunc(mux.handleDeleteSessionVote))
+	mux.Handle("GET /{sessionId}/vote/time-left", http.HandlerFunc(mux.handleGetSessionTimeLeft))
+}
+
+func (mux *SessionMux) handleSessionListPage(w http.ResponseWriter, r *http.Request) {
 	user := r.Context().Value(middleware.UserCtxKey).(*model.UserModel)
 	db := db.Global()
 
@@ -29,10 +60,10 @@ func appHomeHandler(w http.ResponseWriter, r *http.Request) {
 
 	templateModel := templates.NewHomeTemplateModel(user, sessions)
 	component := templates.Home(templateModel)
-	handleHtmlResponse(r, w, component)
+	utils.HandleHtmlResponse(r, w, component)
 }
 
-func createAppSessionHandler(w http.ResponseWriter, r *http.Request) {
+func (mux *SessionMux) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 	db := db.Global()
 
 	session := model.NewSessionModel(db)
@@ -63,7 +94,7 @@ func createAppSessionHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func appSessionHandler(w http.ResponseWriter, r *http.Request) {
+func (mux *SessionMux) handleSessionPage(w http.ResponseWriter, r *http.Request) {
 	user := r.Context().Value(middleware.UserCtxKey).(*model.UserModel)
 	db := db.Global()
 
@@ -86,19 +117,19 @@ func appSessionHandler(w http.ResponseWriter, r *http.Request) {
 	acceptHeader := r.Header.Get("Accept")
 	switch strings.ToLower(acceptHeader) {
 	case "application/json":
-		handleJsonResponse(w, session)
+		utils.HandleJsonResponse(w, session)
 	case "text/html":
 	default:
 		templateModel := templates.NewSessionTemplateModel(*session, *user)
 		component := templates.Session(templateModel, "")
-		handleHtmlResponse(r, w, component)
+		utils.HandleHtmlResponse(r, w, component)
 	}
 }
 
-func appSessionTracksSearchHandler(w http.ResponseWriter, r *http.Request) {
+func (mux *SessionMux) handleCreateSessionTrack(w http.ResponseWriter, r *http.Request) {
 	user := r.Context().Value(middleware.UserCtxKey).(*model.UserModel)
 	db := db.Global()
-	spotifyClient := authorizedSpotifyClient(user)
+	spotifyClient := utils.AuthorizedSpotifyClient(user)
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -134,10 +165,10 @@ func appSessionTracksSearchHandler(w http.ResponseWriter, r *http.Request) {
 	templates.SubmissionSearchBar(templateModel, "").Render(r.Context(), w)
 }
 
-func appSessionCreatePlaylistHandler(w http.ResponseWriter, r *http.Request) {
+func (mux *SessionMux) handleCreateSessionPlaylist(w http.ResponseWriter, r *http.Request) {
 	user := r.Context().Value(middleware.UserCtxKey).(*model.UserModel)
 	db := db.Global()
-	spotifyClient := authorizedSpotifyClient(user)
+	spotifyClient := utils.AuthorizedSpotifyClient(user)
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -188,13 +219,13 @@ func appSessionCreatePlaylistHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	templateModel := templates.NewSessionTemplateModel(*session, model.UserModel{})
-	handleHtmlResponse(r, w, templates.VotePlaylistButton(templateModel, playlist.ExternalUrls.Spotify))
+	utils.HandleHtmlResponse(r, w, templates.VotePlaylistButton(templateModel, playlist.ExternalUrls.Spotify))
 }
 
-func appSessionPlaylistHandler(w http.ResponseWriter, r *http.Request) {
+func (mux *SessionMux) handleGetSessionPlaylist(w http.ResponseWriter, r *http.Request) {
 	user := r.Context().Value(middleware.UserCtxKey).(*model.UserModel)
 	db := db.Global()
-	spotifyClient := authorizedSpotifyClient(user)
+	spotifyClient := utils.AuthorizedSpotifyClient(user)
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -229,10 +260,10 @@ func appSessionPlaylistHandler(w http.ResponseWriter, r *http.Request) {
 
 	templateModel := templates.NewSessionTemplateModel(*session, model.UserModel{})
 	templates.VotePlaylistButton(templateModel, playlist.Uri)
-	handleHtmlResponse(r, w, templates.VotePlaylistButton(templateModel, playlist.ExternalUrls.Spotify))
+	utils.HandleHtmlResponse(r, w, templates.VotePlaylistButton(templateModel, playlist.ExternalUrls.Spotify))
 }
 
-func appSessionSubmissionHandler(w http.ResponseWriter, r *http.Request) {
+func (mux *SessionMux) handleCreateSessionSubmission(w http.ResponseWriter, r *http.Request) {
 	user := r.Context().Value(middleware.UserCtxKey).(*model.UserModel)
 	db := db.Global()
 
@@ -276,7 +307,7 @@ func appSessionSubmissionHandler(w http.ResponseWriter, r *http.Request) {
 	templates.NewSubmission(templateModel, *submission).Render(r.Context(), w)
 }
 
-func appSessionTimeLeftHandler(w http.ResponseWriter, r *http.Request) {
+func (mux *SessionMux) handleGetSessionTimeLeft(w http.ResponseWriter, r *http.Request) {
 	user := r.Context().Value(middleware.UserCtxKey).(*model.UserModel)
 	db := db.Global()
 
@@ -300,10 +331,10 @@ func appSessionTimeLeftHandler(w http.ResponseWriter, r *http.Request) {
 	templates.SessionPhaseTimeLeft(templateModel).Render(r.Context(), w)
 }
 
-func appSessionSubmissionDetailsHandler(w http.ResponseWriter, r *http.Request) {
+func (mux *SessionMux) handleGetSessionSubmission(w http.ResponseWriter, r *http.Request) {
 	user := r.Context().Value(middleware.UserCtxKey).(*model.UserModel)
 	db := db.Global()
-	spotifyClient := authorizedSpotifyClient(user)
+	spotifyClient := utils.AuthorizedSpotifyClient(user)
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -343,7 +374,7 @@ func appSessionSubmissionDetailsHandler(w http.ResponseWriter, r *http.Request) 
 	templates.SubmissionListItem(templateModel, *submission, *track).Render(r.Context(), w)
 }
 
-func appSessionDeleteSubmissionHandler(w http.ResponseWriter, r *http.Request) {
+func (mux *SessionMux) handleDeleteSessionSubmission(w http.ResponseWriter, r *http.Request) {
 	user := r.Context().Value(middleware.UserCtxKey).(*model.UserModel)
 	db := db.Global()
 
@@ -385,10 +416,10 @@ func appSessionDeleteSubmissionHandler(w http.ResponseWriter, r *http.Request) {
 	templates.DeleteSubmission(templateModel).Render(r.Context(), w)
 }
 
-func appSessionSubmissionCandidateHandler(w http.ResponseWriter, r *http.Request) {
+func (mux *SessionMux) handleGetSessionSubmissionCandidate(w http.ResponseWriter, r *http.Request) {
 	user := r.Context().Value(middleware.UserCtxKey).(*model.UserModel)
 	db := db.Global()
-	spotifyClient := authorizedSpotifyClient(user)
+	spotifyClient := utils.AuthorizedSpotifyClient(user)
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -428,7 +459,7 @@ func appSessionSubmissionCandidateHandler(w http.ResponseWriter, r *http.Request
 	templates.VoteListCandidate(templateModel, *submission, *track).Render(r.Context(), w)
 }
 
-func appSessionVoteHandler(w http.ResponseWriter, r *http.Request) {
+func (mux *SessionMux) handleCreateSessionVote(w http.ResponseWriter, r *http.Request) {
 	user := r.Context().Value(middleware.UserCtxKey).(*model.UserModel)
 	db := db.Global()
 
@@ -463,7 +494,7 @@ func appSessionVoteHandler(w http.ResponseWriter, r *http.Request) {
 	templates.LazyLoadVoteCandidate(templateModel, submissionId).Render(r.Context(), w)
 }
 
-func appSessionDeleteVoteHandler(w http.ResponseWriter, r *http.Request) {
+func (mux *SessionMux) handleDeleteSessionVote(w http.ResponseWriter, r *http.Request) {
 	user := r.Context().Value(middleware.UserCtxKey).(*model.UserModel)
 	db := db.Global()
 
@@ -509,34 +540,4 @@ func appSessionDeleteVoteHandler(w http.ResponseWriter, r *http.Request) {
 
 	templateModel := templates.NewSessionTemplateModel(*session, *user)
 	templates.LazyLoadVoteCandidate(templateModel, vote.SubmissionId).Render(r.Context(), w)
-}
-
-type SessionMux struct {
-	*http.ServeMux
-}
-
-func NewSessionMux() *SessionMux {
-	mux := &SessionMux{http.NewServeMux()}
-	mux.RegisterHandlers()
-	return mux
-}
-
-func (mux *SessionMux) RegisterHandlers() {
-	mux.Handle("GET /", http.HandlerFunc(appHomeHandler))
-	mux.Handle("POST /", http.HandlerFunc(createAppSessionHandler))
-
-	mux.Handle("GET /{sessionId}", http.HandlerFunc(appSessionHandler))
-	mux.Handle("POST /{sessionId}/tracks", http.HandlerFunc(appSessionTracksSearchHandler))
-	mux.Handle("POST /{sessionId}/playlist", http.HandlerFunc(appSessionCreatePlaylistHandler))
-	mux.Handle("GET /{sessionId}/playlist", http.HandlerFunc(appSessionPlaylistHandler))
-
-	mux.Handle("POST /{sessionId}/submission", http.HandlerFunc(appSessionSubmissionHandler))
-	mux.Handle("GET /{sessionId}/submission/time-left", http.HandlerFunc(appSessionTimeLeftHandler))
-	mux.Handle("GET /{sessionId}/submission/{submissionId}", http.HandlerFunc(appSessionSubmissionDetailsHandler))
-	mux.Handle("DELETE /{sessionId}/submission/{submissionId}", http.HandlerFunc(appSessionDeleteSubmissionHandler))
-	mux.Handle("GET /{sessionId}/submission/{submissionId}/candidate", http.HandlerFunc(appSessionSubmissionCandidateHandler))
-
-	mux.Handle("POST /{sessionId}/vote", http.HandlerFunc(appSessionVoteHandler))
-	mux.Handle("DELETE /{sessionId}/vote/{voteId}", http.HandlerFunc(appSessionDeleteVoteHandler))
-	mux.Handle("GET /{sessionId}/vote/time-left", http.HandlerFunc(appSessionTimeLeftHandler))
 }
