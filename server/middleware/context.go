@@ -1,4 +1,4 @@
-package server
+package middleware
 
 type ContextKey struct {
 	name string

@@ -4,12 +4,13 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+
+	"github.com/CaribouBlue/top-spot/server/middleware"
+	"github.com/CaribouBlue/top-spot/server/mux"
 )
 
 func StartServer() {
-	rootMux := http.NewServeMux()
-	registerAuthMux(rootMux)
-	registerAppMux(rootMux)
+	rootMux := mux.NewRootMux()
 
 	port := os.Getenv("PORT")
 	if port == "" {
@@ -19,7 +20,7 @@ func StartServer() {
 
 	server := &http.Server{
 		Addr:    serverAddr,
-		Handler: applyMiddleware(rootMux, withRequestLogging),
+		Handler: middleware.Apply(rootMux, middleware.WithRequestLogging()),
 	}
 
 	fmt.Println("Starting server at", serverAddr)
