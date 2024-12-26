@@ -10,17 +10,17 @@ import (
 )
 
 func StartServer() {
-	rootMux := mux.NewRootMux()
-
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
 	serverAddr := fmt.Sprintf("localhost:%s", port)
 
+	rootMuxHandler := middleware.Apply(mux.NewRootMux(), middleware.WithRequestLogging())
+
 	server := &http.Server{
 		Addr:    serverAddr,
-		Handler: middleware.Apply(rootMux, middleware.WithRequestLogging()),
+		Handler: rootMuxHandler,
 	}
 
 	fmt.Println("Starting server at", serverAddr)
