@@ -6,6 +6,6 @@ start:
 start-dev:
 	wgo -file=.go -file=.templ -xfile=_templ.go templ generate :: go run ./cmd/server
 
-.PHONY: setup
-setup:
+.PHONY: testdata
+testdata:
 	go run ./cmd/tools/testdata

@@ -5,9 +5,9 @@ import (
 	"os"
 	"path"
 
-	"github.com/CaribouBlue/top-spot/appdata"
-	"github.com/CaribouBlue/top-spot/db"
-	"github.com/CaribouBlue/top-spot/model"
+	"github.com/CaribouBlue/top-spot/internal/appdata"
+	"github.com/CaribouBlue/top-spot/internal/db"
+	"github.com/CaribouBlue/top-spot/internal/model"
 )
 
 var MockSubmissions = []model.SubmissionData{
@@ -69,13 +69,13 @@ func main() {
 		log.Fatal(err)
 	}
 
-	dbPath := path.Join(appDataDir, db.DbName)
+	dbPath := path.Join(appDataDir, db.GlobalDbName)
 	e := os.Remove(dbPath)
 	if e != nil && !os.IsNotExist(e) {
 		log.Fatal(e)
 	}
 
-	database := db.NewSqliteJsonDb(db.DbName)
+	database := db.NewSqliteJsonDb(db.GlobalDbName)
 
 	for _, collection := range []db.Model{
 		&model.SessionModel{},
