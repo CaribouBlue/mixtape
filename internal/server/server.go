@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/CaribouBlue/top-spot/server/middleware"
-	"github.com/CaribouBlue/top-spot/server/mux"
+	"github.com/CaribouBlue/top-spot/internal/server/middleware"
+	"github.com/CaribouBlue/top-spot/internal/server/mux"
 )
 
 func StartServer() {

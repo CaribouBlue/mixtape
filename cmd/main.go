@@ -3,8 +3,8 @@ package main
 import (
 	"log"
 
-	"github.com/CaribouBlue/top-spot/db"
-	"github.com/CaribouBlue/top-spot/server"
+	"github.com/CaribouBlue/top-spot/internal/db"
+	"github.com/CaribouBlue/top-spot/internal/server"
 	"github.com/joho/godotenv"
 )
 

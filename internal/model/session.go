@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/CaribouBlue/top-spot/db"
+	"github.com/CaribouBlue/top-spot/internal/db"
 	"github.com/google/uuid"
 )
 

@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/CaribouBlue/top-spot/utils"
+	"github.com/CaribouBlue/top-spot/internal/utils"
 	"github.com/google/uuid"
 )
 

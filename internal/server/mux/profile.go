@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/CaribouBlue/top-spot/model"
-	"github.com/CaribouBlue/top-spot/server/middleware"
+	"github.com/CaribouBlue/top-spot/internal/model"
+	"github.com/CaribouBlue/top-spot/internal/server/middleware"
 )
 
 type ProfileMux struct {

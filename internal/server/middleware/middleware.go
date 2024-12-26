@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"slices"
 
-	"github.com/CaribouBlue/top-spot/db"
-	"github.com/CaribouBlue/top-spot/model"
+	"github.com/CaribouBlue/top-spot/internal/db"
+	"github.com/CaribouBlue/top-spot/internal/model"
 )
 
 type middleware func(http.Handler) http.Handler

@@ -8,11 +8,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/CaribouBlue/top-spot/db"
-	"github.com/CaribouBlue/top-spot/model"
-	"github.com/CaribouBlue/top-spot/server/middleware"
-	"github.com/CaribouBlue/top-spot/spotify"
-	"github.com/CaribouBlue/top-spot/templates"
+	"github.com/CaribouBlue/top-spot/internal/db"
+	"github.com/CaribouBlue/top-spot/internal/model"
+	"github.com/CaribouBlue/top-spot/internal/server/middleware"
+	"github.com/CaribouBlue/top-spot/internal/spotify"
+	"github.com/CaribouBlue/top-spot/internal/templates"
 )
 
 func appHomeHandler(w http.ResponseWriter, r *http.Request) {

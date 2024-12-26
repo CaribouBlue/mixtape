@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/CaribouBlue/top-spot/model"
-	"github.com/CaribouBlue/top-spot/spotify"
+	"github.com/CaribouBlue/top-spot/internal/model"
+	"github.com/CaribouBlue/top-spot/internal/spotify"
 	"github.com/a-h/templ"
 )
 

@@ -8,8 +8,8 @@ import (
 	"os"
 	"strings"
 
-	"github.com/CaribouBlue/top-spot/db"
-	"github.com/CaribouBlue/top-spot/spotify"
+	"github.com/CaribouBlue/top-spot/internal/db"
+	"github.com/CaribouBlue/top-spot/internal/spotify"
 )
 
 var (

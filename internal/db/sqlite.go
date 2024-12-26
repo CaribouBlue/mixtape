@@ -6,7 +6,7 @@ import (
 	"log"
 	"path"
 
-	"github.com/CaribouBlue/top-spot/appdata"
+	"github.com/CaribouBlue/top-spot/internal/appdata"
 	_ "github.com/mattn/go-sqlite3"
 )
 

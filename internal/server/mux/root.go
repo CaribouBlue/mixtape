@@ -3,7 +3,7 @@ package mux
 import (
 	"net/http"
 
-	"github.com/CaribouBlue/top-spot/server/middleware"
+	"github.com/CaribouBlue/top-spot/internal/server/middleware"
 )
 
 const (
