@@ -1,0 +1,68 @@
+package templates
+
+const (
+	SpinnerSizeXs string = "1rem"
+	SpinnerSizeS  string = "2rem"
+	SpinnerSizeM  string = "3rem"
+	SpinnerSizeL  string = "4rem"
+	SpinnerSizeXl string = "5rem"
+)
+
+type SpinnerOpts struct {
+	Size string
+}
+
+css spinnerClass(opts SpinnerOpts) {
+	width: { opts.Size };
+	height: { opts.Size };
+	border: 5px solid black;
+	border-bottom-color: transparent;
+	border-radius: 50%;
+	display: inline-block;
+	box-sizing: border-box;
+	animation: rotation 1s linear infinite;
+}
+
+templ spinner(opts SpinnerOpts) {
+	<style type="text/css">
+        @keyframes rotation {
+            0% {
+                transform: rotate(0deg);
+            }
+            100% {
+                transform: rotate(360deg);
+            }
+        } 
+    </style>
+	<span class={ spinnerClass(opts) }></span>
+}
+
+templ requestSpinner(opts SpinnerOpts) {
+	<style type="text/css">
+       .htmx-indicator{
+            display:none;
+        }
+        .htmx-request .htmx-indicator{
+            display:inline;
+        }
+        .htmx-request.htmx-indicator{
+            display:inline;
+        }
+
+        .htmx-indicator-content{
+            display:inline;
+        }
+        .htmx-request .htmx-indicator-content{
+            display:none;
+        }
+        .htmx-request.htmx-indicator-content{
+            display:none;
+        }
+    </style>
+	<div class="htmx-indicator">
+		@spinner(opts)
+	</div>
+	<div class="htmx-indicator-content">
+		{ children... }
+	</div>
+}

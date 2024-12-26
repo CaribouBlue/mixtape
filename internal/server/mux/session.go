@@ -31,19 +31,24 @@ func (mux *SessionMux) RegisterHandlers() {
 	mux.Handle("POST /", http.HandlerFunc(mux.handleCreateSession))
 
 	mux.Handle("GET /{sessionId}", http.HandlerFunc(mux.handleSessionPage))
+
 	mux.Handle("POST /{sessionId}/tracks", http.HandlerFunc(mux.handleCreateSessionTrack))
+
 	mux.Handle("POST /{sessionId}/playlist", http.HandlerFunc(mux.handleCreateSessionPlaylist))
 	mux.Handle("GET /{sessionId}/playlist", http.HandlerFunc(mux.handleGetSessionPlaylist))
 
+	mux.Handle("GET /{sessionId}/phase-duration", http.HandlerFunc(mux.handleGetSessionPhaseDuration))
+
 	mux.Handle("POST /{sessionId}/submission", http.HandlerFunc(mux.handleCreateSessionSubmission))
-	mux.Handle("GET /{sessionId}/submission/time-left", http.HandlerFunc(mux.handleGetSessionTimeLeft))
+
 	mux.Handle("GET /{sessionId}/submission/{submissionId}", http.HandlerFunc(mux.handleGetSessionSubmission))
 	mux.Handle("DELETE /{sessionId}/submission/{submissionId}", http.HandlerFunc(mux.handleDeleteSessionSubmission))
+
 	mux.Handle("GET /{sessionId}/submission/{submissionId}/candidate", http.HandlerFunc(mux.handleGetSessionSubmissionCandidate))
 
 	mux.Handle("POST /{sessionId}/vote", http.HandlerFunc(mux.handleCreateSessionVote))
+
 	mux.Handle("DELETE /{sessionId}/vote/{voteId}", http.HandlerFunc(mux.handleDeleteSessionVote))
-	mux.Handle("GET /{sessionId}/vote/time-left", http.HandlerFunc(mux.handleGetSessionTimeLeft))
 }
 
 func (mux *SessionMux) handleSessionListPage(w http.ResponseWriter, r *http.Request) {
@@ -97,6 +102,7 @@ func (mux *SessionMux) handleCreateSession(w http.ResponseWriter, r *http.Reques
 func (mux *SessionMux) handleSessionPage(w http.ResponseWriter, r *http.Request) {
 	user := r.Context().Value(middleware.UserCtxKey).(*model.UserModel)
 	db := db.Global()
+	spotifyClient := utils.AuthorizedSpotifyClient(user)
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -114,6 +120,21 @@ func (mux *SessionMux) handleSessionPage(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	var playlist *spotify.Playlist
+	userPlaylist, err := user.GetSessionPlaylist(session.Id())
+	if err == model.ErrUserPlaylistNotFound {
+		playlist = &spotify.Playlist{}
+	} else if err != nil {
+		http.Error(w, "Failed to get playlist", http.StatusInternalServerError)
+		return
+	} else {
+		playlist, err = spotifyClient.GetPlaylist(userPlaylist.Id)
+		if err != nil {
+			http.Error(w, "Failed to get playlist", http.StatusInternalServerError)
+			return
+		}
+	}
+
 	acceptHeader := r.Header.Get("Accept")
 	switch strings.ToLower(acceptHeader) {
 	case "application/json":
@@ -121,6 +142,7 @@ func (mux *SessionMux) handleSessionPage(w http.ResponseWriter, r *http.Request)
 	case "text/html":
 	default:
 		templateModel := templates.NewSessionTemplateModel(*session, *user)
+		templateModel.SessionPlaylist = *playlist
 		component := templates.Session(templateModel, "")
 		utils.HandleHtmlResponse(r, w, component)
 	}
@@ -219,7 +241,8 @@ func (mux *SessionMux) handleCreateSessionPlaylist(w http.ResponseWriter, r *htt
 	}
 
 	templateModel := templates.NewSessionTemplateModel(*session, model.UserModel{})
-	utils.HandleHtmlResponse(r, w, templates.VotePlaylistButton(templateModel, playlist.ExternalUrls.Spotify))
+	templateModel.SessionPlaylist = *playlist
+	utils.HandleHtmlResponse(r, w, templates.VotePlaylistButton(templateModel))
 }
 
 func (mux *SessionMux) handleGetSessionPlaylist(w http.ResponseWriter, r *http.Request) {
@@ -258,9 +281,9 @@ func (mux *SessionMux) handleGetSessionPlaylist(w http.ResponseWriter, r *http.R
 		}
 	}
 
-	templateModel := templates.NewSessionTemplateModel(*session, model.UserModel{})
-	templates.VotePlaylistButton(templateModel, playlist.Uri)
-	utils.HandleHtmlResponse(r, w, templates.VotePlaylistButton(templateModel, playlist.ExternalUrls.Spotify))
+	templateModel := templates.NewSessionTemplateModel(*session, *user)
+	templateModel.SessionPlaylist = *playlist
+	utils.HandleHtmlResponse(r, w, templates.VotePlaylistButton(templateModel))
 }
 
 func (mux *SessionMux) handleCreateSessionSubmission(w http.ResponseWriter, r *http.Request) {
@@ -307,7 +330,7 @@ func (mux *SessionMux) handleCreateSessionSubmission(w http.ResponseWriter, r *h
 	templates.NewSubmission(templateModel, *submission).Render(r.Context(), w)
 }
 
-func (mux *SessionMux) handleGetSessionTimeLeft(w http.ResponseWriter, r *http.Request) {
+func (mux *SessionMux) handleGetSessionPhaseDuration(w http.ResponseWriter, r *http.Request) {
 	user := r.Context().Value(middleware.UserCtxKey).(*model.UserModel)
 	db := db.Global()
 
@@ -328,7 +351,7 @@ func (mux *SessionMux) handleGetSessionTimeLeft(w http.ResponseWriter, r *http.R
 	}
 
 	templateModel := templates.NewSessionTemplateModel(*session, *user)
-	templates.SessionPhaseTimeLeft(templateModel).Render(r.Context(), w)
+	templates.SessionPhaseDuration(templateModel).Render(r.Context(), w)
 }
 
 func (mux *SessionMux) handleGetSessionSubmission(w http.ResponseWriter, r *http.Request) {
@@ -462,6 +485,7 @@ func (mux *SessionMux) handleGetSessionSubmissionCandidate(w http.ResponseWriter
 func (mux *SessionMux) handleCreateSessionVote(w http.ResponseWriter, r *http.Request) {
 	user := r.Context().Value(middleware.UserCtxKey).(*model.UserModel)
 	db := db.Global()
+	spotifyClient := utils.AuthorizedSpotifyClient(user)
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -481,6 +505,17 @@ func (mux *SessionMux) handleCreateSessionVote(w http.ResponseWriter, r *http.Re
 
 	r.ParseForm()
 	submissionId := r.Form.Get("submissionId")
+	submission, err := session.GetSubmission(submissionId)
+	if err != nil {
+		http.Error(w, "Failed to get submission", http.StatusInternalServerError)
+		return
+	}
+
+	track, err := spotifyClient.GetTrack(submission.TrackId)
+	if err != nil {
+		http.Error(w, "Failed to get track", http.StatusInternalServerError)
+		return
+	}
 
 	session.AddVote(*model.NewVoteModel(user.Id(), submissionId))
 
@@ -491,12 +526,13 @@ func (mux *SessionMux) handleCreateSessionVote(w http.ResponseWriter, r *http.Re
 	}
 
 	templateModel := templates.NewSessionTemplateModel(*session, *user)
-	templates.LazyLoadVoteCandidate(templateModel, submissionId).Render(r.Context(), w)
+	templates.VoteListCandidate(templateModel, *submission, *track).Render(r.Context(), w)
 }
 
 func (mux *SessionMux) handleDeleteSessionVote(w http.ResponseWriter, r *http.Request) {
 	user := r.Context().Value(middleware.UserCtxKey).(*model.UserModel)
 	db := db.Global()
+	spotifyClient := utils.AuthorizedSpotifyClient(user)
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -526,6 +562,18 @@ func (mux *SessionMux) handleDeleteSessionVote(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	submission, err := session.GetSubmission(vote.SubmissionId)
+	if err != nil {
+		http.Error(w, "Failed to get submission", http.StatusInternalServerError)
+		return
+	}
+
+	track, err := spotifyClient.GetTrack(submission.TrackId)
+	if err != nil {
+		http.Error(w, "Failed to get track", http.StatusInternalServerError)
+		return
+	}
+
 	err = session.DeleteVote(voteId, user.Id())
 	if err != nil {
 		http.Error(w, "Failed to delete vote", http.StatusInternalServerError)
@@ -539,5 +587,5 @@ func (mux *SessionMux) handleDeleteSessionVote(w http.ResponseWriter, r *http.Re
 	}
 
 	templateModel := templates.NewSessionTemplateModel(*session, *user)
-	templates.LazyLoadVoteCandidate(templateModel, vote.SubmissionId).Render(r.Context(), w)
+	templates.VoteListCandidate(templateModel, *submission, *track).Render(r.Context(), w)
 }

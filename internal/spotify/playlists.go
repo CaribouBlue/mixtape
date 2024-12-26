@@ -152,14 +152,14 @@ type CreatePlaylistRequestOptions struct {
 }
 
 func createPlaylist(opts CreatePlaylistRequestOptions) (*Playlist, error) {
-	var playlist Playlist
+	var playlist *Playlist = &Playlist{}
 
 	if opts.userId == "" {
-		return &playlist, errors.New("id is required")
+		return playlist, errors.New("id is required")
 	}
 
 	if opts.name == "" {
-		return &playlist, errors.New("name is required")
+		return playlist, errors.New("name is required")
 	}
 
 	jsonData, err := json.Marshal(map[string]interface{}{
@@ -169,7 +169,7 @@ func createPlaylist(opts CreatePlaylistRequestOptions) (*Playlist, error) {
 		"collaborative": opts.collaborative,
 	})
 	if err != nil {
-		return &playlist, err
+		return playlist, err
 	}
 	body := bytes.NewReader(jsonData)
 
@@ -180,26 +180,26 @@ func createPlaylist(opts CreatePlaylistRequestOptions) (*Playlist, error) {
 		body:        body,
 	})
 	if err != nil {
-		return &playlist, err
+		return playlist, err
 	}
 
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
-		return &playlist, err
+		return playlist, err
 	}
 
 	if resp.StatusCode != http.StatusCreated {
-		return &playlist, fmt.Errorf("failed to create playlist")
+		return playlist, fmt.Errorf("failed to create playlist")
 	}
 
 	defer resp.Body.Close()
-	err = json.NewDecoder(resp.Body).Decode(&playlist)
+	err = json.NewDecoder(resp.Body).Decode(playlist)
 	if err != nil {
-		return &playlist, err
+		return playlist, err
 	}
 
-	return &playlist, nil
+	return playlist, nil
 }
 
 type AddItemsToPlaylistRequestOptions struct {

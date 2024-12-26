@@ -5,6 +5,7 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
+	"log"
 	"os"
 	"strings"
 
@@ -100,6 +101,7 @@ func (user *UserModel) GetPlaylist(playlistId string) (UserPlaylistData, error) 
 }
 
 func (user *UserModel) GetSessionPlaylist(sessionId int64) (UserPlaylistData, error) {
+	log.Println("sessionId", sessionId)
 	for _, playlist := range user.Data.Playlists {
 		if playlist.SessionId == sessionId {
 			return playlist, nil
