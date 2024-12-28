@@ -1,11 +1,9 @@
 package model
 
 import (
-	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
 	"errors"
-	"log"
 	"os"
 	"strings"
 
@@ -101,7 +99,6 @@ func (user *UserModel) GetPlaylist(playlistId string) (UserPlaylistData, error) 
 }
 
 func (user *UserModel) GetSessionPlaylist(sessionId int64) (UserPlaylistData, error) {
-	log.Println("sessionId", sessionId)
 	for _, playlist := range user.Data.Playlists {
 		if playlist.SessionId == sessionId {
 			return playlist, nil
@@ -112,13 +109,6 @@ func (user *UserModel) GetSessionPlaylist(sessionId int64) (UserPlaylistData, er
 }
 
 func (user *UserModel) IsAuthenticated() (bool, error) {
-	err := user.Read()
-	if err == sql.ErrNoRows {
-		return false, nil
-	} else if err != nil {
-		return false, err
-	}
-
 	if user.Data.SpotifyAccessToken.AccessToken == "" {
 		return false, nil
 	}

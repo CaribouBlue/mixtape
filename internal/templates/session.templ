@@ -18,11 +18,10 @@ const (
 )
 
 type SessionTemplateModel struct {
-	Session         model.SessionModel
-	User            model.UserModel
-	SessionPlaylist spotify.Playlist
-	SearchResult    spotify.SearchResult
-	SearchQuery     string
+	Session      model.SessionModel
+	User         model.UserModel
+	SearchResult spotify.SearchResult
+	SearchQuery  string
 }
 
 func (m SessionTemplateModel) Submissions() []model.SubmissionData {
@@ -114,7 +113,7 @@ templ VoteForm(m SessionTemplateModel) {
 		hx-get={ fmt.Sprintf("/app/session/%s/phase-duration", m.SessionId()) }
 		hx-trigger="load, every 1m"
 	></h3>
-	@VotePlaylistButton(m)
+	@LazyLoadPlaylistButton(m)
 	<ul>
 		for _, submission := range m.Session.Data.Submissions {
 			@LazyLoadVoteCandidate(m, submission.Id)
@@ -122,7 +121,7 @@ templ VoteForm(m SessionTemplateModel) {
 	</ul>
 }
 
-templ LazyLoadVotePlaylistButton(m SessionTemplateModel) {
+templ LazyLoadPlaylistButton(m SessionTemplateModel) {
 	<div
 		hx-get={ fmt.Sprintf("/app/session/%d/playlist", m.Session.Id()) }
 		hx-trigger="load"
@@ -132,10 +131,10 @@ templ LazyLoadVotePlaylistButton(m SessionTemplateModel) {
 	</div>
 }
 
-templ VotePlaylistButton(m SessionTemplateModel) {
-	if m.SessionPlaylist.Id != "" {
+templ PlaylistButton(m SessionTemplateModel, playlist spotify.Playlist) {
+	if playlist.Id != "" {
 		<a
-			href={ templ.SafeURL(m.SessionPlaylist.ExternalUrls.Spotify) }
+			href={ templ.SafeURL(playlist.ExternalUrls.Spotify) }
 			target="_blank"
 		>
 			Open Playlist
@@ -164,7 +163,7 @@ templ LazyLoadVoteCandidate(m SessionTemplateModel, submissionId string) {
 	</div>
 }
 
-templ VoteListCandidate(m SessionTemplateModel, submission model.SubmissionData, track spotify.Track) {
+templ VoteCandidate(m SessionTemplateModel, submission model.SubmissionData, track spotify.Track) {
 	<li class="flex gap-5">
 		if m.IsUserSubmission(submission.Id) {
 			<button
@@ -212,13 +211,13 @@ templ SubmissionForm(m SessionTemplateModel) {
 		id={ SubmissionListId }
 	>
 		for _, submission := range m.Submissions() {
-			@LazyLoadSubmissionListItem(m, submission)
+			@LazyLoadSubmissionItem(m, submission)
 		}
 	</ul>
 	@SubmissionSearchBar(m, "")
 }
 
-templ LazyLoadSubmissionListItem(m SessionTemplateModel, submission model.SubmissionData) {
+templ LazyLoadSubmissionItem(m SessionTemplateModel, submission model.SubmissionData) {
 	<div
 		hx-get={ fmt.Sprintf("/app/session/%d/submission/%s", m.Session.Id(), submission.Id) }
 		hx-trigger="load"
@@ -226,7 +225,7 @@ templ LazyLoadSubmissionListItem(m SessionTemplateModel, submission model.Submis
 	></div>
 }
 
-templ SubmissionListItem(m SessionTemplateModel, submission model.SubmissionData, track spotify.Track) {
+templ SubmissionItem(m SessionTemplateModel, submission model.SubmissionData, track spotify.Track) {
 	<li class="flex gap-5">
 		<button
 			hx-delete={ fmt.Sprintf("/app/session/%d/submission/%s", m.Session.Id(), submission.Id) }
@@ -296,7 +295,7 @@ templ NewSubmission(m SessionTemplateModel, submission model.SubmissionData) {
 	<ul
 		hx-swap-oob={ fmt.Sprintf("beforeend:#%s", SubmissionListId) }
 	>
-		@LazyLoadSubmissionListItem(m, submission)
+		@LazyLoadSubmissionItem(m, submission)
 	</ul>
 	@SubmissionCounter(m, "true")
 	if m.SubmissionsLeft() <= 0 {

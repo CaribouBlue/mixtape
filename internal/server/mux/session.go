@@ -79,14 +79,7 @@ func (mux *SessionMux) handleCreateSession(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	err := session.Read()
-	if err == sql.ErrNoRows {
-		err = session.Create()
-	} else if err == nil {
-		http.Error(w, "Session already exists", http.StatusConflict)
-		return
-	}
-
+	err := session.Create()
 	if err != nil {
 		http.Error(w, "Failed to create session", http.StatusInternalServerError)
 		return
@@ -102,7 +95,6 @@ func (mux *SessionMux) handleCreateSession(w http.ResponseWriter, r *http.Reques
 func (mux *SessionMux) handleSessionPage(w http.ResponseWriter, r *http.Request) {
 	user := r.Context().Value(middleware.UserCtxKey).(*model.UserModel)
 	db := db.Global()
-	spotifyClient := utils.AuthorizedSpotifyClient(user)
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -120,21 +112,6 @@ func (mux *SessionMux) handleSessionPage(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	var playlist *spotify.Playlist
-	userPlaylist, err := user.GetSessionPlaylist(session.Id())
-	if err == model.ErrUserPlaylistNotFound {
-		playlist = &spotify.Playlist{}
-	} else if err != nil {
-		http.Error(w, "Failed to get playlist", http.StatusInternalServerError)
-		return
-	} else {
-		playlist, err = spotifyClient.GetPlaylist(userPlaylist.Id)
-		if err != nil {
-			http.Error(w, "Failed to get playlist", http.StatusInternalServerError)
-			return
-		}
-	}
-
 	acceptHeader := r.Header.Get("Accept")
 	switch strings.ToLower(acceptHeader) {
 	case "application/json":
@@ -142,7 +119,6 @@ func (mux *SessionMux) handleSessionPage(w http.ResponseWriter, r *http.Request)
 	case "text/html":
 	default:
 		templateModel := templates.NewSessionTemplateModel(*session, *user)
-		templateModel.SessionPlaylist = *playlist
 		component := templates.Session(templateModel, "")
 		utils.HandleHtmlResponse(r, w, component)
 	}
@@ -241,8 +217,7 @@ func (mux *SessionMux) handleCreateSessionPlaylist(w http.ResponseWriter, r *htt
 	}
 
 	templateModel := templates.NewSessionTemplateModel(*session, model.UserModel{})
-	templateModel.SessionPlaylist = *playlist
-	utils.HandleHtmlResponse(r, w, templates.VotePlaylistButton(templateModel))
+	utils.HandleHtmlResponse(r, w, templates.PlaylistButton(templateModel, *playlist))
 }
 
 func (mux *SessionMux) handleGetSessionPlaylist(w http.ResponseWriter, r *http.Request) {
@@ -282,8 +257,7 @@ func (mux *SessionMux) handleGetSessionPlaylist(w http.ResponseWriter, r *http.R
 	}
 
 	templateModel := templates.NewSessionTemplateModel(*session, *user)
-	templateModel.SessionPlaylist = *playlist
-	utils.HandleHtmlResponse(r, w, templates.VotePlaylistButton(templateModel))
+	utils.HandleHtmlResponse(r, w, templates.PlaylistButton(templateModel, *playlist))
 }
 
 func (mux *SessionMux) handleCreateSessionSubmission(w http.ResponseWriter, r *http.Request) {
@@ -394,7 +368,7 @@ func (mux *SessionMux) handleGetSessionSubmission(w http.ResponseWriter, r *http
 	}
 
 	templateModel := templates.NewSessionTemplateModel(*session, *user)
-	templates.SubmissionListItem(templateModel, *submission, *track).Render(r.Context(), w)
+	templates.SubmissionItem(templateModel, *submission, *track).Render(r.Context(), w)
 }
 
 func (mux *SessionMux) handleDeleteSessionSubmission(w http.ResponseWriter, r *http.Request) {
@@ -479,7 +453,7 @@ func (mux *SessionMux) handleGetSessionSubmissionCandidate(w http.ResponseWriter
 	}
 
 	templateModel := templates.NewSessionTemplateModel(*session, *user)
-	templates.VoteListCandidate(templateModel, *submission, *track).Render(r.Context(), w)
+	templates.VoteCandidate(templateModel, *submission, *track).Render(r.Context(), w)
 }
 
 func (mux *SessionMux) handleCreateSessionVote(w http.ResponseWriter, r *http.Request) {
@@ -526,7 +500,7 @@ func (mux *SessionMux) handleCreateSessionVote(w http.ResponseWriter, r *http.Re
 	}
 
 	templateModel := templates.NewSessionTemplateModel(*session, *user)
-	templates.VoteListCandidate(templateModel, *submission, *track).Render(r.Context(), w)
+	templates.VoteCandidate(templateModel, *submission, *track).Render(r.Context(), w)
 }
 
 func (mux *SessionMux) handleDeleteSessionVote(w http.ResponseWriter, r *http.Request) {
@@ -587,5 +561,5 @@ func (mux *SessionMux) handleDeleteSessionVote(w http.ResponseWriter, r *http.Re
 	}
 
 	templateModel := templates.NewSessionTemplateModel(*session, *user)
-	templates.VoteListCandidate(templateModel, *submission, *track).Render(r.Context(), w)
+	templates.VoteCandidate(templateModel, *submission, *track).Render(r.Context(), w)
 }

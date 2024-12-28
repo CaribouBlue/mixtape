@@ -57,6 +57,7 @@ func (sqlite *SqliteJsonDb) NewCollection(model Model) error {
 	return err
 }
 
+// TODO: Update this method to automatically set the ID field of the model
 func (sqlite *SqliteJsonDb) CreateRecord(model Model) error {
 	stmt, err := sqlite.Db().Prepare(fmt.Sprintf("insert into %s(data) values(?)", model.Name()))
 	if err != nil {
