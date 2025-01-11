@@ -6,9 +6,9 @@ import (
 	"path"
 
 	"github.com/CaribouBlue/top-spot/internal/appdata"
+	"github.com/CaribouBlue/top-spot/internal/db"
 	"github.com/CaribouBlue/top-spot/internal/music"
 	"github.com/CaribouBlue/top-spot/internal/session"
-	"github.com/CaribouBlue/top-spot/internal/store"
 	"github.com/CaribouBlue/top-spot/internal/user"
 )
 
@@ -77,7 +77,7 @@ func main() {
 		log.Fatal(e)
 	}
 
-	database, err := store.NewSqliteJsonStore(dbPath)
+	database, err := db.NewSqliteJsonStore(dbPath)
 	if err != nil {
 		log.Fatal(err)
 	}

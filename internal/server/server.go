@@ -7,11 +7,11 @@ import (
 	"os"
 
 	"github.com/CaribouBlue/top-spot/internal/appdata"
+	"github.com/CaribouBlue/top-spot/internal/db"
 	"github.com/CaribouBlue/top-spot/internal/music"
 	"github.com/CaribouBlue/top-spot/internal/server/middleware"
 	"github.com/CaribouBlue/top-spot/internal/server/mux"
 	"github.com/CaribouBlue/top-spot/internal/session"
-	"github.com/CaribouBlue/top-spot/internal/store"
 	"github.com/CaribouBlue/top-spot/internal/user"
 )
 
@@ -23,7 +23,7 @@ func StartServer() {
 	}
 
 	dbPath := appDataDir + "/top-spot.db"
-	sqliteJsonStore, err := store.NewSqliteJsonStore(dbPath)
+	sqliteJsonStore, err := db.NewSqliteJsonStore(dbPath)
 	if err != nil {
 		log.Fatal("Error creating SQLite JSON store:", err)
 	}
