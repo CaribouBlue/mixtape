@@ -10,29 +10,29 @@ type UserService interface {
 }
 
 type userService struct {
-	store UserStore
+	repo UserRepo
 }
 
-func NewUserService(store UserStore) UserService {
+func NewUserService(repo UserRepo) UserService {
 	return &userService{
-		store: store,
+		repo: repo,
 	}
 }
 
 func (s *userService) Get(userId int64) (*User, error) {
-	return s.store.GetUser(userId)
+	return s.repo.GetUser(userId)
 }
 
 func (s *userService) Create(user *User) error {
-	return s.store.CreateUser(user)
+	return s.repo.CreateUser(user)
 }
 
 func (s *userService) Update(user *User) error {
-	return s.store.UpdateUser(user)
+	return s.repo.UpdateUser(user)
 }
 
 func (s *userService) Delete(user *User) error {
-	return s.store.DeleteUser(user)
+	return s.repo.DeleteUser(user)
 }
 
 func (s *userService) IsAuthenticated(user *User) (bool, error) {

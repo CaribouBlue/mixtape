@@ -2,7 +2,7 @@ package user
 
 import "errors"
 
-type UserStore interface {
+type UserRepo interface {
 	GetUser(userId int64) (*User, error)
 	CreateUser(*User) error
 	UpdateUser(*User) error

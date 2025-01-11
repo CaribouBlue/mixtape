@@ -77,7 +77,7 @@ func main() {
 		log.Fatal(e)
 	}
 
-	database, err := db.NewSqliteJsonStore(dbPath)
+	database, err := db.NewSqliteJsonDb(dbPath)
 	if err != nil {
 		log.Fatal(err)
 	}

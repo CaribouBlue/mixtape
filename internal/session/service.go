@@ -34,33 +34,33 @@ type SessionService interface {
 }
 
 type sessionService struct {
-	store          SessionStore
+	repo           SessionRepo
 	musicService   music.MusicService
 	collectionName string
 }
 
-func NewSessionService(store SessionStore, musicService music.MusicService) SessionService {
+func NewSessionService(repo SessionRepo, musicService music.MusicService) SessionService {
 	return &sessionService{
-		store:          store,
+		repo:           repo,
 		musicService:   musicService,
 		collectionName: "session",
 	}
 }
 
 func (s *sessionService) GetAll() ([]*Session, error) {
-	return s.store.GetSessions()
+	return s.repo.GetSessions()
 }
 
 func (s *sessionService) GetOne(sessionId int64) (*Session, error) {
-	return s.store.GetSession(sessionId)
+	return s.repo.GetSession(sessionId)
 }
 
 func (s *sessionService) Create(session *Session) error {
-	return s.store.CreateSession(session)
+	return s.repo.CreateSession(session)
 }
 
 func (s *sessionService) GetSubmissions(sessionId int64) ([]Submission, error) {
-	session, err := s.store.GetSession(sessionId)
+	session, err := s.repo.GetSession(sessionId)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +69,7 @@ func (s *sessionService) GetSubmissions(sessionId int64) ([]Submission, error) {
 }
 
 func (s *sessionService) GetSubmission(sessionId int64, submissionId string) (*Submission, error) {
-	session, err := s.store.GetSession(sessionId)
+	session, err := s.repo.GetSession(sessionId)
 	if err != nil {
 		return nil, err
 	}
@@ -84,7 +84,7 @@ func (s *sessionService) GetSubmission(sessionId int64, submissionId string) (*S
 }
 
 func (s *sessionService) AddSubmission(sessionId int64, submission *Submission) error {
-	session, err := s.store.GetSession(sessionId)
+	session, err := s.repo.GetSession(sessionId)
 	if err != nil {
 		return err
 	}
@@ -93,11 +93,11 @@ func (s *sessionService) AddSubmission(sessionId int64, submission *Submission) 
 
 	session.Submissions = append(session.Submissions, *submission)
 
-	return s.store.UpdateSession(session)
+	return s.repo.UpdateSession(session)
 }
 
 func (s *sessionService) RemoveSubmission(sessionId int64, submissionId string) error {
-	session, err := s.store.GetSession(sessionId)
+	session, err := s.repo.GetSession(sessionId)
 	if err != nil {
 		return err
 	}
@@ -105,7 +105,7 @@ func (s *sessionService) RemoveSubmission(sessionId int64, submissionId string) 
 	for i, submission := range session.Submissions {
 		if submission.Id == submissionId {
 			session.Submissions = append(session.Submissions[:i], session.Submissions[i+1:]...)
-			return s.store.UpdateSession(session)
+			return s.repo.UpdateSession(session)
 		}
 	}
 
@@ -113,7 +113,7 @@ func (s *sessionService) RemoveSubmission(sessionId int64, submissionId string) 
 }
 
 func (s *sessionService) GetVotes(sessionId int64) ([]Vote, error) {
-	session, err := s.store.GetSession(sessionId)
+	session, err := s.repo.GetSession(sessionId)
 	if err != nil {
 		return nil, err
 	}
@@ -122,7 +122,7 @@ func (s *sessionService) GetVotes(sessionId int64) ([]Vote, error) {
 }
 
 func (s *sessionService) GetVote(sessionId int64, voteId string) (*Vote, error) {
-	session, err := s.store.GetSession(sessionId)
+	session, err := s.repo.GetSession(sessionId)
 	if err != nil {
 		return nil, err
 	}
@@ -137,18 +137,18 @@ func (s *sessionService) GetVote(sessionId int64, voteId string) (*Vote, error) 
 }
 
 func (s *sessionService) AddVote(sessionId int64, vote *Vote) error {
-	session, err := s.store.GetSession(sessionId)
+	session, err := s.repo.GetSession(sessionId)
 	if err != nil {
 		return err
 	}
 
 	session.Votes = append(session.Votes, *vote)
 
-	return s.store.UpdateSession(session)
+	return s.repo.UpdateSession(session)
 }
 
 func (s *sessionService) RemoveVote(sessionId int64, voteId string) error {
-	session, err := s.store.GetSession(sessionId)
+	session, err := s.repo.GetSession(sessionId)
 	if err != nil {
 		return err
 	}
@@ -156,7 +156,7 @@ func (s *sessionService) RemoveVote(sessionId int64, voteId string) error {
 	for i, vote := range session.Votes {
 		if vote.Id == voteId {
 			session.Votes = append(session.Votes[:i], session.Votes[i+1:]...)
-			return s.store.UpdateSession(session)
+			return s.repo.UpdateSession(session)
 		}
 	}
 
@@ -167,7 +167,7 @@ func (s *sessionService) RemoveVote(sessionId int64, voteId string) error {
 // AddPlaylist(sessionId int64, playlistId string, userId int64) error
 
 func (s *sessionService) GetPlaylist(sessionId int64, userId int64) (*Playlist, error) {
-	session, err := s.store.GetSession(sessionId)
+	session, err := s.repo.GetSession(sessionId)
 	if err != nil {
 		return nil, err
 	}
@@ -182,7 +182,7 @@ func (s *sessionService) GetPlaylist(sessionId int64, userId int64) (*Playlist, 
 }
 
 func (s *sessionService) AddPlaylist(sessionId int64, playlistId string, userId int64) error {
-	session, err := s.store.GetSession(sessionId)
+	session, err := s.repo.GetSession(sessionId)
 	if err != nil {
 		return err
 	}
@@ -198,5 +198,5 @@ func (s *sessionService) AddPlaylist(sessionId int64, playlistId string, userId 
 		UserId: userId,
 	})
 
-	return s.store.UpdateSession(session)
+	return s.repo.UpdateSession(session)
 }

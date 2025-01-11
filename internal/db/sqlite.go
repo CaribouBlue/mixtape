@@ -11,15 +11,15 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-type sqliteJsonStore struct {
+type sqliteJsonDb struct {
 	dbPath       string
 	db           *sql.DB
 	UserTable    string
 	SessionTable string
 }
 
-func NewSqliteJsonStore(dbPath string) (*sqliteJsonStore, error) {
-	sqlite := &sqliteJsonStore{
+func NewSqliteJsonDb(dbPath string) (*sqliteJsonDb, error) {
+	sqlite := &sqliteJsonDb{
 		dbPath:       dbPath,
 		UserTable:    "user",
 		SessionTable: "session",
@@ -28,7 +28,7 @@ func NewSqliteJsonStore(dbPath string) (*sqliteJsonStore, error) {
 	return sqlite, err
 }
 
-func (sqlite *sqliteJsonStore) initDb() error {
+func (sqlite *sqliteJsonDb) initDb() error {
 	db, err := sql.Open("sqlite3", sqlite.dbPath)
 	if err != nil {
 		return err
@@ -42,7 +42,7 @@ func (sqlite *sqliteJsonStore) initDb() error {
 	return nil
 }
 
-func (sqlite *sqliteJsonStore) NewCollection(collectionName string) error {
+func (sqlite *sqliteJsonDb) NewCollection(collectionName string) error {
 	query := fmt.Sprintf(`
 	CREATE TABLE IF NOT EXISTS %s (
 		data jsonb
@@ -53,7 +53,7 @@ func (sqlite *sqliteJsonStore) NewCollection(collectionName string) error {
 }
 
 // TODO: Update this method to automatically set the ID field of the model
-func (sqlite *sqliteJsonStore) Insert(tableName string, data []byte) error {
+func (sqlite *sqliteJsonDb) Insert(tableName string, data []byte) error {
 	stmt, err := sqlite.db.Prepare(fmt.Sprintf("insert into %s(data) values(?)", tableName))
 	if err != nil {
 		return err
@@ -68,7 +68,7 @@ func (sqlite *sqliteJsonStore) Insert(tableName string, data []byte) error {
 	return nil
 }
 
-func (sqlite *sqliteJsonStore) SelectAll(tableName string) ([][]byte, error) {
+func (sqlite *sqliteJsonDb) SelectAll(tableName string) ([][]byte, error) {
 	var records [][]byte = make([][]byte, 0)
 
 	query := fmt.Sprintf("select data from %s", tableName)
@@ -92,7 +92,7 @@ func (sqlite *sqliteJsonStore) SelectAll(tableName string) ([][]byte, error) {
 	return records, nil
 }
 
-func (sqlite *sqliteJsonStore) SelectOne(tableName string, recordId int64) ([]byte, error) {
+func (sqlite *sqliteJsonDb) SelectOne(tableName string, recordId int64) ([]byte, error) {
 	var data []byte
 	query := fmt.Sprintf("select data from %s where data->>'id' = %d", tableName, recordId)
 	err := sqlite.db.QueryRow(query).Scan(&data)
@@ -103,7 +103,7 @@ func (sqlite *sqliteJsonStore) SelectOne(tableName string, recordId int64) ([]by
 	return data, err
 }
 
-func (sqlite *sqliteJsonStore) Update(tableName string, recordId any, data []byte) error {
+func (sqlite *sqliteJsonDb) Update(tableName string, recordId any, data []byte) error {
 	stmt, err := sqlite.db.Prepare(fmt.Sprintf("update %s set data = ? where data->>'id' = ?", tableName))
 	if err != nil {
 		return err
@@ -118,11 +118,11 @@ func (sqlite *sqliteJsonStore) Update(tableName string, recordId any, data []byt
 	return nil
 }
 
-func (sqlite *sqliteJsonStore) DeleteRecord(tableName string, recordId any) error {
+func (sqlite *sqliteJsonDb) DeleteRecord(tableName string, recordId any) error {
 	return nil
 }
 
-func (sqlite *sqliteJsonStore) GetUser(userId int64) (*user.User, error) {
+func (sqlite *sqliteJsonDb) GetUser(userId int64) (*user.User, error) {
 	data, err := sqlite.SelectOne(sqlite.UserTable, userId)
 	if err == sql.ErrNoRows {
 		return nil, user.ErrNoUserFound
@@ -135,7 +135,7 @@ func (sqlite *sqliteJsonStore) GetUser(userId int64) (*user.User, error) {
 	return u, err
 }
 
-func (sqlite *sqliteJsonStore) CreateUser(user *user.User) error {
+func (sqlite *sqliteJsonDb) CreateUser(user *user.User) error {
 	data, err := json.Marshal(user)
 	if err != nil {
 		return err
@@ -144,7 +144,7 @@ func (sqlite *sqliteJsonStore) CreateUser(user *user.User) error {
 	return sqlite.Insert(sqlite.UserTable, data)
 }
 
-func (sqlite *sqliteJsonStore) UpdateUser(user *user.User) error {
+func (sqlite *sqliteJsonDb) UpdateUser(user *user.User) error {
 	data, err := json.Marshal(user)
 	if err != nil {
 		return err
@@ -153,11 +153,11 @@ func (sqlite *sqliteJsonStore) UpdateUser(user *user.User) error {
 	return sqlite.Update(sqlite.UserTable, user.Id, data)
 }
 
-func (sqlite *sqliteJsonStore) DeleteUser(user *user.User) error {
+func (sqlite *sqliteJsonDb) DeleteUser(user *user.User) error {
 	return sqlite.DeleteRecord(sqlite.UserTable, user.Id)
 }
 
-func (sqlite *sqliteJsonStore) GetSessions() ([]*session.Session, error) {
+func (sqlite *sqliteJsonDb) GetSessions() ([]*session.Session, error) {
 	records, err := sqlite.SelectAll(sqlite.SessionTable)
 	if err != nil {
 		return nil, err
@@ -177,7 +177,7 @@ func (sqlite *sqliteJsonStore) GetSessions() ([]*session.Session, error) {
 	return sessions, nil
 }
 
-func (sqlite *sqliteJsonStore) GetSession(sessionId int64) (*session.Session, error) {
+func (sqlite *sqliteJsonDb) GetSession(sessionId int64) (*session.Session, error) {
 	data, err := sqlite.SelectOne(sqlite.SessionTable, sessionId)
 	if err != nil {
 		return nil, err
@@ -188,7 +188,7 @@ func (sqlite *sqliteJsonStore) GetSession(sessionId int64) (*session.Session, er
 	return session, err
 }
 
-func (sqlite *sqliteJsonStore) UpdateSession(session *session.Session) error {
+func (sqlite *sqliteJsonDb) UpdateSession(session *session.Session) error {
 	data, err := json.Marshal(session)
 	if err != nil {
 		return err
@@ -197,7 +197,7 @@ func (sqlite *sqliteJsonStore) UpdateSession(session *session.Session) error {
 	return sqlite.Update(sqlite.SessionTable, session.Id, data)
 }
 
-func (sqlite *sqliteJsonStore) CreateSession(session *session.Session) error {
+func (sqlite *sqliteJsonDb) CreateSession(session *session.Session) error {
 	data, err := json.Marshal(session)
 	if err != nil {
 		return err

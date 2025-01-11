@@ -16,22 +16,22 @@ import (
 )
 
 func StartServer() {
-	// Initialize store
+	// Initialize DB
 	appDataDir, err := appdata.GetAppDataDir()
 	if err != nil {
 		log.Fatal("Error getting app data directory:", err)
 	}
 
 	dbPath := appDataDir + "/top-spot.db"
-	sqliteJsonStore, err := db.NewSqliteJsonStore(dbPath)
+	sqliteJsonDb, err := db.NewSqliteJsonDb(dbPath)
 	if err != nil {
-		log.Fatal("Error creating SQLite JSON store:", err)
+		log.Fatal("Error creating SQLite JSON DB:", err)
 	}
 
 	// Initialize services
-	userService := user.NewUserService(sqliteJsonStore)
+	userService := user.NewUserService(sqliteJsonDb)
 	musicService := music.NewSpotifyMusicService()
-	sessionService := session.NewSessionService(sqliteJsonStore, musicService)
+	sessionService := session.NewSessionService(sqliteJsonDb, musicService)
 
 	// Initialize server
 	port := os.Getenv("PORT")
