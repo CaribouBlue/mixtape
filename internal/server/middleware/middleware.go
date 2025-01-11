@@ -2,13 +2,11 @@ package middleware
 
 import (
 	"context"
-	"database/sql"
 	"log"
 	"net/http"
 	"slices"
 
-	"github.com/CaribouBlue/top-spot/internal/db"
-	"github.com/CaribouBlue/top-spot/internal/model"
+	"github.com/CaribouBlue/top-spot/internal/user"
 )
 
 type middleware func(http.Handler) http.Handler
@@ -52,6 +50,7 @@ func WithRequestLogging() middleware {
 
 type WithUserOpts struct {
 	DefaultUserId int64
+	UserService   user.UserService
 }
 
 func WithUser(opts WithUserOpts) middleware {
@@ -59,24 +58,22 @@ func WithUser(opts WithUserOpts) middleware {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 
-			_, ok := ctx.Value(UserCtxKey).(*model.UserModel)
+			_, ok := ctx.Value(UserCtxKey).(*user.User)
 			if ok {
 				next.ServeHTTP(w, r)
 				return
 			}
 
-			db := db.Global()
-
-			user := model.NewUserModel(db, model.WithId(opts.DefaultUserId))
-			err := user.Read()
-			if err == sql.ErrNoRows {
-				// if user does not exist, continue with empty user data model
+			u, err := opts.UserService.Get(opts.DefaultUserId)
+			if err == user.ErrNoUserFound {
+				u = &user.User{}
 			} else if err != nil {
+				log.Print(err)
 				http.Error(w, "Failed to get user", http.StatusInternalServerError)
 				return
 			}
 
-			ctx = context.WithValue(ctx, UserCtxKey, user)
+			ctx = context.WithValue(ctx, UserCtxKey, u)
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -85,6 +82,7 @@ func WithUser(opts WithUserOpts) middleware {
 
 type WithEnforcedAuthenticationOpts struct {
 	UnauthenticatedRedirectPath string
+	UserService                 user.UserService
 }
 
 func WithEnforcedAuthentication(opts WithEnforcedAuthenticationOpts) middleware {
@@ -92,13 +90,13 @@ func WithEnforcedAuthentication(opts WithEnforcedAuthenticationOpts) middleware 
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 
-			user := ctx.Value(UserCtxKey).(*model.UserModel)
-			if user == nil {
+			u := ctx.Value(UserCtxKey).(*user.User)
+			if u == nil {
 				http.Error(w, "User not found in context, may need to apply WithUser middleware", http.StatusInternalServerError)
 				return
 			}
 
-			isAuthenticated, err := user.IsAuthenticated()
+			isAuthenticated, err := opts.UserService.IsAuthenticated(u)
 			if err != nil {
 				http.Error(w, "Failed to check authentication", http.StatusInternalServerError)
 				return

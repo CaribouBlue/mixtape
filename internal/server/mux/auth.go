@@ -1,21 +1,26 @@
 package mux
 
 import (
-	"database/sql"
-	"log"
 	"net/http"
 
-	"github.com/CaribouBlue/top-spot/internal/model"
+	"github.com/CaribouBlue/top-spot/internal/music"
+	"github.com/CaribouBlue/top-spot/internal/music/spotify"
 	"github.com/CaribouBlue/top-spot/internal/server/middleware"
-	"github.com/CaribouBlue/top-spot/internal/server/utils"
+	"github.com/CaribouBlue/top-spot/internal/user"
 )
 
 type AuthMux struct {
 	*http.ServeMux
+	userService  user.UserService
+	musicService music.MusicService
 }
 
-func NewAuthMux() *AuthMux {
-	mux := &AuthMux{http.NewServeMux()}
+func NewAuthMux(userService user.UserService, musicService music.MusicService) *AuthMux {
+	mux := &AuthMux{
+		ServeMux:     http.NewServeMux(),
+		userService:  userService,
+		musicService: musicService,
+	}
 	mux.RegisterHandlers()
 	return mux
 }
@@ -27,43 +32,41 @@ func (mux *AuthMux) RegisterHandlers() {
 }
 
 func (mux *AuthMux) handleUserLogin(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(middleware.UserCtxKey).(*model.UserModel)
-	err := user.Read()
-	if err == sql.ErrNoRows {
-		user.Create()
-	} else if err != nil {
-		http.Error(w, "Failed to get user", http.StatusInternalServerError)
-	}
-
-	isAuthenticated, err := user.IsAuthenticated()
-	if err != nil {
-		http.Error(w, "Failed to check authentication", http.StatusInternalServerError)
+	u := r.Context().Value(middleware.UserCtxKey).(*user.User)
+	if u.Id == 0 {
+		http.Error(w, "User does not exist", http.StatusInternalServerError)
 		return
 	}
 
-	if !isAuthenticated {
+	err := mux.musicService.Authenticate(u)
+	if err != nil {
 		http.Redirect(w, r, "/auth/spotify", http.StatusFound)
 		return
 	} else {
 		http.Redirect(w, r, appPathPrefix, http.StatusFound)
+		return
 	}
 }
 
 func (mux *AuthMux) handleSpotifyAuth(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(middleware.UserCtxKey).(*model.UserModel)
-	spotify := utils.AuthorizedSpotifyClient(user)
-
+	spotify := spotify.DefaultClient()
 	userAuthUrl, err := spotify.GetUserAuthUrl()
 	if err != nil {
-		log.Fatal(err)
+		http.Error(w, "Failed to get user auth url", http.StatusInternalServerError)
+		return
 	}
 
 	http.Redirect(w, r, userAuthUrl, http.StatusFound)
 }
 
 func (mux *AuthMux) handleSpotifyAuthRedirect(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(middleware.UserCtxKey).(*model.UserModel)
-	spotify := utils.AuthorizedSpotifyClient(user)
+	u := r.Context().Value(middleware.UserCtxKey).(*user.User)
+	u, err := mux.userService.Get(u.Id)
+	if err != nil {
+		http.Error(w, "Failed to get user", http.StatusInternalServerError)
+		return
+	}
+	spotify := spotify.DefaultClient()
 
 	code := r.URL.Query().Get("code")
 	if code == "" {
@@ -77,23 +80,18 @@ func (mux *AuthMux) handleSpotifyAuthRedirect(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	err := spotify.GetNewAccessToken(code)
+	err = spotify.GetNewAccessToken(code)
 	if err != nil {
 		http.Error(w, "Failed to get new access token", http.StatusBadRequest)
 		return
 	}
 
-	err = user.Read()
-	if err != nil {
-		http.Error(w, "Failed to get user", http.StatusInternalServerError)
-	}
-
-	user.Data.SpotifyAccessToken, err = spotify.GetValidAccessToken()
+	u.SpotifyAccessToken, err = spotify.GetValidAccessToken()
 	if err != nil {
 		http.Error(w, "Failed to get valid access token", http.StatusInternalServerError)
 		return
 	}
-	user.Update()
+	mux.userService.Update(u)
 
 	http.Redirect(w, r, authPathPrefix+"/user", http.StatusFound)
 }

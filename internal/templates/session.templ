@@ -2,8 +2,9 @@ package templates
 
 import (
 	"fmt"
-	"github.com/CaribouBlue/top-spot/internal/model"
-	"github.com/CaribouBlue/top-spot/internal/spotify"
+	"github.com/CaribouBlue/top-spot/internal/music"
+	"github.com/CaribouBlue/top-spot/internal/session"
+	"github.com/CaribouBlue/top-spot/internal/user"
 	"github.com/CaribouBlue/top-spot/internal/utils"
 	"strconv"
 	"time"
@@ -18,16 +19,16 @@ const (
 )
 
 type SessionTemplateModel struct {
-	Session      model.SessionModel
-	User         model.UserModel
-	SearchResult spotify.SearchResult
+	Session      session.Session
+	User         user.User
+	SearchResult []*music.Track
 	SearchQuery  string
 }
 
-func (m SessionTemplateModel) Submissions() []model.SubmissionData {
-	submissions := make([]model.SubmissionData, 0)
-	for _, submission := range m.Session.Data.Submissions {
-		if submission.UserId == m.User.Id() {
+func (m SessionTemplateModel) Submissions() []session.Submission {
+	submissions := make([]session.Submission, 0)
+	for _, submission := range m.Session.Submissions {
+		if submission.UserId == m.User.Id {
 			submissions = append(submissions, submission)
 		}
 	}
@@ -35,15 +36,15 @@ func (m SessionTemplateModel) Submissions() []model.SubmissionData {
 }
 
 func (m SessionTemplateModel) SubmissionsLeft() int {
-	return m.Session.Data.MaxSubmissions - len(m.Submissions())
+	return m.Session.MaxSubmissions - len(m.Submissions())
 }
 
 func (m SessionTemplateModel) SessionId() string {
-	return strconv.FormatInt(m.Session.Id(), 10)
+	return strconv.FormatInt(m.Session.Id, 10)
 }
 
 func (m SessionTemplateModel) PhaseDuration() string {
-	var duration time.Duration = m.Session.PhaseDurationRemaining()
+	var duration time.Duration = m.Session.RemainingPhaseDuration()
 
 	days := int(duration.Hours()) / 24
 	hours := int(duration.Hours()) % 24
@@ -57,8 +58,8 @@ func (m SessionTemplateModel) PhaseDuration() string {
 }
 
 func (m SessionTemplateModel) GetSubmissionVoteId(submissionId string) string {
-	for _, vote := range m.Session.Data.Votes {
-		if vote.UserId == m.User.Id() && vote.SubmissionId == submissionId {
+	for _, vote := range m.Session.Votes {
+		if vote.UserId == m.User.Id && vote.SubmissionId == submissionId {
 			return vote.Id
 		}
 	}
@@ -66,15 +67,15 @@ func (m SessionTemplateModel) GetSubmissionVoteId(submissionId string) string {
 }
 
 func (m SessionTemplateModel) IsUserSubmission(submissionId string) bool {
-	for _, submission := range m.Session.Data.Submissions {
-		if submission.Id == submissionId && submission.UserId == m.User.Id() {
+	for _, submission := range m.Session.Submissions {
+		if submission.Id == submissionId && submission.UserId == m.User.Id {
 			return true
 		}
 	}
 	return false
 }
 
-func NewSessionTemplateModel(session model.SessionModel, user model.UserModel) SessionTemplateModel {
+func NewSessionTemplateModel(session session.Session, user user.User) SessionTemplateModel {
 	return SessionTemplateModel{
 		Session: session,
 		User:    user,
@@ -87,13 +88,13 @@ templ Session(m SessionTemplateModel, swapOob string) {
 			id={ SessionDetailsId }
 			hx-swap-oob={ swapOob }
 		>
-			<h1>Session: { m.Session.Data.Name }</h1>
+			<h1>Session: { m.Session.Name }</h1>
 			switch m.Session.Phase() {
-				case model.SubmissionPhase:
+				case session.SubmissionPhase:
 					@SubmissionForm(m)
-				case model.VotePhase:
+				case session.VotePhase:
 					@VoteForm(m)
-				case model.ResultPhase:
+				case session.ResultPhase:
 					<h2>Results</h2>
 			}
 		</div>
@@ -115,7 +116,7 @@ templ VoteForm(m SessionTemplateModel) {
 	></h3>
 	@LazyLoadPlaylistButton(m)
 	<ul>
-		for _, submission := range m.Session.Data.Submissions {
+		for _, submission := range m.Session.Submissions {
 			@LazyLoadVoteCandidate(m, submission.Id)
 		}
 	</ul>
@@ -123,7 +124,7 @@ templ VoteForm(m SessionTemplateModel) {
 
 templ LazyLoadPlaylistButton(m SessionTemplateModel) {
 	<div
-		hx-get={ fmt.Sprintf("/app/session/%d/playlist", m.Session.Id()) }
+		hx-get={ fmt.Sprintf("/app/session/%d/playlist", m.Session.Id) }
 		hx-trigger="load"
 		hx-swap="outerHTML"
 	>
@@ -131,17 +132,17 @@ templ LazyLoadPlaylistButton(m SessionTemplateModel) {
 	</div>
 }
 
-templ PlaylistButton(m SessionTemplateModel, playlist spotify.Playlist) {
+templ PlaylistButton(m SessionTemplateModel, playlist music.Playlist) {
 	if playlist.Id != "" {
 		<a
-			href={ templ.SafeURL(playlist.ExternalUrls.Spotify) }
+			href={ templ.SafeURL(playlist.Url) }
 			target="_blank"
 		>
 			Open Playlist
 		</a>
 	} else {
 		<button
-			hx-post={ fmt.Sprintf("/app/session/%d/playlist", m.Session.Id()) }
+			hx-post={ fmt.Sprintf("/app/session/%d/playlist", m.Session.Id) }
 			hx-swap="outerHTML"
 		>
 			@requestSpinner(SpinnerOpts{Size: SpinnerSizeS}) {
@@ -153,7 +154,7 @@ templ PlaylistButton(m SessionTemplateModel, playlist spotify.Playlist) {
 
 templ LazyLoadVoteCandidate(m SessionTemplateModel, submissionId string) {
 	<div
-		hx-get={ fmt.Sprintf("/app/session/%d/submission/%s/candidate", m.Session.Id(), submissionId) }
+		hx-get={ fmt.Sprintf("/app/session/%d/submission/%s/candidate", m.Session.Id, submissionId) }
 		hx-trigger="load"
 		hx-swap="outerHTML"
 	>
@@ -163,7 +164,7 @@ templ LazyLoadVoteCandidate(m SessionTemplateModel, submissionId string) {
 	</div>
 }
 
-templ VoteCandidate(m SessionTemplateModel, submission model.SubmissionData, track spotify.Track) {
+templ VoteCandidate(m SessionTemplateModel, submission session.Submission, track music.Track) {
 	<li class="flex gap-5">
 		if m.IsUserSubmission(submission.Id) {
 			<button
@@ -171,7 +172,7 @@ templ VoteCandidate(m SessionTemplateModel, submission model.SubmissionData, tra
 			></button>
 		} else if m.GetSubmissionVoteId(submission.Id) != "" {
 			<button
-				hx-delete={ fmt.Sprintf("/app/session/%d/vote/%s", m.Session.Id(), m.GetSubmissionVoteId(submission.Id)) }
+				hx-delete={ fmt.Sprintf("/app/session/%d/vote/%s", m.Session.Id, m.GetSubmissionVoteId(submission.Id)) }
 				hx-target="closest li"
 				hx-swap="outerHTML"
 				hx-disabled-elt="this"
@@ -182,7 +183,7 @@ templ VoteCandidate(m SessionTemplateModel, submission model.SubmissionData, tra
 			</button>
 		} else {
 			<button
-				hx-post={ fmt.Sprintf("/app/session/%d/vote", m.Session.Id()) }
+				hx-post={ fmt.Sprintf("/app/session/%d/vote", m.Session.Id) }
 				hx-vals={ fmt.Sprintf(`{"submissionId": "%s"}`, submission.Id) }
 				hx-target="closest li"
 				hx-swap="outerHTML"
@@ -195,7 +196,7 @@ templ VoteCandidate(m SessionTemplateModel, submission model.SubmissionData, tra
 		}
 		<div class="flex flex-col">
 			<p>{ track.Name }</p>
-			<p class="text-slate-400">{ utils.MapJoin(track.Artists, ", ", func(artist spotify.TrackArtist) string {return artist.Name} ) }</p>
+			<p class="text-slate-400">{ utils.MapJoin(track.Artists, ", ", func(artist music.Artist) string {return artist.Name} ) }</p>
 		</div>
 	</li>
 }
@@ -217,24 +218,24 @@ templ SubmissionForm(m SessionTemplateModel) {
 	@SubmissionSearchBar(m, "")
 }
 
-templ LazyLoadSubmissionItem(m SessionTemplateModel, submission model.SubmissionData) {
+templ LazyLoadSubmissionItem(m SessionTemplateModel, submission session.Submission) {
 	<div
-		hx-get={ fmt.Sprintf("/app/session/%d/submission/%s", m.Session.Id(), submission.Id) }
+		hx-get={ fmt.Sprintf("/app/session/%d/submission/%s", m.Session.Id, submission.Id) }
 		hx-trigger="load"
 		hx-swap="outerHTML"
 	></div>
 }
 
-templ SubmissionItem(m SessionTemplateModel, submission model.SubmissionData, track spotify.Track) {
+templ SubmissionItem(m SessionTemplateModel, submission session.Submission, track music.Track) {
 	<li class="flex gap-5">
 		<button
-			hx-delete={ fmt.Sprintf("/app/session/%d/submission/%s", m.Session.Id(), submission.Id) }
+			hx-delete={ fmt.Sprintf("/app/session/%d/submission/%s", m.Session.Id, submission.Id) }
 			hx-target="closest li"
 			hx-swap="delete"
 		>X</button>
 		<div class="flex flex-col">
 			<p>{ track.Name }</p>
-			<p class="text-slate-400">{ utils.MapJoin(track.Artists, ", ", func(artist spotify.TrackArtist) string {return artist.Name} ) }</p>
+			<p class="text-slate-400">{ utils.MapJoin(track.Artists, ", ", func(artist music.Artist) string {return artist.Name} ) }</p>
 		</div>
 	</li>
 }
@@ -259,7 +260,7 @@ templ SubmissionSearchBar(m SessionTemplateModel, swapOob string) {
 	>
 		if m.SubmissionsLeft() > 0 {
 			<input
-				hx-post={ fmt.Sprintf("/app/session/%d/tracks", m.Session.Id()) }
+				hx-post={ fmt.Sprintf("/app/session/%d/tracks", m.Session.Id) }
 				hx-trigger="input changed delay:500ms, search"
 				hx-target={ fmt.Sprintf("#%s", SubmissionSearchBarResultsId) }
 				hx-select={ "#" + SubmissionSearchBarResultsId }
@@ -272,17 +273,17 @@ templ SubmissionSearchBar(m SessionTemplateModel, swapOob string) {
 			<div
 				id={ SubmissionSearchBarResultsId }
 			>
-				for _, track := range  m.SearchResult.Tracks.Items {
+				for _, track := range  m.SearchResult {
 					<div class="flex gap-5">
 						<button
-							hx-post={ fmt.Sprintf("/app/session/%d/submission", m.Session.Id()) }
+							hx-post={ fmt.Sprintf("/app/session/%d/submission", m.Session.Id) }
 							hx-vals={ fmt.Sprintf(`{"trackId": "%s"}`, track.Id) }
 							hx-target="closest div"
 							hx-swap="delete"
 						>Add</button>
 						<div class="flex flex-col">
 							<p>{ track.Name }</p>
-							<p class="text-slate-400">{ utils.MapJoin(track.Artists, ", ", func(artist spotify.SearchResultArtist) string {return artist.Name} ) }</p>
+							<p class="text-slate-400">{ utils.MapJoin(track.Artists, ", ", func(artist music.Artist) string {return artist.Name} ) }</p>
 						</div>
 					</div>
 				}
@@ -291,7 +292,7 @@ templ SubmissionSearchBar(m SessionTemplateModel, swapOob string) {
 	</div>
 }
 
-templ NewSubmission(m SessionTemplateModel, submission model.SubmissionData) {
+templ NewSubmission(m SessionTemplateModel, submission session.Submission) {
 	<ul
 		hx-swap-oob={ fmt.Sprintf("beforeend:#%s", SubmissionListId) }
 	>

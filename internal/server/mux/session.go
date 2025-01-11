@@ -1,27 +1,33 @@
 package mux
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
 
-	"github.com/CaribouBlue/top-spot/internal/db"
-	"github.com/CaribouBlue/top-spot/internal/model"
+	"github.com/CaribouBlue/top-spot/internal/music"
 	"github.com/CaribouBlue/top-spot/internal/server/middleware"
 	"github.com/CaribouBlue/top-spot/internal/server/utils"
-	"github.com/CaribouBlue/top-spot/internal/spotify"
+	"github.com/CaribouBlue/top-spot/internal/session"
 	"github.com/CaribouBlue/top-spot/internal/templates"
+	"github.com/CaribouBlue/top-spot/internal/user"
 )
 
 type SessionMux struct {
 	*http.ServeMux
+	sessionService session.SessionService
+	musicService   music.MusicService
 }
 
-func NewSessionMux() *SessionMux {
-	mux := &SessionMux{http.NewServeMux()}
+func NewSessionMux(sessionService session.SessionService, musicService music.MusicService) *SessionMux {
+	mux := &SessionMux{
+		http.NewServeMux(),
+		sessionService,
+		musicService,
+	}
 	mux.RegisterHandlers()
 	return mux
 }
@@ -52,13 +58,11 @@ func (mux *SessionMux) RegisterHandlers() {
 }
 
 func (mux *SessionMux) handleSessionListPage(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(middleware.UserCtxKey).(*model.UserModel)
-	db := db.Global()
+	user := r.Context().Value(middleware.UserCtxKey).(*user.User)
 
-	session := model.NewSessionModel(db)
-
-	sessions, err := session.ReadAll()
+	sessions, err := mux.sessionService.GetAll()
 	if err != nil {
+		log.Print(err)
 		http.Error(w, "Failed to get sessions", http.StatusInternalServerError)
 		return
 	}
@@ -69,17 +73,15 @@ func (mux *SessionMux) handleSessionListPage(w http.ResponseWriter, r *http.Requ
 }
 
 func (mux *SessionMux) handleCreateSession(w http.ResponseWriter, r *http.Request) {
-	db := db.Global()
-
-	session := model.NewSessionModel(db)
-
+	session := &session.Session{}
 	defer r.Body.Close()
-	if err := session.Scan(r.Body); err != nil {
+	err := json.NewDecoder(r.Body).Decode(session)
+	if err != nil {
 		http.Error(w, "Failed to decode request body", http.StatusBadRequest)
 		return
 	}
 
-	err := session.Create()
+	err = mux.sessionService.Create(session)
 	if err != nil {
 		http.Error(w, "Failed to create session", http.StatusInternalServerError)
 		return
@@ -93,8 +95,7 @@ func (mux *SessionMux) handleCreateSession(w http.ResponseWriter, r *http.Reques
 }
 
 func (mux *SessionMux) handleSessionPage(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(middleware.UserCtxKey).(*model.UserModel)
-	db := db.Global()
+	user := r.Context().Value(middleware.UserCtxKey).(*user.User)
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -102,12 +103,8 @@ func (mux *SessionMux) handleSessionPage(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	session := model.NewSessionModel(db, model.WithId(sessionId))
-	err = session.Read()
-	if err == sql.ErrNoRows {
-		http.Error(w, "Session not found", http.StatusNotFound)
-		return
-	} else if err != nil {
+	session, err := mux.sessionService.GetOne(sessionId)
+	if err != nil {
 		http.Error(w, "Failed to get session", http.StatusInternalServerError)
 		return
 	}
@@ -125,9 +122,12 @@ func (mux *SessionMux) handleSessionPage(w http.ResponseWriter, r *http.Request)
 }
 
 func (mux *SessionMux) handleCreateSessionTrack(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(middleware.UserCtxKey).(*model.UserModel)
-	db := db.Global()
-	spotifyClient := utils.AuthorizedSpotifyClient(user)
+	user := r.Context().Value(middleware.UserCtxKey).(*user.User)
+	err := mux.musicService.Authenticate(user)
+	if err != nil {
+		http.Error(w, "Failed to authenticate user", http.StatusInternalServerError)
+		return
+	}
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -135,12 +135,8 @@ func (mux *SessionMux) handleCreateSessionTrack(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	session := model.NewSessionModel(db, model.WithId(sessionId))
-	err = session.Read()
-	if err == sql.ErrNoRows {
-		http.Error(w, "Session not found", http.StatusNotFound)
-		return
-	} else if err != nil {
+	session, err := mux.sessionService.GetOne(sessionId)
+	if err != nil {
 		http.Error(w, "Failed to get session", http.StatusInternalServerError)
 		return
 	}
@@ -151,22 +147,25 @@ func (mux *SessionMux) handleCreateSessionTrack(w http.ResponseWriter, r *http.R
 	templateModel := templates.NewSessionTemplateModel(*session, *user)
 
 	if query != "" {
-		searchResults, err := spotifyClient.SearchTracks(query)
+		searchResults, err := mux.musicService.SearchTracks(query)
 		if err != nil {
 			http.Error(w, "Failed to search Spotify", http.StatusInternalServerError)
 			return
 		}
 
-		templateModel.SearchResult = *searchResults
+		templateModel.SearchResult = searchResults
 	}
 
 	templates.SubmissionSearchBar(templateModel, "").Render(r.Context(), w)
 }
 
 func (mux *SessionMux) handleCreateSessionPlaylist(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(middleware.UserCtxKey).(*model.UserModel)
-	db := db.Global()
-	spotifyClient := utils.AuthorizedSpotifyClient(user)
+	user := r.Context().Value(middleware.UserCtxKey).(*user.User)
+	err := mux.musicService.Authenticate(user)
+	if err != nil {
+		http.Error(w, "Failed to authenticate user", http.StatusInternalServerError)
+		return
+	}
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -174,56 +173,42 @@ func (mux *SessionMux) handleCreateSessionPlaylist(w http.ResponseWriter, r *htt
 		return
 	}
 
-	session := model.NewSessionModel(db, model.WithId(sessionId))
-	err = session.Read()
-	if err == sql.ErrNoRows {
-		http.Error(w, "Session not found", http.StatusNotFound)
-		return
-	} else if err != nil {
+	session, err := mux.sessionService.GetOne(sessionId)
+	if err != nil {
 		http.Error(w, "Failed to get session", http.StatusInternalServerError)
 		return
 	}
 
-	playlist, err := spotifyClient.CreatePlaylist(session.PlaylistName())
+	playlist := &music.Playlist{
+		Name: fmt.Sprintf("Top Spot Session: %d", session.Name),
+	}
+	trackIds := make([]string, len(session.Submissions))
+	for i, submission := range session.Submissions {
+		trackIds[i] = submission.TrackId
+	}
+	err = mux.musicService.CreatePlaylist(playlist, trackIds)
 	if err != nil {
-		fmt.Printf("%s\n", err)
 		http.Error(w, "Failed to create playlist", http.StatusInternalServerError)
 		return
 	}
 
-	trackIds := make([]string, len(session.Data.Submissions))
-	for i, submission := range session.Data.Submissions {
-		trackIds[i] = submission.TrackId
-	}
-	err = spotifyClient.AddTracksToPlaylist(playlist.Id, trackIds)
+	err = mux.sessionService.AddPlaylist(sessionId, playlist.Id, user.Id)
 	if err != nil {
-		spotifyClient.UnfollowPlaylist(playlist.Id)
-		http.Error(w, "Failed to add tracks to playlist", http.StatusInternalServerError)
+		http.Error(w, "Failed to add playlist to session", http.StatusInternalServerError)
 		return
 	}
 
-	err = user.AddPlaylist(playlist.Id, session.Id())
-	if err != nil {
-		spotifyClient.UnfollowPlaylist(playlist.Id)
-		http.Error(w, "Failed to add playlist to user", http.StatusInternalServerError)
-		return
-	}
-
-	err = user.Update()
-	if err != nil {
-		spotifyClient.UnfollowPlaylist(playlist.Id)
-		http.Error(w, "Failed to update user", http.StatusInternalServerError)
-		return
-	}
-
-	templateModel := templates.NewSessionTemplateModel(*session, model.UserModel{})
+	templateModel := templates.NewSessionTemplateModel(*session, *user)
 	utils.HandleHtmlResponse(r, w, templates.PlaylistButton(templateModel, *playlist))
 }
 
 func (mux *SessionMux) handleGetSessionPlaylist(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(middleware.UserCtxKey).(*model.UserModel)
-	db := db.Global()
-	spotifyClient := utils.AuthorizedSpotifyClient(user)
+	user := r.Context().Value(middleware.UserCtxKey).(*user.User)
+	err := mux.musicService.Authenticate(user)
+	if err != nil {
+		http.Error(w, "Failed to authenticate user", http.StatusInternalServerError)
+		return
+	}
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -231,29 +216,22 @@ func (mux *SessionMux) handleGetSessionPlaylist(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	session := model.NewSessionModel(db, model.WithId(sessionId))
-	err = session.Read()
-	if err == sql.ErrNoRows {
-		http.Error(w, "Session not found", http.StatusNotFound)
-		return
-	} else if err != nil {
+	session, err := mux.sessionService.GetOne(sessionId)
+	if err != nil {
 		http.Error(w, "Failed to get session", http.StatusInternalServerError)
 		return
 	}
 
-	var playlist *spotify.Playlist
-	userPlaylist, err := user.GetSessionPlaylist(session.Id())
-	if err == model.ErrUserPlaylistNotFound {
-		playlist = &spotify.Playlist{}
-	} else if err != nil {
+	sessionPlaylist, err := mux.sessionService.GetPlaylist(sessionId, user.Id)
+	if err != nil {
+		http.Error(w, "Failed to get playlist from session", http.StatusInternalServerError)
+		return
+	}
+
+	playlist, err := mux.musicService.GetPlaylist(sessionPlaylist.Id)
+	if err != nil {
 		http.Error(w, "Failed to get playlist", http.StatusInternalServerError)
 		return
-	} else {
-		playlist, err = spotifyClient.GetPlaylist(userPlaylist.Id)
-		if err != nil {
-			http.Error(w, "Failed to get playlist", http.StatusInternalServerError)
-			return
-		}
 	}
 
 	templateModel := templates.NewSessionTemplateModel(*session, *user)
@@ -261,8 +239,7 @@ func (mux *SessionMux) handleGetSessionPlaylist(w http.ResponseWriter, r *http.R
 }
 
 func (mux *SessionMux) handleCreateSessionSubmission(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(middleware.UserCtxKey).(*model.UserModel)
-	db := db.Global()
+	user := r.Context().Value(middleware.UserCtxKey).(*user.User)
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -270,43 +247,26 @@ func (mux *SessionMux) handleCreateSessionSubmission(w http.ResponseWriter, r *h
 		return
 	}
 
-	session := model.NewSessionModel(db, model.WithId(sessionId))
-	err = session.Read()
-	if err == sql.ErrNoRows {
-		http.Error(w, "Session not found", http.StatusNotFound)
-		return
-	} else if err != nil {
+	s, err := mux.sessionService.GetOne(sessionId)
+	if err != nil {
 		http.Error(w, "Failed to get session", http.StatusInternalServerError)
 		return
 	}
 
 	r.ParseForm()
 	trackId := r.Form.Get("trackId")
-	submission := model.NewSubmissionData(user.Id(), trackId)
-
-	err = session.AddSubmission(*submission)
-	if err != nil {
-		if err == model.ErrSubmissionsMaxedOut {
-			http.Error(w, "Max submissions reached", http.StatusConflict)
-			return
-		}
-		http.Error(w, "Failed to add submission", http.StatusInternalServerError)
-		return
+	submission := &session.Submission{
+		UserId:  user.Id,
+		TrackId: trackId,
 	}
+	mux.sessionService.AddSubmission(s.Id, submission)
 
-	err = session.Update()
-	if err != nil {
-		http.Error(w, "Failed to add submission", http.StatusInternalServerError)
-		return
-	}
-
-	templateModel := templates.NewSessionTemplateModel(*session, *user)
+	templateModel := templates.NewSessionTemplateModel(*s, *user)
 	templates.NewSubmission(templateModel, *submission).Render(r.Context(), w)
 }
 
 func (mux *SessionMux) handleGetSessionPhaseDuration(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(middleware.UserCtxKey).(*model.UserModel)
-	db := db.Global()
+	user := r.Context().Value(middleware.UserCtxKey).(*user.User)
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -314,12 +274,8 @@ func (mux *SessionMux) handleGetSessionPhaseDuration(w http.ResponseWriter, r *h
 		return
 	}
 
-	session := model.NewSessionModel(db, model.WithId(sessionId))
-	err = session.Read()
-	if err == sql.ErrNoRows {
-		http.Error(w, "Session not found", http.StatusNotFound)
-		return
-	} else if err != nil {
+	session, err := mux.sessionService.GetOne(sessionId)
+	if err != nil {
 		http.Error(w, "Failed to get session", http.StatusInternalServerError)
 		return
 	}
@@ -329,9 +285,12 @@ func (mux *SessionMux) handleGetSessionPhaseDuration(w http.ResponseWriter, r *h
 }
 
 func (mux *SessionMux) handleGetSessionSubmission(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(middleware.UserCtxKey).(*model.UserModel)
-	db := db.Global()
-	spotifyClient := utils.AuthorizedSpotifyClient(user)
+	user := r.Context().Value(middleware.UserCtxKey).(*user.User)
+	err := mux.musicService.Authenticate(user)
+	if err != nil {
+		http.Error(w, "Failed to authenticate user", http.StatusInternalServerError)
+		return
+	}
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -345,23 +304,19 @@ func (mux *SessionMux) handleGetSessionSubmission(w http.ResponseWriter, r *http
 		return
 	}
 
-	session := model.NewSessionModel(db, model.WithId(sessionId))
-	err = session.Read()
-	if err == sql.ErrNoRows {
-		http.Error(w, "Session not found", http.StatusNotFound)
-		return
-	} else if err != nil {
+	session, err := mux.sessionService.GetOne(sessionId)
+	if err != nil {
 		http.Error(w, "Failed to get session", http.StatusInternalServerError)
 		return
 	}
 
-	submission, err := session.GetSubmission(submissionId)
+	submission, err := mux.sessionService.GetSubmission(sessionId, submissionId)
 	if err != nil {
 		http.Error(w, "Failed to get submission", http.StatusInternalServerError)
 		return
 	}
 
-	track, err := spotifyClient.GetTrack(submission.TrackId)
+	track, err := mux.musicService.GetTrack(submission.TrackId)
 	if err != nil {
 		http.Error(w, "Failed to get track", http.StatusInternalServerError)
 		return
@@ -372,8 +327,7 @@ func (mux *SessionMux) handleGetSessionSubmission(w http.ResponseWriter, r *http
 }
 
 func (mux *SessionMux) handleDeleteSessionSubmission(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(middleware.UserCtxKey).(*model.UserModel)
-	db := db.Global()
+	user := r.Context().Value(middleware.UserCtxKey).(*user.User)
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -387,23 +341,13 @@ func (mux *SessionMux) handleDeleteSessionSubmission(w http.ResponseWriter, r *h
 		return
 	}
 
-	session := model.NewSessionModel(db, model.WithId(sessionId))
-	err = session.Read()
-	if err == sql.ErrNoRows {
-		http.Error(w, "Session not found", http.StatusNotFound)
-		return
-	} else if err != nil {
+	session, err := mux.sessionService.GetOne(sessionId)
+	if err != nil {
 		http.Error(w, "Failed to get session", http.StatusInternalServerError)
 		return
 	}
 
-	err = session.DeleteSubmission(submissionId, user.Id())
-	if err != nil {
-		http.Error(w, "Failed to delete submission", http.StatusInternalServerError)
-		return
-	}
-
-	err = session.Update()
+	err = mux.sessionService.RemoveSubmission(sessionId, submissionId)
 	if err != nil {
 		http.Error(w, "Failed to delete submission", http.StatusInternalServerError)
 		return
@@ -414,9 +358,13 @@ func (mux *SessionMux) handleDeleteSessionSubmission(w http.ResponseWriter, r *h
 }
 
 func (mux *SessionMux) handleGetSessionSubmissionCandidate(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(middleware.UserCtxKey).(*model.UserModel)
-	db := db.Global()
-	spotifyClient := utils.AuthorizedSpotifyClient(user)
+	user := r.Context().Value(middleware.UserCtxKey).(*user.User)
+
+	err := mux.musicService.Authenticate(user)
+	if err != nil {
+		http.Error(w, "Failed to authenticate user", http.StatusInternalServerError)
+		return
+	}
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -430,23 +378,19 @@ func (mux *SessionMux) handleGetSessionSubmissionCandidate(w http.ResponseWriter
 		return
 	}
 
-	session := model.NewSessionModel(db, model.WithId(sessionId))
-	err = session.Read()
-	if err == sql.ErrNoRows {
-		http.Error(w, "Session not found", http.StatusNotFound)
-		return
-	} else if err != nil {
+	session, err := mux.sessionService.GetOne(sessionId)
+	if err != nil {
 		http.Error(w, "Failed to get session", http.StatusInternalServerError)
 		return
 	}
 
-	submission, err := session.GetSubmission(submissionId)
+	submission, err := mux.sessionService.GetSubmission(sessionId, submissionId)
 	if err != nil {
 		http.Error(w, "Failed to get submission", http.StatusInternalServerError)
 		return
 	}
 
-	track, err := spotifyClient.GetTrack(submission.TrackId)
+	track, err := mux.musicService.GetTrack(submission.TrackId)
 	if err != nil {
 		http.Error(w, "Failed to get track", http.StatusInternalServerError)
 		return
@@ -457,9 +401,13 @@ func (mux *SessionMux) handleGetSessionSubmissionCandidate(w http.ResponseWriter
 }
 
 func (mux *SessionMux) handleCreateSessionVote(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(middleware.UserCtxKey).(*model.UserModel)
-	db := db.Global()
-	spotifyClient := utils.AuthorizedSpotifyClient(user)
+	user := r.Context().Value(middleware.UserCtxKey).(*user.User)
+
+	err := mux.musicService.Authenticate(user)
+	if err != nil {
+		http.Error(w, "Failed to authenticate user", http.StatusInternalServerError)
+		return
+	}
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -467,46 +415,48 @@ func (mux *SessionMux) handleCreateSessionVote(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	session := model.NewSessionModel(db, model.WithId(sessionId))
-	err = session.Read()
-	if err == sql.ErrNoRows {
-		http.Error(w, "Session not found", http.StatusNotFound)
-		return
-	} else if err != nil {
+	s, err := mux.sessionService.GetOne(sessionId)
+	if err != nil {
 		http.Error(w, "Failed to get session", http.StatusInternalServerError)
 		return
 	}
 
 	r.ParseForm()
 	submissionId := r.Form.Get("submissionId")
-	submission, err := session.GetSubmission(submissionId)
+	submission, err := mux.sessionService.GetSubmission(sessionId, submissionId)
 	if err != nil {
 		http.Error(w, "Failed to get submission", http.StatusInternalServerError)
 		return
 	}
 
-	track, err := spotifyClient.GetTrack(submission.TrackId)
+	track, err := mux.musicService.GetTrack(submission.TrackId)
 	if err != nil {
 		http.Error(w, "Failed to get track", http.StatusInternalServerError)
 		return
 	}
 
-	session.AddVote(*model.NewVoteModel(user.Id(), submissionId))
-
-	err = session.Update()
+	vote := &session.Vote{
+		UserId:       user.Id,
+		SubmissionId: submissionId,
+	}
+	err = mux.sessionService.AddVote(sessionId, vote)
 	if err != nil {
 		http.Error(w, "Failed to add vote", http.StatusInternalServerError)
 		return
 	}
 
-	templateModel := templates.NewSessionTemplateModel(*session, *user)
+	templateModel := templates.NewSessionTemplateModel(*s, *user)
 	templates.VoteCandidate(templateModel, *submission, *track).Render(r.Context(), w)
 }
 
 func (mux *SessionMux) handleDeleteSessionVote(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(middleware.UserCtxKey).(*model.UserModel)
-	db := db.Global()
-	spotifyClient := utils.AuthorizedSpotifyClient(user)
+	user := r.Context().Value(middleware.UserCtxKey).(*user.User)
+
+	err := mux.musicService.Authenticate(user)
+	if err != nil {
+		http.Error(w, "Failed to authenticate user", http.StatusInternalServerError)
+		return
+	}
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -520,41 +470,31 @@ func (mux *SessionMux) handleDeleteSessionVote(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	session := model.NewSessionModel(db, model.WithId(sessionId))
-	err = session.Read()
-	if err == sql.ErrNoRows {
-		http.Error(w, "Session not found", http.StatusNotFound)
-		return
-	} else if err != nil {
+	session, err := mux.sessionService.GetOne(sessionId)
+	if err != nil {
 		http.Error(w, "Failed to get session", http.StatusInternalServerError)
 		return
 	}
 
-	vote, err := session.GetVote(voteId, user.Id())
+	vote, err := mux.sessionService.GetVote(sessionId, voteId)
 	if err != nil {
 		http.Error(w, "Failed to get vote", http.StatusInternalServerError)
 		return
 	}
 
-	submission, err := session.GetSubmission(vote.SubmissionId)
+	submission, err := mux.sessionService.GetSubmission(sessionId, vote.SubmissionId)
 	if err != nil {
 		http.Error(w, "Failed to get submission", http.StatusInternalServerError)
 		return
 	}
 
-	track, err := spotifyClient.GetTrack(submission.TrackId)
+	track, err := mux.musicService.GetTrack(submission.TrackId)
 	if err != nil {
 		http.Error(w, "Failed to get track", http.StatusInternalServerError)
 		return
 	}
 
-	err = session.DeleteVote(voteId, user.Id())
-	if err != nil {
-		http.Error(w, "Failed to delete vote", http.StatusInternalServerError)
-		return
-	}
-
-	err = session.Update()
+	err = mux.sessionService.RemoveVote(sessionId, voteId)
 	if err != nil {
 		http.Error(w, "Failed to delete vote", http.StatusInternalServerError)
 		return

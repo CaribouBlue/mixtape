@@ -6,11 +6,13 @@ import (
 	"path"
 
 	"github.com/CaribouBlue/top-spot/internal/appdata"
-	"github.com/CaribouBlue/top-spot/internal/db"
-	"github.com/CaribouBlue/top-spot/internal/model"
+	"github.com/CaribouBlue/top-spot/internal/music"
+	"github.com/CaribouBlue/top-spot/internal/session"
+	"github.com/CaribouBlue/top-spot/internal/store"
+	"github.com/CaribouBlue/top-spot/internal/user"
 )
 
-var MockSubmissions = []model.SubmissionData{
+var MockSubmissions = []session.Submission{
 	{
 		Id:      "f9b7dc17-081f-428f-80ff-b27db0bbe5f5",
 		UserId:  6666,
@@ -69,35 +71,37 @@ func main() {
 		log.Fatal(err)
 	}
 
-	dbPath := path.Join(appDataDir, db.GlobalDbName)
+	dbPath := path.Join(appDataDir, "/top-spot.db")
 	e := os.Remove(dbPath)
 	if e != nil && !os.IsNotExist(e) {
 		log.Fatal(e)
 	}
 
-	database := db.NewSqliteJsonDb(db.GlobalDbName)
-
-	for _, collection := range []db.Model{
-		&model.SessionModel{},
-		&model.UserModel{},
-	} {
-		err = database.NewCollection(collection)
-		if err != nil {
-			log.Fatal(err)
-		}
-	}
-
-	err = database.NewCollection(&model.SessionModel{})
+	database, err := store.NewSqliteJsonStore(dbPath)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = database.NewCollection(&model.UserModel{})
+	err = database.NewCollection(database.UserTable)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	err = addTestSessions(database)
+	err = database.NewCollection(database.SessionTable)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	userService := user.NewUserService(database)
+	musicService := music.NewSpotifyMusicService()
+	sessionService := session.NewSessionService(database, musicService)
+
+	err = addTestUsers(userService)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = addTestSessions(sessionService)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -105,28 +109,46 @@ func main() {
 	log.Println("Test data setup successfully")
 }
 
-func addTestSessions(database db.Db) error {
-	newSession := model.NewSessionModel(database, model.WithId(0))
-	newSession.Data.Name = "New Session"
-	err := newSession.Create()
+func addTestUsers(userService user.UserService) error {
+	u := user.User{}
+	u.Id = 6666
+	err := userService.Create(&u)
 	if err != nil {
 		return err
 	}
 
-	voteSession := model.NewSessionModel(database, model.WithId(1))
-	voteSession.Data.Name = "Vote Session"
-	voteSession.Data.Submissions = MockSubmissions
-	voteSession.Data.StartAt = voteSession.Data.StartAt.Add(-voteSession.Data.SubmissionDuration)
-	err = voteSession.Create()
+	u = user.User{}
+	u.Id = 9999
+	err = userService.Create(&u)
 	if err != nil {
 		return err
 	}
 
-	resultsSession := model.NewSessionModel(database, model.WithId(2))
-	resultsSession.Data.Name = "Results Session"
-	resultsSession.Data.Submissions = MockSubmissions
-	resultsSession.Data.StartAt = resultsSession.Data.StartAt.Add(-resultsSession.Data.SubmissionDuration - resultsSession.Data.VoteDuration)
-	err = resultsSession.Create()
+	return nil
+}
+
+func addTestSessions(sessionService session.SessionService) error {
+	s := session.NewSession("New Session")
+	s.Id = 0
+	err := sessionService.Create(s)
+	if err != nil {
+		return err
+	}
+
+	s = session.NewSession("Vote Session")
+	s.Id = 1
+	s.Submissions = MockSubmissions
+	s.StartAt = s.StartAt.Add(-s.SubmissionDuration)
+	err = sessionService.Create(s)
+	if err != nil {
+		return err
+	}
+
+	s = session.NewSession("Results Session")
+	s.Id = 2
+	s.Submissions = MockSubmissions
+	s.StartAt = s.StartAt.Add(-s.SubmissionDuration - s.VoteDuration)
+	err = sessionService.Create(s)
 	if err != nil {
 		return err
 	}

@@ -2,19 +2,20 @@ package templates
 
 import (
 	"fmt"
-	"github.com/CaribouBlue/top-spot/internal/model"
+	"github.com/CaribouBlue/top-spot/internal/session"
+	"github.com/CaribouBlue/top-spot/internal/user"
 )
 
 type HomeTemplateModel struct {
-	User     *model.UserModel
-	Sessions []*model.SessionModel
+	User     *user.User
+	Sessions []*session.Session
 }
 
 func (model HomeTemplateModel) GetSessionHref(sessionId int64) string {
 	return fmt.Sprintf("/app/session/%d", sessionId)
 }
 
-func NewHomeTemplateModel(user *model.UserModel, sessions []*model.SessionModel) HomeTemplateModel {
+func NewHomeTemplateModel(user *user.User, sessions []*session.Session) HomeTemplateModel {
 	return HomeTemplateModel{User: user, Sessions: sessions}
 }
 
@@ -25,7 +26,7 @@ templ Home(model HomeTemplateModel) {
 		<ul hx-boost="true">
 			for _, session := range model.Sessions {
 				<li>
-					<a href={ templ.URL(model.GetSessionHref(session.Id())) }>{ session.Data.Name }</a>
+					<a href={ templ.URL(model.GetSessionHref(session.Id)) }>{ session.Name }</a>
 				</li>
 			}
 		</ul>

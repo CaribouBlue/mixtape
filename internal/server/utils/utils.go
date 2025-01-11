@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/CaribouBlue/top-spot/internal/model"
-	"github.com/CaribouBlue/top-spot/internal/spotify"
+	"github.com/CaribouBlue/top-spot/internal/music/spotify"
+	"github.com/CaribouBlue/top-spot/internal/user"
 	"github.com/a-h/templ"
 )
 
@@ -23,8 +23,8 @@ func HandleHtmlResponse(r *http.Request, w http.ResponseWriter, component templ.
 	component.Render(r.Context(), w)
 }
 
-func AuthorizedSpotifyClient(user *model.UserModel) *spotify.Client {
+func AuthorizedSpotifyClient(user *user.User) *spotify.Client {
 	spotify := spotify.DefaultClient()
-	spotify.SetAccessToken(user.Data.SpotifyAccessToken)
+	spotify.SetAccessToken(user.SpotifyAccessToken)
 	return spotify
 }
