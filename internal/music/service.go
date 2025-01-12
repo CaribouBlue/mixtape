@@ -77,26 +77,30 @@ func (s *spotifyMusicService) GetTrack(trackId string) (*Track, error) {
 	return track, nil
 }
 
+func (s *spotifyMusicService) newPlaylist(spotifyPlaylist *spotify.Playlist) *Playlist {
+	return &Playlist{
+		Id:   spotifyPlaylist.Id,
+		Name: spotifyPlaylist.Name,
+		Url:  spotifyPlaylist.ExternalUrls.Spotify,
+	}
+}
+
 func (s *spotifyMusicService) CreatePlaylist(playlist *Playlist, trackIds []string) error {
-	newPlaylist, err := s.client.CreatePlaylist(playlist.Name)
+	spotifyPlaylist, err := s.client.CreatePlaylist(playlist.Name)
 	if err != nil {
 		return err
 	}
 
-	playlist.Id = newPlaylist.Id
+	*playlist = *s.newPlaylist(spotifyPlaylist)
 
 	return s.client.AddTracksToPlaylist(playlist.Id, trackIds)
 }
 
 func (s *spotifyMusicService) GetPlaylist(playlistId string) (*Playlist, error) {
-	playlist, err := s.client.GetPlaylist(playlistId)
+	spotifyPlaylist, err := s.client.GetPlaylist(playlistId)
 	if err != nil {
 		return nil, err
 	}
 
-	return &Playlist{
-		Id:   playlist.Id,
-		Name: playlist.Name,
-		Url:  playlist.ExternalUrls.Spotify,
-	}, nil
+	return s.newPlaylist(spotifyPlaylist), nil
 }
