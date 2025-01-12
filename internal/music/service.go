@@ -97,5 +97,6 @@ func (s *spotifyMusicService) GetPlaylist(playlistId string) (*Playlist, error) 
 	return &Playlist{
 		Id:   playlist.Id,
 		Name: playlist.Name,
+		Url:  playlist.ExternalUrls.Spotify,
 	}, nil
 }

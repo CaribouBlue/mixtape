@@ -10,6 +10,7 @@ import (
 var (
 	ErrSubmissionNotFound = errors.New("submission not found")
 	ErrVoteNotFound       = errors.New("vote not found")
+	ErrVoteExists         = errors.New("vote already exists")
 	ErrPlaylistNotFound   = errors.New("playlist not found")
 	ErrPlaylistExists     = errors.New("playlist already exists")
 )
@@ -144,6 +145,14 @@ func (s *sessionService) AddVote(sessionId int64, vote *Vote) (*Session, error) 
 		return nil, err
 	}
 
+	for _, v := range session.Votes {
+		if v.UserId == vote.UserId && v.SubmissionId == vote.SubmissionId {
+			return nil, ErrVoteExists
+		}
+	}
+
+	vote.Id = uuid.New().String()
+
 	session.Votes = append(session.Votes, *vote)
 
 	return session, s.repo.UpdateSession(session)
@@ -164,9 +173,6 @@ func (s *sessionService) RemoveVote(sessionId int64, voteId string) (*Session, e
 
 	return nil, ErrVoteNotFound
 }
-
-// GetPlaylist(sessionId int64, userId int64) (Playlist, error)
-// AddPlaylist(sessionId int64, playlistId string, userId int64) error
 
 func (s *sessionService) GetPlaylist(sessionId int64, userId int64) (*Playlist, error) {
 	session, err := s.repo.GetSession(sessionId)

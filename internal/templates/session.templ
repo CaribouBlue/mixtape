@@ -82,7 +82,8 @@ func NewSessionTemplateModel(session session.Session, user user.User) SessionTem
 	}
 }
 
-templ Session(m SessionTemplateModel, swapOob string) {
+// Session Page Templates
+templ SessionPage(m SessionTemplateModel, swapOob string) {
 	@root(RootProps{Title: "Session " + m.SessionId()}) {
 		<div
 			id={ SessionDetailsId }
@@ -91,9 +92,9 @@ templ Session(m SessionTemplateModel, swapOob string) {
 			<h1>Session: { m.Session.Name }</h1>
 			switch m.Session.Phase() {
 				case session.SubmissionPhase:
-					@SubmissionForm(m)
+					@SubmissionPhaseView(m)
 				case session.VotePhase:
-					@VoteForm(m)
+					@VotePhaseView(m)
 				case session.ResultPhase:
 					<h2>Results</h2>
 			}
@@ -101,107 +102,8 @@ templ Session(m SessionTemplateModel, swapOob string) {
 	}
 }
 
-templ SessionPhaseDuration(m SessionTemplateModel) {
-	if m.PhaseDuration() != "" {
-		<p>{ m.PhaseDuration() } remaining</p>
-	} else {
-		@Session(m, "true")
-	}
-}
-
-templ VoteForm(m SessionTemplateModel) {
-	<h3
-		hx-get={ fmt.Sprintf("/app/session/%s/phase-duration", m.SessionId()) }
-		hx-trigger="load, every 1m"
-	></h3>
-	@LazyLoadPlaylistButton(m)
-	<ul>
-		for _, submission := range m.Session.Submissions {
-			@LazyLoadVoteCandidate(m, submission.Id)
-		}
-	</ul>
-}
-
-templ LazyLoadPlaylistButton(m SessionTemplateModel) {
-	<div
-		hx-get={ fmt.Sprintf("/app/session/%d/playlist", m.Session.Id) }
-		hx-trigger="load"
-		hx-swap="outerHTML"
-	>
-		@spinner(SpinnerOpts{Size: SpinnerSizeS})
-	</div>
-}
-
-templ PlaylistButton(m SessionTemplateModel, playlist music.Playlist) {
-	if playlist.Id != "" {
-		<a
-			href={ templ.SafeURL(playlist.Url) }
-			target="_blank"
-		>
-			Open Playlist
-		</a>
-	} else {
-		<button
-			hx-post={ fmt.Sprintf("/app/session/%d/playlist", m.Session.Id) }
-			hx-swap="outerHTML"
-		>
-			@requestSpinner(SpinnerOpts{Size: SpinnerSizeS}) {
-				Create Playlist
-			}
-		</button>
-	}
-}
-
-templ LazyLoadVoteCandidate(m SessionTemplateModel, submissionId string) {
-	<div
-		hx-get={ fmt.Sprintf("/app/session/%d/submission/%s/candidate", m.Session.Id, submissionId) }
-		hx-trigger="load"
-		hx-swap="outerHTML"
-	>
-		<li class="flex gap-5">
-			@spinner(SpinnerOpts{Size: SpinnerSizeS})
-		</li>
-	</div>
-}
-
-templ VoteCandidate(m SessionTemplateModel, submission session.Submission, track music.Track) {
-	<li class="flex gap-5">
-		if m.IsUserSubmission(submission.Id) {
-			<button
-				disabled
-			></button>
-		} else if m.GetSubmissionVoteId(submission.Id) != "" {
-			<button
-				hx-delete={ fmt.Sprintf("/app/session/%d/vote/%s", m.Session.Id, m.GetSubmissionVoteId(submission.Id)) }
-				hx-target="closest li"
-				hx-swap="outerHTML"
-				hx-disabled-elt="this"
-			>
-				@requestSpinner(SpinnerOpts{Size: SpinnerSizeXs}) {
-					★
-				}
-			</button>
-		} else {
-			<button
-				hx-post={ fmt.Sprintf("/app/session/%d/vote", m.Session.Id) }
-				hx-vals={ fmt.Sprintf(`{"submissionId": "%s"}`, submission.Id) }
-				hx-target="closest li"
-				hx-swap="outerHTML"
-				hx-disabled-elt="this"
-			>
-				@requestSpinner(SpinnerOpts{Size: SpinnerSizeXs}) {
-					☆
-				}
-			</button>
-		}
-		<div class="flex flex-col">
-			<p>{ track.Name }</p>
-			<p class="text-slate-400">{ utils.MapJoin(track.Artists, ", ", func(artist music.Artist) string {return artist.Name} ) }</p>
-		</div>
-	</li>
-}
-
-templ SubmissionForm(m SessionTemplateModel) {
+// Submission Phase View Templates
+templ SubmissionPhaseView(m SessionTemplateModel) {
 	<h2>Phase: Submission</h2>
 	<h3
 		hx-get={ fmt.Sprintf("/app/session/%s/phase-duration", m.SessionId()) }
@@ -312,4 +214,106 @@ templ DeleteSubmission(m SessionTemplateModel) {
 		@SubmissionSearchBar(m, "true")
 	}
 	@SubmissionCounter(m, "true")
+}
+
+// Vote Phase View Templates
+templ VotePhaseView(m SessionTemplateModel) {
+	<h3
+		hx-get={ fmt.Sprintf("/app/session/%s/phase-duration", m.SessionId()) }
+		hx-trigger="load, every 1m"
+	></h3>
+	@LazyLoadPlaylistButton(m)
+	<ul>
+		for _, submission := range m.Session.Submissions {
+			@LazyLoadVoteCandidate(m, submission.Id)
+		}
+	</ul>
+}
+
+templ LazyLoadPlaylistButton(m SessionTemplateModel) {
+	<div
+		hx-get={ fmt.Sprintf("/app/session/%d/playlist", m.Session.Id) }
+		hx-trigger="load"
+		hx-swap="outerHTML"
+	>
+		@spinner(SpinnerOpts{Size: SpinnerSizeS})
+	</div>
+}
+
+templ PlaylistButton(m SessionTemplateModel, playlist music.Playlist) {
+	if playlist.Id != "" {
+		<a
+			href={ templ.SafeURL(playlist.Url) }
+			target="_blank"
+		>
+			Open Playlist
+		</a>
+	} else {
+		<button
+			hx-post={ fmt.Sprintf("/app/session/%d/playlist", m.Session.Id) }
+			hx-swap="outerHTML"
+		>
+			@requestSpinner(SpinnerOpts{Size: SpinnerSizeS}) {
+				Create Playlist
+			}
+		</button>
+	}
+}
+
+templ LazyLoadVoteCandidate(m SessionTemplateModel, submissionId string) {
+	<div
+		hx-get={ fmt.Sprintf("/app/session/%d/submission/%s/candidate", m.Session.Id, submissionId) }
+		hx-trigger="load"
+		hx-swap="outerHTML"
+	>
+		<li class="flex gap-5">
+			@spinner(SpinnerOpts{Size: SpinnerSizeS})
+		</li>
+	</div>
+}
+
+templ VoteCandidate(m SessionTemplateModel, submission session.Submission, track music.Track) {
+	<li class="flex gap-5">
+		if m.IsUserSubmission(submission.Id) {
+			<button
+				disabled
+			></button>
+		} else if m.GetSubmissionVoteId(submission.Id) != "" {
+			<button
+				hx-delete={ fmt.Sprintf("/app/session/%d/vote/%s", m.Session.Id, m.GetSubmissionVoteId(submission.Id)) }
+				hx-target="closest li"
+				hx-swap="outerHTML"
+				hx-disabled-elt="this"
+			>
+				@requestSpinner(SpinnerOpts{Size: SpinnerSizeXs}) {
+					★
+				}
+			</button>
+		} else {
+			<button
+				hx-post={ fmt.Sprintf("/app/session/%d/vote", m.Session.Id) }
+				hx-vals={ fmt.Sprintf(`{"submissionId": "%s"}`, submission.Id) }
+				hx-target="closest li"
+				hx-swap="outerHTML"
+				hx-disabled-elt="this"
+			>
+				@requestSpinner(SpinnerOpts{Size: SpinnerSizeXs}) {
+					☆
+				}
+			</button>
+		}
+		<div class="flex flex-col">
+			<p>{ track.Name }</p>
+			<p class="text-slate-400">{ utils.MapJoin(track.Artists, ", ", func(artist music.Artist) string {return artist.Name} ) }</p>
+		</div>
+	</li>
+}
+
+// Shared Templates
+templ SessionPhaseDuration(m SessionTemplateModel) {
+	if m.PhaseDuration() != "" {
+		<p>{ m.PhaseDuration() } remaining</p>
+	} else {
+		@SessionPage(m, "true")
+	}
 }

@@ -116,7 +116,7 @@ func (mux *SessionMux) handleSessionPage(w http.ResponseWriter, r *http.Request)
 	case "text/html":
 	default:
 		templateModel := templates.NewSessionTemplateModel(*session, *user)
-		component := templates.Session(templateModel, "")
+		component := templates.SessionPage(templateModel, "")
 		utils.HandleHtmlResponse(r, w, component)
 	}
 }
@@ -216,25 +216,28 @@ func (mux *SessionMux) handleGetSessionPlaylist(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	session, err := mux.sessionService.GetOne(sessionId)
+	sesh, err := mux.sessionService.GetOne(sessionId)
 	if err != nil {
 		http.Error(w, "Failed to get session", http.StatusInternalServerError)
 		return
 	}
 
+	var playlist *music.Playlist
 	sessionPlaylist, err := mux.sessionService.GetPlaylist(sessionId, user.Id)
-	if err != nil {
+	if err == session.ErrPlaylistNotFound {
+		playlist = &music.Playlist{}
+	} else if err != nil {
 		http.Error(w, "Failed to get playlist from session", http.StatusInternalServerError)
 		return
+	} else {
+		playlist, err = mux.musicService.GetPlaylist(sessionPlaylist.Id)
+		if err != nil {
+			http.Error(w, "Failed to get playlist", http.StatusInternalServerError)
+			return
+		}
 	}
 
-	playlist, err := mux.musicService.GetPlaylist(sessionPlaylist.Id)
-	if err != nil {
-		http.Error(w, "Failed to get playlist", http.StatusInternalServerError)
-		return
-	}
-
-	templateModel := templates.NewSessionTemplateModel(*session, *user)
+	templateModel := templates.NewSessionTemplateModel(*sesh, *user)
 	utils.HandleHtmlResponse(r, w, templates.PlaylistButton(templateModel, *playlist))
 }
 
@@ -247,7 +250,7 @@ func (mux *SessionMux) handleCreateSessionSubmission(w http.ResponseWriter, r *h
 		return
 	}
 
-	s, err := mux.sessionService.GetOne(sessionId)
+	sesh, err := mux.sessionService.GetOne(sessionId)
 	if err != nil {
 		http.Error(w, "Failed to get session", http.StatusInternalServerError)
 		return
@@ -259,13 +262,13 @@ func (mux *SessionMux) handleCreateSessionSubmission(w http.ResponseWriter, r *h
 		UserId:  user.Id,
 		TrackId: trackId,
 	}
-	s, err = mux.sessionService.AddSubmission(s.Id, submission)
+	sesh, err = mux.sessionService.AddSubmission(sesh.Id, submission)
 	if err != nil {
 		http.Error(w, "Failed to add submission", http.StatusInternalServerError)
 		return
 	}
 
-	templateModel := templates.NewSessionTemplateModel(*s, *user)
+	templateModel := templates.NewSessionTemplateModel(*sesh, *user)
 	templates.NewSubmission(templateModel, *submission).Render(r.Context(), w)
 }
 
@@ -345,13 +348,7 @@ func (mux *SessionMux) handleDeleteSessionSubmission(w http.ResponseWriter, r *h
 		return
 	}
 
-	session, err := mux.sessionService.GetOne(sessionId)
-	if err != nil {
-		http.Error(w, "Failed to get session", http.StatusInternalServerError)
-		return
-	}
-
-	session, err = mux.sessionService.RemoveSubmission(sessionId, submissionId)
+	session, err := mux.sessionService.RemoveSubmission(sessionId, submissionId)
 	if err != nil {
 		http.Error(w, "Failed to delete submission", http.StatusInternalServerError)
 		return
@@ -437,13 +434,13 @@ func (mux *SessionMux) handleCreateSessionVote(w http.ResponseWriter, r *http.Re
 		UserId:       user.Id,
 		SubmissionId: submissionId,
 	}
-	s, err := mux.sessionService.AddVote(sessionId, vote)
+	sesh, err := mux.sessionService.AddVote(sessionId, vote)
 	if err != nil {
 		http.Error(w, "Failed to add vote", http.StatusInternalServerError)
 		return
 	}
 
-	templateModel := templates.NewSessionTemplateModel(*s, *user)
+	templateModel := templates.NewSessionTemplateModel(*sesh, *user)
 	templates.VoteCandidate(templateModel, *submission, *track).Render(r.Context(), w)
 }
 
