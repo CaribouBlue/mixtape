@@ -180,7 +180,7 @@ func (mux *SessionMux) handleCreateSessionPlaylist(w http.ResponseWriter, r *htt
 	}
 
 	playlist := &music.Playlist{
-		Name: fmt.Sprintf("Top Spot Session: %d", session.Name),
+		Name: fmt.Sprintf("Top Spot Session: %s", session.Name),
 	}
 	trackIds := make([]string, len(session.Submissions))
 	for i, submission := range session.Submissions {
@@ -192,7 +192,7 @@ func (mux *SessionMux) handleCreateSessionPlaylist(w http.ResponseWriter, r *htt
 		return
 	}
 
-	err = mux.sessionService.AddPlaylist(sessionId, playlist.Id, user.Id)
+	session, err = mux.sessionService.AddPlaylist(sessionId, playlist.Id, user.Id)
 	if err != nil {
 		http.Error(w, "Failed to add playlist to session", http.StatusInternalServerError)
 		return
@@ -259,7 +259,11 @@ func (mux *SessionMux) handleCreateSessionSubmission(w http.ResponseWriter, r *h
 		UserId:  user.Id,
 		TrackId: trackId,
 	}
-	mux.sessionService.AddSubmission(s.Id, submission)
+	s, err = mux.sessionService.AddSubmission(s.Id, submission)
+	if err != nil {
+		http.Error(w, "Failed to add submission", http.StatusInternalServerError)
+		return
+	}
 
 	templateModel := templates.NewSessionTemplateModel(*s, *user)
 	templates.NewSubmission(templateModel, *submission).Render(r.Context(), w)
@@ -347,7 +351,7 @@ func (mux *SessionMux) handleDeleteSessionSubmission(w http.ResponseWriter, r *h
 		return
 	}
 
-	err = mux.sessionService.RemoveSubmission(sessionId, submissionId)
+	session, err = mux.sessionService.RemoveSubmission(sessionId, submissionId)
 	if err != nil {
 		http.Error(w, "Failed to delete submission", http.StatusInternalServerError)
 		return
@@ -415,12 +419,6 @@ func (mux *SessionMux) handleCreateSessionVote(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	s, err := mux.sessionService.GetOne(sessionId)
-	if err != nil {
-		http.Error(w, "Failed to get session", http.StatusInternalServerError)
-		return
-	}
-
 	r.ParseForm()
 	submissionId := r.Form.Get("submissionId")
 	submission, err := mux.sessionService.GetSubmission(sessionId, submissionId)
@@ -439,7 +437,7 @@ func (mux *SessionMux) handleCreateSessionVote(w http.ResponseWriter, r *http.Re
 		UserId:       user.Id,
 		SubmissionId: submissionId,
 	}
-	err = mux.sessionService.AddVote(sessionId, vote)
+	s, err := mux.sessionService.AddVote(sessionId, vote)
 	if err != nil {
 		http.Error(w, "Failed to add vote", http.StatusInternalServerError)
 		return
@@ -470,12 +468,6 @@ func (mux *SessionMux) handleDeleteSessionVote(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	session, err := mux.sessionService.GetOne(sessionId)
-	if err != nil {
-		http.Error(w, "Failed to get session", http.StatusInternalServerError)
-		return
-	}
-
 	vote, err := mux.sessionService.GetVote(sessionId, voteId)
 	if err != nil {
 		http.Error(w, "Failed to get vote", http.StatusInternalServerError)
@@ -494,7 +486,7 @@ func (mux *SessionMux) handleDeleteSessionVote(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	err = mux.sessionService.RemoveVote(sessionId, voteId)
+	session, err := mux.sessionService.RemoveVote(sessionId, voteId)
 	if err != nil {
 		http.Error(w, "Failed to delete vote", http.StatusInternalServerError)
 		return
