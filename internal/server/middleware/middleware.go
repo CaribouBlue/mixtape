@@ -7,19 +7,22 @@ import (
 	"slices"
 
 	"github.com/CaribouBlue/top-spot/internal/user"
+	"github.com/google/uuid"
 )
 
-type middleware func(http.Handler) http.Handler
+type Middleware func(http.Handler) http.Handler
 
-func Apply(handler http.Handler, middlewares ...middleware) http.Handler {
-	slices.Reverse(middlewares)
-	for _, middleware := range middlewares {
+func Apply(handler http.Handler, middlewares ...Middleware) http.Handler {
+	safeMiddlewares := make([]Middleware, len(middlewares))
+	copy(safeMiddlewares, middlewares)
+	slices.Reverse(safeMiddlewares)
+	for _, middleware := range safeMiddlewares {
 		handler = middleware(handler)
 	}
 	return handler
 }
 
-func HandlerFunc(handler http.HandlerFunc, middlewares ...middleware) http.Handler {
+func HandlerFunc(handler http.HandlerFunc, middlewares ...Middleware) http.Handler {
 	return Apply(http.HandlerFunc(handler), middlewares...)
 }
 
@@ -33,7 +36,7 @@ func (w *wrappedWriter) WriteHeader(statusCode int) {
 	w.ResponseWriter.WriteHeader(statusCode)
 }
 
-func WithRequestLogging() middleware {
+func WithRequestLogging() Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			wrappedWriter := &wrappedWriter{w, http.StatusOK}
@@ -48,12 +51,39 @@ func WithRequestLogging() middleware {
 	}
 }
 
+type RequestMetadata struct {
+	RequestId string
+}
+
+func NewRequestMetadata() RequestMetadata {
+	return RequestMetadata{
+		RequestId: uuid.New().String(),
+	}
+}
+
+func WithRequestMetadata() Middleware {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := r.Context()
+
+			metadata, ok := ctx.Value(RequestMetaDataCtxKey).(RequestMetadata)
+			if !ok {
+				metadata = NewRequestMetadata()
+			}
+
+			ctx = context.WithValue(ctx, RequestMetaDataCtxKey, metadata)
+
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
 type WithUserOpts struct {
 	DefaultUserId int64
 	UserService   user.UserService
 }
 
-func WithUser(opts WithUserOpts) middleware {
+func WithUser(opts WithUserOpts) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
@@ -85,13 +115,13 @@ type WithEnforcedAuthenticationOpts struct {
 	UserService                 user.UserService
 }
 
-func WithEnforcedAuthentication(opts WithEnforcedAuthenticationOpts) middleware {
+func WithEnforcedAuthentication(opts WithEnforcedAuthenticationOpts) Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 
-			u := ctx.Value(UserCtxKey).(*user.User)
-			if u == nil {
+			u, ok := ctx.Value(UserCtxKey).(*user.User)
+			if !ok || u == nil {
 				http.Error(w, "User not found in context, may need to apply WithUser middleware", http.StatusInternalServerError)
 				return
 			}

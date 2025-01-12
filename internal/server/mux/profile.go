@@ -10,20 +10,36 @@ import (
 
 type ProfileMux struct {
 	*http.ServeMux
-	userService user.UserService
+	Opts       ProfileMuxOpts
+	Services   ProfileMuxServices
+	Children   ProfileMuxChildren
+	Middleware []middleware.Middleware
 }
 
-func NewProfileMux(userService user.UserService) *ProfileMux {
+type ProfileMuxOpts struct {
+	PathPrefix string
+}
+
+type ProfileMuxServices struct{}
+
+type ProfileMuxChildren struct{}
+
+func NewProfileMux(opts ProfileMuxOpts, services ProfileMuxServices, middleware []middleware.Middleware, children ProfileMuxChildren) *ProfileMux {
 	mux := &ProfileMux{
 		http.NewServeMux(),
-		userService,
+		opts,
+		services,
+		children,
+		middleware,
 	}
-	mux.RegisterHandlers()
+
+	mux.Handle("GET /", http.HandlerFunc(mux.handleProfilePage))
+
 	return mux
 }
 
-func (mux *ProfileMux) RegisterHandlers() {
-	mux.Handle("GET /", http.HandlerFunc(mux.handleProfilePage))
+func (mux *ProfileMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	middleware.Apply(mux.ServeMux, mux.Middleware...).ServeHTTP(w, r)
 }
 
 func (mux *ProfileMux) handleProfilePage(w http.ResponseWriter, r *http.Request) {

@@ -23,15 +23,15 @@ func StartServer() {
 	}
 
 	dbPath := appDataDir + "/top-spot.db"
-	sqliteJsonDb, err := db.NewSqliteJsonDb(dbPath)
+	db, err := db.NewSqliteJsonDb(dbPath)
 	if err != nil {
 		log.Fatal("Error creating SQLite JSON DB:", err)
 	}
 
 	// Initialize services
-	userService := user.NewUserService(sqliteJsonDb)
+	userService := user.NewUserService(db)
 	musicService := music.NewSpotifyMusicService()
-	sessionService := session.NewSessionService(sqliteJsonDb, musicService)
+	sessionService := session.NewSessionService(db)
 
 	// Initialize server
 	port := os.Getenv("PORT")
@@ -40,7 +40,71 @@ func StartServer() {
 	}
 	serverAddr := fmt.Sprintf("localhost:%s", port)
 
-	rootMuxHandler := middleware.Apply(mux.NewRootMux(userService, musicService, sessionService), middleware.WithRequestLogging())
+	rootMuxHandler := mux.NewRootMux(
+		mux.RootMuxServices{
+			UserService: userService,
+		},
+		[]middleware.Middleware{
+			middleware.WithRequestMetadata(),
+			middleware.WithRequestLogging(),
+		},
+		mux.RootMuxChildren{
+			AuthMux: mux.NewAuthMux(
+				mux.AuthMuxOpts{
+					PathPrefix:        "/auth",
+					LoginRedirectPath: "/app/session",
+				},
+				mux.AuthMuxServices{
+					UserService:  userService,
+					MusicService: musicService,
+				},
+				[]middleware.Middleware{
+					middleware.WithUser(middleware.WithUserOpts{
+						DefaultUserId: 6666,
+						UserService:   userService,
+					}),
+				},
+				mux.AuthMuxChildren{},
+			),
+			AppMux: mux.NewAppMux(
+				mux.AppMuxOpts{
+					PathPrefix: "/app",
+				},
+				mux.AppMuxServices{},
+				[]middleware.Middleware{
+					middleware.WithUser(middleware.WithUserOpts{
+						DefaultUserId: 6666,
+						UserService:   userService,
+					}),
+					middleware.WithEnforcedAuthentication(middleware.WithEnforcedAuthenticationOpts{
+						UnauthenticatedRedirectPath: "/auth/user",
+						UserService:                 userService,
+					}),
+				},
+				mux.AppMuxChildren{
+					SessionMux: mux.NewSessionMux(
+						mux.SessionMuxOpts{
+							PathPrefix: "/session",
+						},
+						mux.SessionMuxServices{
+							SessionService: sessionService,
+							MusicService:   musicService,
+						},
+						[]middleware.Middleware{},
+						mux.SessionMuxChildren{},
+					),
+					ProfileMux: mux.NewProfileMux(
+						mux.ProfileMuxOpts{
+							PathPrefix: "/profile",
+						},
+						mux.ProfileMuxServices{},
+						[]middleware.Middleware{},
+						mux.ProfileMuxChildren{},
+					),
+				},
+			),
+		},
+	)
 
 	server := &http.Server{
 		Addr:    serverAddr,

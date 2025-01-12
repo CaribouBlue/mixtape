@@ -7,7 +7,6 @@ import (
 
 	"github.com/CaribouBlue/top-spot/internal/appdata"
 	"github.com/CaribouBlue/top-spot/internal/db"
-	"github.com/CaribouBlue/top-spot/internal/music"
 	"github.com/CaribouBlue/top-spot/internal/session"
 	"github.com/CaribouBlue/top-spot/internal/user"
 )
@@ -93,8 +92,7 @@ func main() {
 	}
 
 	userService := user.NewUserService(database)
-	musicService := music.NewSpotifyMusicService()
-	sessionService := session.NewSessionService(database, musicService)
+	sessionService := session.NewSessionService(database)
 
 	err = addTestUsers(userService)
 	if err != nil {

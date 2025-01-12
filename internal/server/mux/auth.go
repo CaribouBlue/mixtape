@@ -11,24 +11,42 @@ import (
 
 type AuthMux struct {
 	*http.ServeMux
-	userService  user.UserService
-	musicService music.MusicService
+	Opts       AuthMuxOpts
+	Services   AuthMuxServices
+	Children   AuthMuxChildren
+	Middleware []middleware.Middleware
 }
 
-func NewAuthMux(userService user.UserService, musicService music.MusicService) *AuthMux {
+type AuthMuxOpts struct {
+	PathPrefix        string
+	LoginRedirectPath string
+}
+
+type AuthMuxServices struct {
+	UserService  user.UserService
+	MusicService music.MusicService
+}
+
+type AuthMuxChildren struct{}
+
+func NewAuthMux(opts AuthMuxOpts, services AuthMuxServices, middleware []middleware.Middleware, children AuthMuxChildren) *AuthMux {
 	mux := &AuthMux{
-		ServeMux:     http.NewServeMux(),
-		userService:  userService,
-		musicService: musicService,
+		http.NewServeMux(),
+		opts,
+		services,
+		children,
+		middleware,
 	}
-	mux.RegisterHandlers()
-	return mux
-}
 
-func (mux *AuthMux) RegisterHandlers() {
 	mux.Handle("/user", http.HandlerFunc(mux.handleUserLogin))
 	mux.Handle("/spotify", http.HandlerFunc(mux.handleSpotifyAuth))
 	mux.Handle("/spotify/redirect", http.HandlerFunc(mux.handleSpotifyAuthRedirect))
+
+	return mux
+}
+
+func (mux *AuthMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	middleware.Apply(mux.ServeMux, mux.Middleware...).ServeHTTP(w, r)
 }
 
 func (mux *AuthMux) handleUserLogin(w http.ResponseWriter, r *http.Request) {
@@ -38,12 +56,12 @@ func (mux *AuthMux) handleUserLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err := mux.musicService.Authenticate(u)
+	err := mux.Services.MusicService.Authenticate(u)
 	if err != nil {
 		http.Redirect(w, r, "/auth/spotify", http.StatusFound)
 		return
 	} else {
-		http.Redirect(w, r, appPathPrefix, http.StatusFound)
+		http.Redirect(w, r, mux.Opts.LoginRedirectPath, http.StatusFound)
 		return
 	}
 }
@@ -61,7 +79,7 @@ func (mux *AuthMux) handleSpotifyAuth(w http.ResponseWriter, r *http.Request) {
 
 func (mux *AuthMux) handleSpotifyAuthRedirect(w http.ResponseWriter, r *http.Request) {
 	u := r.Context().Value(middleware.UserCtxKey).(*user.User)
-	u, err := mux.userService.Get(u.Id)
+	u, err := mux.Services.UserService.Get(u.Id)
 	if err != nil {
 		http.Error(w, "Failed to get user", http.StatusInternalServerError)
 		return
@@ -91,7 +109,7 @@ func (mux *AuthMux) handleSpotifyAuthRedirect(w http.ResponseWriter, r *http.Req
 		http.Error(w, "Failed to get valid access token", http.StatusInternalServerError)
 		return
 	}
-	mux.userService.Update(u)
+	mux.Services.UserService.Update(u)
 
-	http.Redirect(w, r, authPathPrefix+"/user", http.StatusFound)
+	http.Redirect(w, r, mux.Opts.PathPrefix+"/user", http.StatusFound)
 }

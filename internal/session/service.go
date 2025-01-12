@@ -3,7 +3,6 @@ package session
 import (
 	"errors"
 
-	"github.com/CaribouBlue/top-spot/internal/music"
 	"github.com/google/uuid"
 )
 
@@ -36,14 +35,12 @@ type SessionService interface {
 
 type sessionService struct {
 	repo           SessionRepo
-	musicService   music.MusicService
 	collectionName string
 }
 
-func NewSessionService(repo SessionRepo, musicService music.MusicService) SessionService {
+func NewSessionService(repo SessionRepo) SessionService {
 	return &sessionService{
 		repo:           repo,
-		musicService:   musicService,
 		collectionName: "session",
 	}
 }

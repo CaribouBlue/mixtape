@@ -3,48 +3,43 @@ package mux
 import (
 	"net/http"
 
-	"github.com/CaribouBlue/top-spot/internal/music"
 	"github.com/CaribouBlue/top-spot/internal/server/middleware"
-	"github.com/CaribouBlue/top-spot/internal/session"
 	"github.com/CaribouBlue/top-spot/internal/user"
-)
-
-const (
-	authPathPrefix    string = "/auth"
-	appPathPrefix     string = "/app"
-	sessionPathPrefix string = "/session"
-	profilePathPrefix string = "/profile"
-	defaultUserId     int64  = 6666
 )
 
 type RootMux struct {
 	*http.ServeMux
-	userService    user.UserService
-	musicService   music.MusicService
-	sessionService session.SessionService
+	Services   RootMuxServices
+	Middleware []middleware.Middleware
+	Children   RootMuxChildren
 }
 
-func NewRootMux(userService user.UserService, musicService music.MusicService, sessionService session.SessionService) *RootMux {
+type RootMuxServices struct {
+	UserService user.UserService
+}
+
+type RootMuxChildren struct {
+	AuthMux *AuthMux
+	AppMux  *AppMux
+}
+
+func NewRootMux(services RootMuxServices, middleware []middleware.Middleware, children RootMuxChildren) *RootMux {
 	mux := &RootMux{
 		http.NewServeMux(),
-		userService,
-		musicService,
-		sessionService,
+		services,
+		middleware,
+		children,
 	}
-	mux.RegisterHandlers()
+
+	authPathPrefix := mux.Children.AuthMux.Opts.PathPrefix
+	mux.Handle(authPathPrefix+"/", http.StripPrefix(authPathPrefix, mux.Children.AuthMux))
+
+	appPathPrefix := mux.Children.AppMux.Opts.PathPrefix
+	mux.Handle(appPathPrefix+"/", http.StripPrefix(appPathPrefix, mux.Children.AppMux))
+
 	return mux
 }
 
-func (mux *RootMux) RegisterHandlers() {
-	withUser := middleware.WithUser(middleware.WithUserOpts{DefaultUserId: defaultUserId, UserService: mux.userService})
-	withEnforcedAuthentication := middleware.WithEnforcedAuthentication(middleware.WithEnforcedAuthenticationOpts{
-		UnauthenticatedRedirectPath: authPathPrefix + "/user",
-		UserService:                 mux.userService,
-	})
-
-	authMuxHandler := middleware.Apply(NewAuthMux(mux.userService, mux.musicService), withUser)
-	mux.Handle(authPathPrefix+"/", http.StripPrefix(authPathPrefix, authMuxHandler))
-
-	appMuxHandler := middleware.Apply(NewAppMux(mux.userService, mux.musicService, mux.sessionService), withUser, withEnforcedAuthentication)
-	mux.Handle(appPathPrefix+"/", http.StripPrefix(appPathPrefix, appMuxHandler))
+func (mux *RootMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	middleware.Apply(mux.ServeMux, mux.Middleware...).ServeHTTP(w, r)
 }

@@ -3,33 +3,46 @@ package mux
 import (
 	"net/http"
 
-	"github.com/CaribouBlue/top-spot/internal/music"
-	"github.com/CaribouBlue/top-spot/internal/session"
-	"github.com/CaribouBlue/top-spot/internal/user"
+	"github.com/CaribouBlue/top-spot/internal/server/middleware"
 )
 
 type AppMux struct {
 	*http.ServeMux
-	userService    user.UserService
-	musicService   music.MusicService
-	sessionService session.SessionService
+	Opts       AppMuxOpts
+	Services   AppMuxServices
+	Children   AppMuxChildren
+	Middleware []middleware.Middleware
 }
 
-func NewAppMux(userService user.UserService, musicService music.MusicService, sessionService session.SessionService) *AppMux {
+type AppMuxOpts struct {
+	PathPrefix string
+}
+
+type AppMuxServices struct{}
+
+type AppMuxChildren struct {
+	SessionMux *SessionMux
+	ProfileMux *ProfileMux
+}
+
+func NewAppMux(opts AppMuxOpts, services AppMuxServices, mw []middleware.Middleware, children AppMuxChildren) *AppMux {
 	mux := &AppMux{
 		http.NewServeMux(),
-		userService,
-		musicService,
-		sessionService,
+		opts,
+		services,
+		children,
+		mw,
 	}
-	mux.RegisterHandlers()
+
+	sessionPathPrefix := mux.Children.SessionMux.Opts.PathPrefix
+	mux.Handle(sessionPathPrefix+"/", http.StripPrefix(sessionPathPrefix, mux.Children.SessionMux))
+
+	profilePathPrefix := mux.Children.ProfileMux.Opts.PathPrefix
+	mux.Handle(profilePathPrefix+"/", http.StripPrefix(profilePathPrefix, mux.Children.ProfileMux))
+
 	return mux
 }
 
-func (mux *AppMux) RegisterHandlers() {
-	sessionMuxHandler := NewSessionMux(mux.sessionService, mux.musicService)
-	mux.Handle(sessionPathPrefix+"/", http.StripPrefix(sessionPathPrefix, sessionMuxHandler))
-
-	profileMuxHandler := NewProfileMux(mux.userService)
-	mux.Handle(profilePathPrefix+"/", http.StripPrefix(profilePathPrefix, profileMuxHandler))
+func (mux *AppMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	middleware.Apply(mux.ServeMux, mux.Middleware...).ServeHTTP(w, r)
 }
