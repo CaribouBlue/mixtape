@@ -64,6 +64,29 @@ var MockSubmissions = []session.Submission{
 	},
 }
 
+var MockVotes = []session.Vote{
+	{
+		Id:           "0",
+		UserId:       6666,
+		SubmissionId: "f9b7dc17-081f-428f-80ff-b27db0bbe5f5",
+	},
+	{
+		Id:           "1",
+		UserId:       6666,
+		SubmissionId: "a7d19ca8-3a81-46c8-970f-4956ddc77028",
+	},
+	{
+		Id:           "1",
+		UserId:       6666,
+		SubmissionId: "84b4d9a2-fbdc-4db6-b666-c0dbe377bc8e",
+	},
+	{
+		Id:           "2",
+		UserId:       9999,
+		SubmissionId: "84b4d9a2-fbdc-4db6-b666-c0dbe377bc8e",
+	},
+}
+
 func main() {
 	appDataDir, err := appdata.GetAppDataDir()
 	if err != nil {
@@ -145,6 +168,7 @@ func addTestSessions(sessionService session.SessionService) error {
 	s = session.NewSession("Results Session")
 	s.Id = 2
 	s.Submissions = MockSubmissions
+	s.Votes = MockVotes
 	s.StartAt = s.StartAt.Add(-s.SubmissionDuration - s.VoteDuration)
 	err = sessionService.Create(s)
 	if err != nil {

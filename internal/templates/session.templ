@@ -75,6 +75,11 @@ func (m SessionTemplateModel) IsUserSubmission(submissionId string) bool {
 	return false
 }
 
+func (m SessionTemplateModel) Results() []session.Result {
+	results := m.Session.GetResults()
+	return results
+}
+
 func NewSessionTemplateModel(session session.Session, user user.User) SessionTemplateModel {
 	return SessionTemplateModel{
 		Session: session,
@@ -96,7 +101,7 @@ templ SessionPage(m SessionTemplateModel, swapOob string) {
 				case session.VotePhase:
 					@VotePhaseView(m)
 				case session.ResultPhase:
-					<h2>Results</h2>
+					@ResultsPhaseView(m)
 			}
 		</div>
 	}
@@ -218,6 +223,7 @@ templ DeleteSubmission(m SessionTemplateModel) {
 
 // Vote Phase View Templates
 templ VotePhaseView(m SessionTemplateModel) {
+	<h2>Phase: Vote</h2>
 	<h3
 		hx-get={ fmt.Sprintf("/app/session/%s/phase-duration", m.SessionId()) }
 		hx-trigger="load, every 1m"
@@ -307,6 +313,22 @@ templ VoteCandidate(m SessionTemplateModel, submission session.Submission, track
 			<p class="text-slate-400">{ utils.MapJoin(track.Artists, ", ", func(artist music.Artist) string {return artist.Name} ) }</p>
 		</div>
 	</li>
+}
+
+// Results Phase View Templates
+templ ResultsPhaseView(m SessionTemplateModel) {
+	<h2>Phase: Results</h2>
+	@LazyLoadPlaylistButton(m)
+	<br/>
+	<ul>
+		for _, result := range m.Results() {
+			@Result(m, result)
+		}
+	</ul>
+}
+
+templ Result(m SessionTemplateModel, result session.Result) {
+	<li>{ fmt.Sprint(result) }</li>
 }
 
 // Shared Templates
