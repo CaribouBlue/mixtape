@@ -7,8 +7,8 @@ import (
 
 	"github.com/CaribouBlue/top-spot/internal/appdata"
 	"github.com/CaribouBlue/top-spot/internal/db"
-	"github.com/CaribouBlue/top-spot/internal/session"
-	"github.com/CaribouBlue/top-spot/internal/user"
+	"github.com/CaribouBlue/top-spot/internal/entities/session"
+	"github.com/CaribouBlue/top-spot/internal/entities/user"
 )
 
 var MockSubmissions = []session.Submission{

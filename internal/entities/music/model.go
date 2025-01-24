@@ -9,6 +9,7 @@ type Track struct {
 	Id      string
 	Name    string
 	Artists []Artist
+	Url     string
 }
 
 type Playlist struct {

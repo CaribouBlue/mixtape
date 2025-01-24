@@ -3,10 +3,10 @@ package mux
 import (
 	"net/http"
 
-	"github.com/CaribouBlue/top-spot/internal/music"
-	"github.com/CaribouBlue/top-spot/internal/music/spotify"
+	"github.com/CaribouBlue/top-spot/internal/entities/music"
+	"github.com/CaribouBlue/top-spot/internal/entities/user"
 	"github.com/CaribouBlue/top-spot/internal/server/middleware"
-	"github.com/CaribouBlue/top-spot/internal/user"
+	"github.com/CaribouBlue/top-spot/internal/spotify"
 )
 
 type AuthMux struct {

@@ -8,11 +8,11 @@ import (
 
 	"github.com/CaribouBlue/top-spot/internal/appdata"
 	"github.com/CaribouBlue/top-spot/internal/db"
-	"github.com/CaribouBlue/top-spot/internal/music"
+	"github.com/CaribouBlue/top-spot/internal/entities/music"
+	"github.com/CaribouBlue/top-spot/internal/entities/session"
+	"github.com/CaribouBlue/top-spot/internal/entities/user"
 	"github.com/CaribouBlue/top-spot/internal/server/middleware"
 	"github.com/CaribouBlue/top-spot/internal/server/mux"
-	"github.com/CaribouBlue/top-spot/internal/session"
-	"github.com/CaribouBlue/top-spot/internal/user"
 )
 
 func StartServer() {

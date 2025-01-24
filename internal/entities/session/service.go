@@ -12,6 +12,7 @@ var (
 	ErrVoteExists         = errors.New("vote already exists")
 	ErrPlaylistNotFound   = errors.New("playlist not found")
 	ErrPlaylistExists     = errors.New("playlist already exists")
+	ErrResultNotFound     = errors.New("result not found")
 )
 
 type SessionService interface {
@@ -31,6 +32,9 @@ type SessionService interface {
 
 	GetPlaylist(sessionId int64, userId int64) (*Playlist, error)
 	AddPlaylist(sessionId int64, playlistId string, userId int64) (*Session, error)
+
+	GetResults(sessionId int64) (*[]Result, error)
+	GetResult(sessionId int64, resultId string) (*Result, error)
 }
 
 type sessionService struct {
@@ -50,7 +54,21 @@ func (s *sessionService) GetAll() ([]*Session, error) {
 }
 
 func (s *sessionService) GetOne(sessionId int64) (*Session, error) {
-	return s.repo.GetSession(sessionId)
+	session, err := s.repo.GetSession(sessionId)
+	if err != nil {
+		return nil, err
+	}
+
+	if session.Phase() == ResultPhase && len(session.Results) == 0 {
+		results := session.DeriveResults()
+		session.Results = results
+		err = s.repo.UpdateSession(session)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return session, nil
 }
 
 func (s *sessionService) Create(session *Session) error {
@@ -204,4 +222,37 @@ func (s *sessionService) AddPlaylist(sessionId int64, playlistId string, userId 
 	})
 
 	return session, s.repo.UpdateSession(session)
+}
+
+func (s *sessionService) GetResults(sessionId int64) (*[]Result, error) {
+	session, err := s.repo.GetSession(sessionId)
+	if err != nil {
+		return nil, err
+	}
+
+	if session.Phase() == ResultPhase && len(session.Results) == 0 {
+		results := session.DeriveResults()
+		session.Results = results
+		err = s.repo.UpdateSession(session)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return &session.Results, nil
+}
+
+func (s *sessionService) GetResult(sessionId int64, resultId string) (*Result, error) {
+	session, err := s.repo.GetSession(sessionId)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, result := range session.Results {
+		if result.Id == resultId {
+			return &result, nil
+		}
+	}
+
+	return nil, ErrResultNotFound
 }

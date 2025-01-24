@@ -2,9 +2,9 @@ package templates
 
 import (
 	"fmt"
-	"github.com/CaribouBlue/top-spot/internal/music"
-	"github.com/CaribouBlue/top-spot/internal/session"
-	"github.com/CaribouBlue/top-spot/internal/user"
+	"github.com/CaribouBlue/top-spot/internal/entities/music"
+	"github.com/CaribouBlue/top-spot/internal/entities/session"
+	"github.com/CaribouBlue/top-spot/internal/entities/user"
 	"github.com/CaribouBlue/top-spot/internal/utils"
 	"strconv"
 	"time"
@@ -73,11 +73,6 @@ func (m SessionTemplateModel) IsUserSubmission(submissionId string) bool {
 		}
 	}
 	return false
-}
-
-func (m SessionTemplateModel) Results() []session.Result {
-	results := m.Session.GetResults()
-	return results
 }
 
 func NewSessionTemplateModel(session session.Session, user user.User) SessionTemplateModel {
@@ -320,22 +315,40 @@ templ ResultsPhaseView(m SessionTemplateModel) {
 	<h2>Phase: Results</h2>
 	@LazyLoadPlaylistButton(m)
 	<br/>
-	<ul>
-		for _, result := range m.Results() {
-			@Result(m, result)
+	<table>
+		<tr>
+			<th>Place </th>
+			<th>Track </th>
+			<th>User </th>
+		</tr>
+		for _, result := range m.Session.Results {
+			@LazyLoadResult(m, result)
 		}
-	</ul>
+	</table>
 }
 
-templ Result(m SessionTemplateModel, result session.Result) {
-	<li>{ fmt.Sprint(result) }</li>
+templ LazyLoadResult(m SessionTemplateModel, result session.Result) {
+	<tr
+		hx-get={ fmt.Sprintf("/app/session/%d/result/%s", m.Session.Id, result.Id) }
+		hx-trigger="load"
+		hx-swap="outerHTML"
+	></tr>
+}
+
+templ Result(m SessionTemplateModel, result session.Result, submission session.Submission, track music.Track) {
+	<tr>
+		<td>{ fmt.Sprint(result.Place) }</td>
+		<td>
+			<a
+				href={ templ.SafeURL(track.Url) }
+				target="_blank"
+			>{ fmt.Sprint(track.Name) + " | " + utils.MapJoin(track.Artists, ", ", func(artist music.Artist) string {return artist.Name} ) }</a>
+		</td>
+		<td>{ fmt.Sprint(submission.UserId) }</td>
+	</tr>
 }
 
 // Shared Templates
 templ SessionPhaseDuration(m SessionTemplateModel) {
-	if m.PhaseDuration() != "" {
-		<p>{ m.PhaseDuration() } remaining</p>
-	} else {
-		@SessionPage(m, "true")
-	}
+	<p>{ m.PhaseDuration() } remaining</p>
 }

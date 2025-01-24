@@ -1,8 +1,8 @@
 package music
 
 import (
-	"github.com/CaribouBlue/top-spot/internal/music/spotify"
-	"github.com/CaribouBlue/top-spot/internal/user"
+	"github.com/CaribouBlue/top-spot/internal/entities/user"
+	"github.com/CaribouBlue/top-spot/internal/spotify"
 )
 
 type MusicService interface {
@@ -65,6 +65,7 @@ func (s *spotifyMusicService) GetTrack(trackId string) (*Track, error) {
 		Id:      t.Id,
 		Name:    t.Name,
 		Artists: make([]Artist, len(t.Artists)),
+		Url:     t.ExternalUrls.Spotify,
 	}
 
 	for i, artist := range t.Artists {

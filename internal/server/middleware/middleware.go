@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"slices"
 
-	"github.com/CaribouBlue/top-spot/internal/user"
+	"github.com/CaribouBlue/top-spot/internal/entities/user"
 	"github.com/google/uuid"
 )
 

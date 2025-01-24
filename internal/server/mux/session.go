@@ -8,12 +8,12 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/CaribouBlue/top-spot/internal/music"
+	"github.com/CaribouBlue/top-spot/internal/entities/music"
+	"github.com/CaribouBlue/top-spot/internal/entities/session"
+	"github.com/CaribouBlue/top-spot/internal/entities/user"
 	"github.com/CaribouBlue/top-spot/internal/server/middleware"
 	"github.com/CaribouBlue/top-spot/internal/server/utils"
-	"github.com/CaribouBlue/top-spot/internal/session"
 	"github.com/CaribouBlue/top-spot/internal/templates"
-	"github.com/CaribouBlue/top-spot/internal/user"
 )
 
 type SessionMux struct {
@@ -62,6 +62,8 @@ func NewSessionMux(opts SessionMuxOpts, services SessionMuxServices, middleware 
 	mux.Handle("DELETE /{sessionId}/submission/{submissionId}", http.HandlerFunc(mux.handleDeleteSessionSubmission))
 
 	mux.Handle("GET /{sessionId}/submission/{submissionId}/candidate", http.HandlerFunc(mux.handleGetSessionSubmissionCandidate))
+
+	mux.Handle("GET /{sessionId}/result/{resultId}", http.HandlerFunc(mux.handleGetSessionResult))
 
 	mux.Handle("POST /{sessionId}/vote", http.HandlerFunc(mux.handleCreateSessionVote))
 
@@ -508,4 +510,53 @@ func (mux *SessionMux) handleDeleteSessionVote(w http.ResponseWriter, r *http.Re
 
 	templateModel := templates.NewSessionTemplateModel(*session, *user)
 	templates.VoteCandidate(templateModel, *submission, *track).Render(r.Context(), w)
+}
+
+func (mux *SessionMux) handleGetSessionResult(w http.ResponseWriter, r *http.Request) {
+	user := r.Context().Value(middleware.UserCtxKey).(*user.User)
+
+	err := mux.Services.MusicService.Authenticate(user)
+	if err != nil {
+		http.Error(w, "Failed to authenticate user", http.StatusInternalServerError)
+		return
+	}
+
+	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid session ID", http.StatusBadRequest)
+		return
+	}
+
+	resultId := r.PathValue("resultId")
+	if resultId == "" {
+		http.Error(w, "Invalid result ID", http.StatusBadRequest)
+		return
+	}
+
+	session, err := mux.Services.SessionService.GetOne(sessionId)
+	if err != nil {
+		http.Error(w, "Failed to get session", http.StatusInternalServerError)
+		return
+	}
+
+	result, err := mux.Services.SessionService.GetResult(sessionId, resultId)
+	if err != nil {
+		http.Error(w, "Failed to get result", http.StatusInternalServerError)
+		return
+	}
+
+	submission, err := mux.Services.SessionService.GetSubmission(sessionId, result.SubmissionId)
+	if err != nil {
+		http.Error(w, "Failed to get submission", http.StatusInternalServerError)
+		return
+	}
+
+	track, err := mux.Services.MusicService.GetTrack(submission.TrackId)
+	if err != nil {
+		http.Error(w, "Failed to get track", http.StatusInternalServerError)
+		return
+	}
+
+	templateModel := templates.NewSessionTemplateModel(*session, *user)
+	templates.Result(templateModel, *result, *submission, *track).Render(r.Context(), w)
 }

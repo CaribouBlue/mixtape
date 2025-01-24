@@ -3,6 +3,8 @@ package session
 import (
 	"sort"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 type SessionPhase string
@@ -31,6 +33,7 @@ type Playlist struct {
 }
 
 type Result struct {
+	Id           string
 	SubmissionId string
 	VoteCount    int
 	Place        int
@@ -97,7 +100,7 @@ func (s *Session) RemainingPhaseDuration() time.Duration {
 	}
 }
 
-func (s *Session) GetResults() []Result {
+func (s *Session) DeriveResults() []Result {
 	if len(s.Results) > 0 {
 		return s.Results
 	}
@@ -110,6 +113,7 @@ func (s *Session) GetResults() []Result {
 	s.Results = make([]Result, 0)
 	for submissionId, count := range voteCountBySubmission {
 		s.Results = append(s.Results, Result{
+			Id:           uuid.New().String(),
 			SubmissionId: submissionId,
 			VoteCount:    count,
 		})
@@ -118,12 +122,12 @@ func (s *Session) GetResults() []Result {
 	sort.Sort(ByVoteCountDesc(s.Results))
 
 	place := 1
-	currentBest := s.Results[0].VoteCount
+	currentBest := 0
 	for i, result := range s.Results {
 		if result.VoteCount < currentBest {
 			place += 1
-			currentBest = result.VoteCount
 		}
+		currentBest = result.VoteCount
 		s.Results[i].Place = place
 	}
 

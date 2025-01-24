@@ -3,8 +3,8 @@ package mux
 import (
 	"net/http"
 
+	"github.com/CaribouBlue/top-spot/internal/entities/user"
 	"github.com/CaribouBlue/top-spot/internal/server/middleware"
-	"github.com/CaribouBlue/top-spot/internal/user"
 )
 
 type RootMux struct {
