@@ -87,8 +87,7 @@ func (mux *SessionMux) handleSessionListPage(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	templateModel := templates.NewHomeTemplateModel(user, sessions)
-	component := templates.Home(templateModel)
+	component := templates.Home(*user, utils.Map(sessions, func(session *session.Session) session.Session { return *session }))
 	serverUtils.HandleHtmlResponse(r, w, component)
 }
 
