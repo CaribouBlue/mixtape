@@ -100,6 +100,31 @@ func (s *Session) RemainingPhaseDuration() time.Duration {
 	}
 }
 
+func (s *Session) SubmissionsByUser(userId int64) []Submission {
+	submissionsByUser := make([]Submission, 0)
+	for _, submission := range s.Submissions {
+		if submission.UserId == userId {
+			submissionsByUser = append(submissionsByUser, submission)
+		}
+	}
+
+	return submissionsByUser
+}
+
+func (s *Session) SubmissionsLeft(userId int64) int {
+	return s.MaxSubmissions - len(s.SubmissionsByUser(userId))
+}
+
+func (s *Session) SubmissionVoteByUser(userId int64, submissionId string) Vote {
+	for _, vote := range s.Votes {
+		if vote.UserId == userId && vote.SubmissionId == submissionId {
+			return vote
+		}
+	}
+
+	return Vote{}
+}
+
 func (s *Session) DeriveResults() []Result {
 	if len(s.Results) > 0 {
 		return s.Results
