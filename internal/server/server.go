@@ -47,12 +47,15 @@ func StartServer() {
 		[]middleware.Middleware{
 			middleware.WithRequestMetadata(),
 			middleware.WithRequestLogging(),
+			middleware.WithCustomNotFoundHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				http.Error(w, "Not found", http.StatusNotFound)
+			})),
 		},
 		mux.RootMuxChildren{
 			AuthMux: mux.NewAuthMux(
 				mux.AuthMuxOpts{
 					PathPrefix:        "/auth",
-					LoginRedirectPath: "/app/session",
+					LoginRedirectPath: "/app",
 				},
 				mux.AuthMuxServices{
 					UserService:  userService,
@@ -80,6 +83,9 @@ func StartServer() {
 						UnauthenticatedRedirectPath: "/auth/user",
 						UserService:                 userService,
 					}),
+					middleware.WithCustomNotFoundHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						http.Redirect(w, r, "/app/session/", http.StatusFound)
+					})),
 				},
 				mux.AppMuxChildren{
 					SessionMux: mux.NewSessionMux(

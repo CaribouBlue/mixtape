@@ -26,12 +26,12 @@ func HandlerFunc(handler http.HandlerFunc, middlewares ...Middleware) http.Handl
 	return Apply(http.HandlerFunc(handler), middlewares...)
 }
 
-type wrappedWriter struct {
+type wrappedLoggerWriter struct {
 	http.ResponseWriter
 	statusCode int
 }
 
-func (w *wrappedWriter) WriteHeader(statusCode int) {
+func (w *wrappedLoggerWriter) WriteHeader(statusCode int) {
 	w.statusCode = statusCode
 	w.ResponseWriter.WriteHeader(statusCode)
 }
@@ -39,7 +39,7 @@ func (w *wrappedWriter) WriteHeader(statusCode int) {
 func WithRequestLogging() Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			wrappedWriter := &wrappedWriter{w, http.StatusOK}
+			wrappedWriter := &wrappedLoggerWriter{w, http.StatusOK}
 
 			path := r.URL.Path
 			method := r.Method
@@ -47,6 +47,42 @@ func WithRequestLogging() Middleware {
 			next.ServeHTTP(wrappedWriter, r)
 
 			log.Println(wrappedWriter.statusCode, method, path)
+		})
+	}
+}
+
+type wrappedCustomNotFoundWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (w *wrappedCustomNotFoundWriter) WriteHeader(statusCode int) {
+	w.statusCode = statusCode
+	if w.statusCode == http.StatusNotFound {
+		return
+	}
+
+	w.ResponseWriter.WriteHeader(statusCode)
+}
+
+func (w *wrappedCustomNotFoundWriter) Write(b []byte) (int, error) {
+	if w.statusCode == http.StatusNotFound {
+		return len(b), nil
+	}
+
+	return w.ResponseWriter.Write(b)
+}
+
+func WithCustomNotFoundHandler(notFoundHandler http.Handler) Middleware {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			wrappedWriter := &wrappedCustomNotFoundWriter{w, http.StatusOK}
+
+			next.ServeHTTP(wrappedWriter, r)
+
+			if wrappedWriter.statusCode == http.StatusNotFound {
+				notFoundHandler.ServeHTTP(w, r)
+			}
 		})
 	}
 }
