@@ -20,7 +20,7 @@ const (
 
 // Session Page Templates
 templ SessionPage(s session.Session, u user.User) {
-	@root(RootProps{Title: "Session " + s.Name}) {
+	@Root(RootProps{Title: "Session " + s.Name}) {
 		<div
 			id={ SessionDetailsId }
 		>

@@ -7,6 +7,7 @@ import (
 	"slices"
 
 	"github.com/CaribouBlue/top-spot/internal/entities/user"
+	"github.com/CaribouBlue/top-spot/internal/server/utils"
 	"github.com/google/uuid"
 )
 
@@ -130,16 +131,26 @@ func WithUser(opts WithUserOpts) Middleware {
 				return
 			}
 
-			u, err := opts.UserService.Get(opts.DefaultUserId)
-			if err == user.ErrNoUserFound {
-				u = &user.User{}
-			} else if err != nil {
+			userCtx := &user.User{}
+
+			userCtx, err := utils.ParseAuthCookie(w, r)
+			if err == nil {
+				storedUser, err := opts.UserService.Get(userCtx.Id)
+				if err == user.ErrNoUserFound {
+					userCtx = &user.User{}
+				} else if err == nil {
+					userCtx = storedUser
+				} else {
+					log.Print(err)
+					http.Error(w, "Failed to get user", http.StatusInternalServerError)
+					return
+				}
+			} else {
 				log.Print(err)
-				http.Error(w, "Failed to get user", http.StatusInternalServerError)
-				return
+				userCtx = &user.User{}
 			}
 
-			ctx = context.WithValue(ctx, UserCtxKey, u)
+			ctx = context.WithValue(ctx, UserCtxKey, userCtx)
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})

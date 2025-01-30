@@ -54,8 +54,8 @@ func StartServer() {
 		mux.RootMuxChildren{
 			AuthMux: mux.NewAuthMux(
 				mux.AuthMuxOpts{
-					PathPrefix:        "/auth",
-					LoginRedirectPath: "/app",
+					PathPrefix:       "/auth",
+					LoginSuccessPath: "/app",
 				},
 				mux.AuthMuxServices{
 					UserService:  userService,
@@ -80,7 +80,7 @@ func StartServer() {
 						UserService:   userService,
 					}),
 					middleware.WithEnforcedAuthentication(middleware.WithEnforcedAuthenticationOpts{
-						UnauthenticatedRedirectPath: "/auth/user",
+						UnauthenticatedRedirectPath: "/auth/login",
 						UserService:                 userService,
 					}),
 					middleware.WithCustomNotFoundHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

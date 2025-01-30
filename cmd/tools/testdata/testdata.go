@@ -131,16 +131,12 @@ func main() {
 }
 
 func addTestUsers(userService user.UserService) error {
-	u := user.User{}
-	u.Id = 6666
-	err := userService.Create(&u)
+	_, err := userService.SignUp("bob", "pwd")
 	if err != nil {
 		return err
 	}
 
-	u = user.User{}
-	u.Id = 9999
-	err = userService.Create(&u)
+	_, err = userService.SignUp("alice", "pwd")
 	if err != nil {
 		return err
 	}

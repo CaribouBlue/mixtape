@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 
 	"github.com/CaribouBlue/top-spot/internal/entities/session"
 	"github.com/CaribouBlue/top-spot/internal/entities/user"
@@ -45,7 +46,8 @@ func (sqlite *sqliteJsonDb) initDb() error {
 func (sqlite *sqliteJsonDb) NewCollection(collectionName string) error {
 	query := fmt.Sprintf(`
 	CREATE TABLE IF NOT EXISTS %s (
-		data jsonb
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		data JSONB
 	);`, collectionName)
 
 	_, err := sqlite.db.Exec(query)
@@ -53,19 +55,19 @@ func (sqlite *sqliteJsonDb) NewCollection(collectionName string) error {
 }
 
 // TODO: Update this method to automatically set the ID field of the model
-func (sqlite *sqliteJsonDb) Insert(tableName string, data []byte) error {
+func (sqlite *sqliteJsonDb) Insert(tableName string, data []byte) (sql.Result, error) {
 	stmt, err := sqlite.db.Prepare(fmt.Sprintf("insert into %s(data) values(?)", tableName))
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	defer stmt.Close()
-	_, err = stmt.Exec(data)
+	result, err := stmt.Exec(data)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return nil
+	return result, nil
 }
 
 func (sqlite *sqliteJsonDb) SelectAll(tableName string) ([][]byte, error) {
@@ -92,15 +94,19 @@ func (sqlite *sqliteJsonDb) SelectAll(tableName string) ([][]byte, error) {
 	return records, nil
 }
 
-func (sqlite *sqliteJsonDb) SelectOne(tableName string, recordId int64) ([]byte, error) {
+func (sqlite *sqliteJsonDb) QueryRow(query string) ([]byte, error) {
 	var data []byte
-	query := fmt.Sprintf("select data from %s where data->>'id' = %d", tableName, recordId)
 	err := sqlite.db.QueryRow(query).Scan(&data)
 	if err != nil {
 		return data, err
 	}
 
 	return data, err
+}
+
+func (sqlite *sqliteJsonDb) SelectOne(tableName string, recordId int64) ([]byte, error) {
+	query := fmt.Sprintf("select data from %s where data->>'id' = %d", tableName, recordId)
+	return sqlite.QueryRow(query)
 }
 
 func (sqlite *sqliteJsonDb) Update(tableName string, recordId any, data []byte) error {
@@ -123,7 +129,22 @@ func (sqlite *sqliteJsonDb) DeleteRecord(tableName string, recordId any) error {
 }
 
 func (sqlite *sqliteJsonDb) GetUser(userId int64) (*user.User, error) {
-	data, err := sqlite.SelectOne(sqlite.UserTable, userId)
+	query := fmt.Sprintf("SELECT data FROM %s WHERE id = %d", sqlite.UserTable, userId)
+	log.Default().Println("Query: ", query)
+	data, err := sqlite.QueryRow(query)
+	if err == sql.ErrNoRows {
+		return nil, user.ErrNoUserFound
+	} else if err != nil {
+		return nil, err
+	}
+
+	u := &user.User{}
+	err = json.Unmarshal(data, u)
+	return u, err
+}
+
+func (sqlite *sqliteJsonDb) GetUserByUsername(username string) (*user.User, error) {
+	data, err := sqlite.QueryRow(fmt.Sprintf("select data from %s where data->>'userName' = '%s'", sqlite.UserTable, username))
 	if err == sql.ErrNoRows {
 		return nil, user.ErrNoUserFound
 	} else if err != nil {
@@ -141,7 +162,28 @@ func (sqlite *sqliteJsonDb) CreateUser(user *user.User) error {
 		return err
 	}
 
-	return sqlite.Insert(sqlite.UserTable, data)
+	result, err := sqlite.Insert(sqlite.UserTable, data)
+	if err != nil {
+		return err
+	}
+
+	log.Default().Println("User ID: ", user.Id)
+
+	if user.Id == 0 {
+		user.Id, err = result.LastInsertId()
+		if err != nil {
+			return err
+		}
+
+		log.Default().Println("New User ID: ", user.Id)
+
+		err = sqlite.UpdateUser(user)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (sqlite *sqliteJsonDb) UpdateUser(user *user.User) error {
@@ -150,7 +192,18 @@ func (sqlite *sqliteJsonDb) UpdateUser(user *user.User) error {
 		return err
 	}
 
-	return sqlite.Update(sqlite.UserTable, user.Id, data)
+	stmt, err := sqlite.db.Prepare(fmt.Sprintf("UPDATE %s SET data = ? WHERE id = ?", sqlite.UserTable))
+	if err != nil {
+		return err
+	}
+
+	defer stmt.Close()
+	_, err = stmt.Exec(data, user.Id)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (sqlite *sqliteJsonDb) DeleteUser(user *user.User) error {
@@ -203,5 +256,6 @@ func (sqlite *sqliteJsonDb) CreateSession(session *session.Session) error {
 		return err
 	}
 
-	return sqlite.Insert(sqlite.SessionTable, data)
+	_, err = sqlite.Insert(sqlite.SessionTable, data)
+	return err
 }
