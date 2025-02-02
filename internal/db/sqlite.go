@@ -4,7 +4,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"log"
 
 	"github.com/CaribouBlue/top-spot/internal/entities/session"
 	"github.com/CaribouBlue/top-spot/internal/entities/user"
@@ -130,7 +129,6 @@ func (sqlite *sqliteJsonDb) DeleteRecord(tableName string, recordId any) error {
 
 func (sqlite *sqliteJsonDb) GetUser(userId int64) (*user.User, error) {
 	query := fmt.Sprintf("SELECT data FROM %s WHERE id = %d", sqlite.UserTable, userId)
-	log.Default().Println("Query: ", query)
 	data, err := sqlite.QueryRow(query)
 	if err == sql.ErrNoRows {
 		return nil, user.ErrNoUserFound
@@ -156,6 +154,36 @@ func (sqlite *sqliteJsonDb) GetUserByUsername(username string) (*user.User, erro
 	return u, err
 }
 
+func (sqlite *sqliteJsonDb) SearchUsers(q string) (*[]user.User, error) {
+	var users []user.User = make([]user.User, 0)
+
+	query := fmt.Sprintf("SELECT data FROM %s WHERE data->>'userName' LIKE '%%%s%%' LIMIT 10", sqlite.UserTable, q)
+	rows, err := sqlite.db.Query(query)
+	if err != nil {
+		return &users, err
+	}
+
+	defer rows.Close()
+
+	for rows.Next() {
+		data := []byte{}
+		err = rows.Scan(&data)
+		if err != nil {
+			return &users, err
+		}
+
+		user := user.User{}
+		err = json.Unmarshal(data, &user)
+		if err != nil {
+			return &users, err
+		}
+
+		users = append(users, user)
+	}
+
+	return &users, nil
+}
+
 func (sqlite *sqliteJsonDb) CreateUser(user *user.User) error {
 	data, err := json.Marshal(user)
 	if err != nil {
@@ -167,15 +195,11 @@ func (sqlite *sqliteJsonDb) CreateUser(user *user.User) error {
 		return err
 	}
 
-	log.Default().Println("User ID: ", user.Id)
-
 	if user.Id == 0 {
 		user.Id, err = result.LastInsertId()
 		if err != nil {
 			return err
 		}
-
-		log.Default().Println("New User ID: ", user.Id)
 
 		err = sqlite.UpdateUser(user)
 		if err != nil {
@@ -256,6 +280,19 @@ func (sqlite *sqliteJsonDb) CreateSession(session *session.Session) error {
 		return err
 	}
 
-	_, err = sqlite.Insert(sqlite.SessionTable, data)
+	result, err := sqlite.Insert(sqlite.SessionTable, data)
+
+	if session.Id == 0 {
+		session.Id, err = result.LastInsertId()
+		if err != nil {
+			return err
+		}
+
+		err = sqlite.UpdateSession(session)
+		if err != nil {
+			return err
+		}
+	}
+
 	return err
 }

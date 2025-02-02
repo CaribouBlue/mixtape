@@ -3,6 +3,7 @@ package session
 import (
 	"errors"
 
+	"github.com/CaribouBlue/top-spot/internal/entities/user"
 	"github.com/google/uuid"
 )
 
@@ -18,7 +19,7 @@ var (
 type SessionService interface {
 	GetAll() ([]*Session, error)
 	GetOne(sessionId int64) (*Session, error)
-	Create(*Session) error
+	Create(creator *user.User, name string) (*Session, error)
 
 	GetSubmissions(sessionId int64) ([]Submission, error)
 	GetSubmission(sessionId int64, submissionId string) (*Submission, error)
@@ -71,8 +72,14 @@ func (s *sessionService) GetOne(sessionId int64) (*Session, error) {
 	return session, nil
 }
 
-func (s *sessionService) Create(session *Session) error {
-	return s.repo.CreateSession(session)
+func (s *sessionService) Create(creator *user.User, name string) (*Session, error) {
+	if name == "" {
+		return nil, errors.New("session name cannot be empty")
+	}
+
+	newSession := NewSession(name)
+	newSession.CreatedBy = creator.Id
+	return newSession, s.repo.CreateSession(newSession)
 }
 
 func (s *sessionService) GetSubmissions(sessionId int64) ([]Submission, error) {

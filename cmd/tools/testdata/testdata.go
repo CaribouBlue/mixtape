@@ -147,6 +147,7 @@ func addTestUsers(userService user.UserService) error {
 func addTestSessions(sessionService session.SessionService) error {
 	s := session.NewSession("New Session")
 	s.Id = 0
+	s.CreatedBy = 1
 	err := sessionService.Create(s)
 	if err != nil {
 		return err
@@ -154,6 +155,7 @@ func addTestSessions(sessionService session.SessionService) error {
 
 	s = session.NewSession("Vote Session")
 	s.Id = 1
+	s.CreatedBy = 1
 	s.Submissions = MockSubmissions
 	s.StartAt = s.StartAt.Add(-s.SubmissionDuration)
 	err = sessionService.Create(s)
@@ -163,6 +165,7 @@ func addTestSessions(sessionService session.SessionService) error {
 
 	s = session.NewSession("Results Session")
 	s.Id = 2
+	s.CreatedBy = 1
 	s.Submissions = MockSubmissions
 	s.Votes = MockVotes
 	s.StartAt = s.StartAt.Add(-s.SubmissionDuration - s.VoteDuration)

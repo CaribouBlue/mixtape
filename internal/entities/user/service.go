@@ -18,6 +18,8 @@ type UserService interface {
 	Update(*User) error
 	Delete(*User) error
 
+	Search(query string) (*[]User, error)
+
 	SignUp(username string, password string) (*User, error)
 	Login(username string, password string) (*User, error)
 
@@ -50,6 +52,10 @@ func (s *userService) Delete(user *User) error {
 	return s.repo.DeleteUser(user)
 }
 
+func (s *userService) Search(query string) (*[]User, error) {
+	return s.repo.SearchUsers(query)
+}
+
 func (s *userService) SignUp(username string, password string) (*User, error) {
 	log.Default().Println("signing up user")
 
@@ -68,7 +74,7 @@ func (s *userService) SignUp(username string, password string) (*User, error) {
 
 	user := &User{
 		Id:           0,
-		UserName:     username,
+		Username:     username,
 		PasswordHash: hashedPassword,
 	}
 
@@ -84,7 +90,7 @@ func (s *userService) Login(username string, password string) (*User, error) {
 		return nil, err
 	}
 
-	log.Default().Println("got user: ", user.Id, user.UserName)
+	log.Default().Println("got user: ", user.Id, user.Username)
 
 	log.Default().Println("comparing password")
 

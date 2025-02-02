@@ -180,6 +180,7 @@ func WithEnforcedAuthentication(opts WithEnforcedAuthenticationOpts) Middleware 
 			}
 
 			if !isAuthenticated {
+				w.Header().Add("HX-Redirect", opts.UnauthenticatedRedirectPath)
 				http.Redirect(w, r, opts.UnauthenticatedRedirectPath, http.StatusFound)
 				return
 			}

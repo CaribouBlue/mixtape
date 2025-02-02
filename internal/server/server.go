@@ -95,6 +95,7 @@ func StartServer() {
 						mux.SessionMuxServices{
 							SessionService: sessionService,
 							MusicService:   musicService,
+							UserService:    userService,
 						},
 						[]middleware.Middleware{},
 						mux.SessionMuxChildren{},

@@ -1,0 +1,123 @@
+package templates
+
+import (
+	"fmt"
+	"github.com/CaribouBlue/top-spot/internal/entities/user"
+)
+
+var (
+	IdSessionMaker         string = "session-maker"
+	IdUserSearchBarResults string = "user-search-bar-results"
+	IdNewSessionUsers      string = "new-session-users"
+	IdNewSessionName       string = "new-session-name"
+)
+
+templ SessionMakerPage(u user.User) {
+	@Root(RootProps{Title: "Session Maker"}) {
+		<div
+			id={ IdSessionMaker }
+		>
+			<h1>Session Maker</h1>
+			<form
+				id="maker"
+				hx-include="closest form"
+				hx-post="/app/session/maker/pl"
+				class="inline-grid"
+			>
+				<div>
+					<label for={ IdNewSessionName }>Session Name:</label>
+					<input
+						id={ IdNewSessionName }
+						type="text"
+						name="name"
+						_="on keydown[key is 'Enter'] halt the event"
+					/>
+				</div>
+				<button>Create Session</button>
+				<a
+					href="/app/session/"
+					hx-boost="true"
+				>Cancel</a>
+			</form>
+		</div>
+	}
+}
+
+templ SessionMakerDialog(u user.User) {
+	<dialog>
+		<p>New Session</p>
+		<form
+			id="maker"
+			hx-include="closest form"
+			hx-post="/app/session/maker/pl"
+			class="inline-grid"
+		>
+			<div>
+				<label for={ IdNewSessionName }>Session Name:</label>
+				<input type="text" id={ IdNewSessionName } name="name" autofocus/>
+			</div>
+			<button
+				hx-trigger="click"
+				type="submit"
+			>Create Session</button>
+		</form>
+	</dialog>
+}
+
+templ SessionMakerUsersInput() {
+	<div>
+		<label for={ IdNewSessionUsers }>Users:</label>
+		<fieldset id={ IdNewSessionUsers }></fieldset>
+	</div>
+	<input
+		id="search-bar"
+		hx-get="/app/session/maker/users/search"
+		hx-trigger="input changed delay:500ms, search"
+		hx-target={ fmt.Sprintf("#%s", IdUserSearchBarResults) }
+		hx-swap="innerHTML"
+		type="search"
+		name="query"
+		placeholder="Begin Typing To Search Users..."
+		class="w-full p-2"
+	/>
+	<div
+		id={ IdUserSearchBarResults }
+	></div>
+}
+
+templ SessionMakerUserSearchResults(users []user.User) {
+	for _, user := range  users {
+		<div class="flex gap-5">
+			<button
+				hx-post="/app/session/maker/users"
+				hx-vals={ fmt.Sprintf(`{"userId": %d}`, user.Id) }
+				hx-target="closest div"
+				hx-swap="delete"
+				type="button"
+			>Add</button>
+			<p name="users">{ user.Username }</p>
+		</div>
+	}
+}
+
+templ SessionMakerUser(u user.User) {
+	<div
+		hx-swap-oob={ fmt.Sprintf("beforeend:#%s", IdNewSessionUsers) }
+	>
+		<div>
+			<button
+				_="on click remove closest <div/>"
+				type="button"
+			>x</button>
+			<label
+				for={ fmt.Sprintf("user-%s", u.IdString()) }
+			>{ u.Username }</label>
+			<input
+				id={ fmt.Sprintf("user-%s", u.IdString()) }
+				value={ u.IdString() }
+				type="hidden"
+				name="users"
+			/>
+		</div>
+	</div>
+}

@@ -17,6 +17,9 @@ templ Home(u user.User, sessions []session.Session) {
 				</li>
 			}
 		</ul>
-		<button>Create Session</button>
+		<a
+			href="/app/session/maker"
+			hx-boost="true"
+		>Create Session</a>
 	}
 }

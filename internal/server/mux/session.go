@@ -32,6 +32,7 @@ type SessionMuxOpts struct {
 type SessionMuxServices struct {
 	SessionService session.SessionService
 	MusicService   music.MusicService
+	UserService    user.UserService
 }
 
 type SessionMuxChildren struct{}
@@ -47,6 +48,8 @@ func NewSessionMux(opts SessionMuxOpts, services SessionMuxServices, middleware 
 
 	mux.Handle("GET /", http.HandlerFunc(mux.handleSessionListPage))
 	mux.Handle("POST /", http.HandlerFunc(mux.handleCreateSession))
+
+	mux.Handle("GET /maker", http.HandlerFunc(mux.handleSessionMakerPage))
 
 	mux.Handle("GET /{sessionId}", http.HandlerFunc(mux.handleSessionPage))
 
@@ -92,15 +95,17 @@ func (mux *SessionMux) handleSessionListPage(w http.ResponseWriter, r *http.Requ
 }
 
 func (mux *SessionMux) handleCreateSession(w http.ResponseWriter, r *http.Request) {
-	session := &session.Session{}
-	defer r.Body.Close()
-	err := json.NewDecoder(r.Body).Decode(session)
+	u := r.Context().Value(middleware.UserCtxKey).(*user.User)
+
+	err := r.ParseForm()
 	if err != nil {
-		http.Error(w, "Failed to decode request body", http.StatusBadRequest)
+		http.Error(w, "Failed to parse form", http.StatusBadRequest)
 		return
 	}
 
-	err = mux.Services.SessionService.Create(session)
+	name := r.Form.Get("name")
+
+	session, err := mux.Services.SessionService.Create(u, name)
 	if err != nil {
 		http.Error(w, "Failed to create session", http.StatusInternalServerError)
 		return
@@ -111,6 +116,11 @@ func (mux *SessionMux) handleCreateSession(w http.ResponseWriter, r *http.Reques
 	if err := json.NewEncoder(w).Encode(session); err != nil {
 		http.Error(w, "Failed to encode data", http.StatusInternalServerError)
 	}
+}
+
+func (mux *SessionMux) handleSessionMakerPage(w http.ResponseWriter, r *http.Request) {
+	user := r.Context().Value(middleware.UserCtxKey).(*user.User)
+	serverUtils.HandleHtmlResponse(r, w, templates.SessionMakerPage(*user))
 }
 
 func (mux *SessionMux) handleSessionPage(w http.ResponseWriter, r *http.Request) {

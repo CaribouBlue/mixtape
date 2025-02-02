@@ -52,6 +52,8 @@ type Session struct {
 	Votes              []Vote        `json:"votes"`
 	Playlists          []Playlist    `json:"playlists"`
 	Results            []Result      `json:"result"`
+	Users              []int64       `json:"users"`
+	CreatedBy          int64         `json:"createdBy"`
 	CreatedAt          time.Time     `json:"createdAt"`
 	MaxSubmissions     int           `json:"maxSubmissions"`
 	StartAt            time.Time     `json:"startAt"`
