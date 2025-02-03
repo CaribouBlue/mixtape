@@ -113,26 +113,26 @@ func (mux *AuthMux) handleUserLoginSubmit(w http.ResponseWriter, r *http.Request
 }
 
 func (mux *AuthMux) handleLogin(w http.ResponseWriter, r *http.Request) {
-	u := r.Context().Value(middleware.UserCtxKey).(*user.User)
+	u := r.Context().Value(utils.UserCtxKey).(*user.User)
 
 	if u.Id == 0 {
-		http.Redirect(w, r, mux.Opts.PathPrefix+"/user/login", http.StatusFound)
+		utils.HandleRedirect(w, r, mux.Opts.PathPrefix+"/user/login")
 		return
 	}
 
 	err := mux.Services.MusicService.Authenticate(u)
 	if err != nil {
-		http.Redirect(w, r, mux.Opts.PathPrefix+"/spotify", http.StatusFound)
+		utils.HandleRedirect(w, r, mux.Opts.PathPrefix+"/spotify")
 		return
 	} else {
-		http.Redirect(w, r, mux.Opts.LoginSuccessPath, http.StatusFound)
+		utils.HandleRedirect(w, r, mux.Opts.LoginSuccessPath)
 		return
 	}
 }
 
 func (mux *AuthMux) handleLogout(w http.ResponseWriter, r *http.Request) {
 	utils.ClearAuthCookie(w)
-	http.Redirect(w, r, mux.Opts.PathPrefix+"/user/login", http.StatusFound)
+	utils.HandleRedirect(w, r, mux.Opts.PathPrefix+"/user/login")
 }
 
 func (mux *AuthMux) handleSpotifyAuth(w http.ResponseWriter, r *http.Request) {
@@ -143,11 +143,11 @@ func (mux *AuthMux) handleSpotifyAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	http.Redirect(w, r, userAuthUrl, http.StatusFound)
+	utils.HandleRedirect(w, r, userAuthUrl)
 }
 
 func (mux *AuthMux) handleSpotifyAuthRedirect(w http.ResponseWriter, r *http.Request) {
-	u := r.Context().Value(middleware.UserCtxKey).(*user.User)
+	u := r.Context().Value(utils.UserCtxKey).(*user.User)
 	u, err := mux.Services.UserService.Get(u.Id)
 	if err != nil {
 		http.Error(w, "Failed to get user", http.StatusInternalServerError)
@@ -180,5 +180,5 @@ func (mux *AuthMux) handleSpotifyAuthRedirect(w http.ResponseWriter, r *http.Req
 	}
 	mux.Services.UserService.Update(u)
 
-	http.Redirect(w, r, mux.Opts.PathPrefix+"/login", http.StatusFound)
+	utils.HandleRedirect(w, r, mux.Opts.PathPrefix+"/login")
 }

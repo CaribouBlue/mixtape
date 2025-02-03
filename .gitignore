@@ -29,3 +29,6 @@ tmp/
 
 # templ
 *_templ.go
+
+# Node
+node_modules/

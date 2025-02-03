@@ -11,8 +11,7 @@ templ Root(props RootProps) {
 			<title>Top Spot | { props.Title }</title>
 			<script src="https://unpkg.com/htmx.org@2.0.3" integrity="sha384-0895/pl2MU10Hqc6jd4RvrthNlDiE9U1tWmX7WRESftEDRosgxNsQG/Ze9YMRzHq" crossorigin="anonymous"></script>
 			<script src="https://unpkg.com/hyperscript.org@0.9.14"></script>
-			<link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.23/dist/full.min.css" rel="stylesheet" type="text/css"/>
-			<script src="https://cdn.tailwindcss.com"></script>
+			<link href="/static/css/output.css" rel="stylesheet" type="text/css"/>
 		</head>
 		<body class="w-screen h-screen flex flex-col items-center">
 			@Header(props.IsAuthenticated)

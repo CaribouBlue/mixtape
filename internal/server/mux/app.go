@@ -38,7 +38,7 @@ func NewAppMux(opts AppMuxOpts, services AppMuxServices, mw []middleware.Middlew
 	}
 
 	mux.Handle("/home", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		user := r.Context().Value(middleware.UserCtxKey).(*user.User)
+		user := r.Context().Value(utils.UserCtxKey).(*user.User)
 
 		utils.HandleHtmlResponse(r, w, templates.Home(*user))
 	}))

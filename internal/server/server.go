@@ -13,6 +13,7 @@ import (
 	"github.com/CaribouBlue/top-spot/internal/entities/user"
 	"github.com/CaribouBlue/top-spot/internal/server/middleware"
 	"github.com/CaribouBlue/top-spot/internal/server/mux"
+	"github.com/CaribouBlue/top-spot/internal/server/utils"
 )
 
 func StartServer() {
@@ -52,6 +53,16 @@ func StartServer() {
 			})),
 		},
 		mux.RootMuxChildren{
+			StaticMux: mux.NewStaticMux(
+				mux.StaticMuxOpts{
+					PathPrefix: "/static",
+				},
+				mux.StaticMuxServices{},
+				[]middleware.Middleware{
+					middleware.WithRequestMetadata(),
+				},
+				mux.StaticMuxChildren{},
+			),
 			AuthMux: mux.NewAuthMux(
 				mux.AuthMuxOpts{
 					PathPrefix:       "/auth",
@@ -67,17 +78,7 @@ func StartServer() {
 						UserService:   userService,
 					}),
 					middleware.WithCustomNotFoundHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-						isHxRequest := r.Header.Get("HX-Request") != ""
-						var statusCode int
-						if isHxRequest {
-							statusCode = http.StatusNotFound
-						} else {
-							statusCode = http.StatusFound
-						}
-
-						redirect := "/auth/login"
-						w.Header().Add("HX-Redirect", redirect)
-						http.Redirect(w, r, redirect, statusCode)
+						utils.HandleRedirect(w, r, "/auth/login")
 					})),
 				},
 				mux.AuthMuxChildren{},
@@ -97,17 +98,7 @@ func StartServer() {
 						UserService:                 userService,
 					}),
 					middleware.WithCustomNotFoundHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-						isHxRequest := r.Header.Get("HX-Request") != ""
-						var statusCode int
-						if isHxRequest {
-							statusCode = http.StatusNotFound
-						} else {
-							statusCode = http.StatusFound
-						}
-
-						redirect := "/app/home"
-						w.Header().Add("HX-Redirect", redirect)
-						http.Redirect(w, r, redirect, statusCode)
+						utils.HandleRedirect(w, r, "/app/home")
 					})),
 				},
 				mux.AppMuxChildren{

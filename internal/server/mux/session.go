@@ -3,7 +3,6 @@ package mux
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -81,24 +80,21 @@ func (mux *SessionMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (mux *SessionMux) handleSessionListPage(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(middleware.UserCtxKey).(*user.User)
+	user := r.Context().Value(serverUtils.UserCtxKey).(*user.User)
 
 	sessions, err := mux.Services.SessionService.GetAll()
 	if err != nil {
-		log.Print(err)
 		http.Error(w, "Failed to get sessions", http.StatusInternalServerError)
 		return
 	}
 	sessionValues := utils.Map(sessions, func(session *session.Session) session.Session { return *session })
-
-	log.Default().Println(sessionValues)
 
 	component := templates.UserSessions(*user, sessionValues)
 	serverUtils.HandleHtmlResponse(r, w, component)
 }
 
 func (mux *SessionMux) handleCreateSession(w http.ResponseWriter, r *http.Request) {
-	u := r.Context().Value(middleware.UserCtxKey).(*user.User)
+	u := r.Context().Value(serverUtils.UserCtxKey).(*user.User)
 
 	err := r.ParseForm()
 	if err != nil {
@@ -122,12 +118,12 @@ func (mux *SessionMux) handleCreateSession(w http.ResponseWriter, r *http.Reques
 }
 
 func (mux *SessionMux) handleSessionMakerPage(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(middleware.UserCtxKey).(*user.User)
+	user := r.Context().Value(serverUtils.UserCtxKey).(*user.User)
 	serverUtils.HandleHtmlResponse(r, w, templates.SessionMakerPage(*user))
 }
 
 func (mux *SessionMux) handleSessionPage(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(middleware.UserCtxKey).(*user.User)
+	user := r.Context().Value(serverUtils.UserCtxKey).(*user.User)
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -153,7 +149,7 @@ func (mux *SessionMux) handleSessionPage(w http.ResponseWriter, r *http.Request)
 }
 
 func (mux *SessionMux) handleCreateSessionTrack(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(middleware.UserCtxKey).(*user.User)
+	user := r.Context().Value(serverUtils.UserCtxKey).(*user.User)
 	err := mux.Services.MusicService.Authenticate(user)
 	if err != nil {
 		http.Error(w, "Failed to authenticate user", http.StatusInternalServerError)
@@ -191,7 +187,7 @@ func (mux *SessionMux) handleCreateSessionTrack(w http.ResponseWriter, r *http.R
 }
 
 func (mux *SessionMux) handleCreateSessionPlaylist(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(middleware.UserCtxKey).(*user.User)
+	user := r.Context().Value(serverUtils.UserCtxKey).(*user.User)
 	err := mux.Services.MusicService.Authenticate(user)
 	if err != nil {
 		http.Error(w, "Failed to authenticate user", http.StatusInternalServerError)
@@ -233,7 +229,7 @@ func (mux *SessionMux) handleCreateSessionPlaylist(w http.ResponseWriter, r *htt
 }
 
 func (mux *SessionMux) handleGetSessionPlaylist(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(middleware.UserCtxKey).(*user.User)
+	user := r.Context().Value(serverUtils.UserCtxKey).(*user.User)
 	err := mux.Services.MusicService.Authenticate(user)
 	if err != nil {
 		http.Error(w, "Failed to authenticate user", http.StatusInternalServerError)
@@ -271,7 +267,7 @@ func (mux *SessionMux) handleGetSessionPlaylist(w http.ResponseWriter, r *http.R
 }
 
 func (mux *SessionMux) handleCreateSessionSubmission(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(middleware.UserCtxKey).(*user.User)
+	user := r.Context().Value(serverUtils.UserCtxKey).(*user.User)
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -317,7 +313,7 @@ func (mux *SessionMux) handleGetSessionPhaseDuration(w http.ResponseWriter, r *h
 }
 
 func (mux *SessionMux) handleGetSessionSubmission(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(middleware.UserCtxKey).(*user.User)
+	user := r.Context().Value(serverUtils.UserCtxKey).(*user.User)
 	err := mux.Services.MusicService.Authenticate(user)
 	if err != nil {
 		http.Error(w, "Failed to authenticate user", http.StatusInternalServerError)
@@ -358,7 +354,7 @@ func (mux *SessionMux) handleGetSessionSubmission(w http.ResponseWriter, r *http
 }
 
 func (mux *SessionMux) handleDeleteSessionSubmission(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(middleware.UserCtxKey).(*user.User)
+	user := r.Context().Value(serverUtils.UserCtxKey).(*user.User)
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -382,7 +378,7 @@ func (mux *SessionMux) handleDeleteSessionSubmission(w http.ResponseWriter, r *h
 }
 
 func (mux *SessionMux) handleGetSessionSubmissionCandidate(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(middleware.UserCtxKey).(*user.User)
+	user := r.Context().Value(serverUtils.UserCtxKey).(*user.User)
 
 	err := mux.Services.MusicService.Authenticate(user)
 	if err != nil {
@@ -424,7 +420,7 @@ func (mux *SessionMux) handleGetSessionSubmissionCandidate(w http.ResponseWriter
 }
 
 func (mux *SessionMux) handleCreateSessionVote(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(middleware.UserCtxKey).(*user.User)
+	user := r.Context().Value(serverUtils.UserCtxKey).(*user.User)
 
 	err := mux.Services.MusicService.Authenticate(user)
 	if err != nil {
@@ -466,7 +462,7 @@ func (mux *SessionMux) handleCreateSessionVote(w http.ResponseWriter, r *http.Re
 }
 
 func (mux *SessionMux) handleDeleteSessionVote(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(middleware.UserCtxKey).(*user.User)
+	user := r.Context().Value(serverUtils.UserCtxKey).(*user.User)
 
 	err := mux.Services.MusicService.Authenticate(user)
 	if err != nil {
@@ -514,7 +510,7 @@ func (mux *SessionMux) handleDeleteSessionVote(w http.ResponseWriter, r *http.Re
 }
 
 func (mux *SessionMux) handleGetSessionResult(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(middleware.UserCtxKey).(*user.User)
+	user := r.Context().Value(serverUtils.UserCtxKey).(*user.User)
 
 	err := mux.Services.MusicService.Authenticate(user)
 	if err != nil {

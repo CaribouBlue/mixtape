@@ -6,6 +6,7 @@ import (
 
 	"github.com/CaribouBlue/top-spot/internal/entities/user"
 	"github.com/CaribouBlue/top-spot/internal/server/middleware"
+	"github.com/CaribouBlue/top-spot/internal/server/utils"
 )
 
 type ProfileMux struct {
@@ -43,7 +44,7 @@ func (mux *ProfileMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (mux *ProfileMux) handleProfilePage(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(middleware.UserCtxKey).(*user.User)
+	user := r.Context().Value(utils.UserCtxKey).(*user.User)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)

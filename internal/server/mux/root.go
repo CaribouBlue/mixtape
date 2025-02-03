@@ -19,8 +19,9 @@ type RootMuxServices struct {
 }
 
 type RootMuxChildren struct {
-	AuthMux *AuthMux
-	AppMux  *AppMux
+	AuthMux   *AuthMux
+	AppMux    *AppMux
+	StaticMux *StaticMux
 }
 
 func NewRootMux(services RootMuxServices, middleware []middleware.Middleware, children RootMuxChildren) *RootMux {
@@ -36,6 +37,9 @@ func NewRootMux(services RootMuxServices, middleware []middleware.Middleware, ch
 
 	appPathPrefix := mux.Children.AppMux.Opts.PathPrefix
 	mux.Handle(appPathPrefix+"/", http.StripPrefix(appPathPrefix, mux.Children.AppMux))
+
+	staticPathPrefix := mux.Children.StaticMux.Opts.PathPrefix
+	mux.Handle(staticPathPrefix+"/", http.StripPrefix(staticPathPrefix, mux.Children.StaticMux))
 
 	return mux
 }

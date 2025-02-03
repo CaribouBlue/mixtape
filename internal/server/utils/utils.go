@@ -28,3 +28,24 @@ func AuthorizedSpotifyClient(user *user.User) *spotify.Client {
 	spotify.SetAccessToken(user.SpotifyAccessToken)
 	return spotify
 }
+
+func HandleRedirect(w http.ResponseWriter, r *http.Request, redirect string) {
+	metadata, ok := r.Context().Value(RequestMetaDataCtxKey).(RequestMetadata)
+
+	var isHtmxRequest bool
+	if !ok {
+		isHtmxRequest = false
+	} else {
+		isHtmxRequest = metadata.IsHtmxRequest
+	}
+
+	var statusCode int
+	if isHtmxRequest {
+		statusCode = http.StatusNotFound
+	} else {
+		statusCode = http.StatusFound
+	}
+
+	w.Header().Add("HX-Redirect", redirect)
+	http.Redirect(w, r, redirect, statusCode)
+}

@@ -8,7 +8,6 @@ import (
 
 	"github.com/CaribouBlue/top-spot/internal/entities/user"
 	"github.com/CaribouBlue/top-spot/internal/server/utils"
-	"github.com/google/uuid"
 )
 
 type Middleware func(http.Handler) http.Handler
@@ -88,27 +87,17 @@ func WithCustomNotFoundHandler(notFoundHandler http.Handler) Middleware {
 	}
 }
 
-type RequestMetadata struct {
-	RequestId string
-}
-
-func NewRequestMetadata() RequestMetadata {
-	return RequestMetadata{
-		RequestId: uuid.New().String(),
-	}
-}
-
 func WithRequestMetadata() Middleware {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 
-			metadata, ok := ctx.Value(RequestMetaDataCtxKey).(RequestMetadata)
+			metadata, ok := ctx.Value(utils.RequestMetaDataCtxKey).(utils.RequestMetadata)
 			if !ok {
-				metadata = NewRequestMetadata()
+				metadata = utils.NewRequestMetadata(r)
 			}
 
-			ctx = context.WithValue(ctx, RequestMetaDataCtxKey, metadata)
+			ctx = context.WithValue(ctx, utils.RequestMetaDataCtxKey, metadata)
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -125,7 +114,7 @@ func WithUser(opts WithUserOpts) Middleware {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 
-			_, ok := ctx.Value(UserCtxKey).(*user.User)
+			_, ok := ctx.Value(utils.UserCtxKey).(*user.User)
 			if ok {
 				next.ServeHTTP(w, r)
 				return
@@ -141,16 +130,14 @@ func WithUser(opts WithUserOpts) Middleware {
 				} else if err == nil {
 					userCtx = storedUser
 				} else {
-					log.Print(err)
 					http.Error(w, "Failed to get user", http.StatusInternalServerError)
 					return
 				}
 			} else {
-				log.Print(err)
 				userCtx = &user.User{}
 			}
 
-			ctx = context.WithValue(ctx, UserCtxKey, userCtx)
+			ctx = context.WithValue(ctx, utils.UserCtxKey, userCtx)
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -167,7 +154,7 @@ func WithEnforcedAuthentication(opts WithEnforcedAuthenticationOpts) Middleware 
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 
-			u, ok := ctx.Value(UserCtxKey).(*user.User)
+			u, ok := ctx.Value(utils.UserCtxKey).(*user.User)
 			if !ok || u == nil {
 				http.Error(w, "User not found in context, may need to apply WithUser middleware", http.StatusInternalServerError)
 				return
@@ -180,8 +167,7 @@ func WithEnforcedAuthentication(opts WithEnforcedAuthenticationOpts) Middleware 
 			}
 
 			if !isAuthenticated {
-				w.Header().Add("HX-Redirect", opts.UnauthenticatedRedirectPath)
-				http.Redirect(w, r, opts.UnauthenticatedRedirectPath, http.StatusFound)
+				utils.HandleRedirect(w, r, opts.UnauthenticatedRedirectPath)
 				return
 			}
 
