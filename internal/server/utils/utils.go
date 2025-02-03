@@ -39,13 +39,12 @@ func HandleRedirect(w http.ResponseWriter, r *http.Request, redirect string) {
 		isHtmxRequest = metadata.IsHtmxRequest
 	}
 
-	var statusCode int
 	if isHtmxRequest {
-		statusCode = http.StatusNotFound
+		w.Header().Add("HX-Redirect", redirect)
+		w.WriteHeader(http.StatusFound)
+		return
 	} else {
-		statusCode = http.StatusFound
+		http.Redirect(w, r, redirect, http.StatusFound)
 	}
 
-	w.Header().Add("HX-Redirect", redirect)
-	http.Redirect(w, r, redirect, statusCode)
 }

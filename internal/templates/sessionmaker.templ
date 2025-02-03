@@ -16,28 +16,38 @@ templ SessionMakerPage(u user.User) {
 	@Root(RootProps{Title: "Session Maker", IsAuthenticated: true}) {
 		<div
 			id={ IdSessionMaker }
+			class="grid grid-cols-1 gap-4"
 		>
-			<h1>Session Maker</h1>
+			<h1 class="text-2xl">Session Maker</h1>
 			<form
 				id="maker"
-				hx-include="closest form"
-				hx-post="/app/session/maker/pl"
-				class="inline-grid"
+				hx-post="/app/session/"
+				hx-trigger="submit"
+				class="grid grid-cols-1 gap-4"
 			>
-				<div>
-					<label for={ IdNewSessionName }>Session Name:</label>
+				<label class="form-control w-full max-w-xs">
+					<div class="label">
+						<span class="label-text">Session Name</span>
+					</div>
 					<input
-						id={ IdNewSessionName }
+						_="on keydown[key is 'Enter'] halt the event"
+						class="input input-bordered w-full max-w-xs"
 						type="text"
 						name="name"
-						_="on keydown[key is 'Enter'] halt the event"
 					/>
-				</div>
-				<button>Create Session</button>
-				<a
-					href="/app/session/"
-					hx-boost="true"
-				>Cancel</a>
+				</label>
+				<button
+					type="submit"
+					class="btn btn-wide w-full"
+				>Create Session</button>
+				<button
+					hx-get="/app/home"
+					hx-target="body"
+					hx-push-url="true"
+					hx-trigger="click"
+					type="button"
+					class="btn btn-wide w-full btn-outline btn-error"
+				>Cancel</button>
 			</form>
 		</div>
 	}

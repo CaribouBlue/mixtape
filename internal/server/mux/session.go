@@ -1,7 +1,6 @@
 package mux
 
 import (
-	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
@@ -110,11 +109,7 @@ func (mux *SessionMux) handleCreateSession(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	if err := json.NewEncoder(w).Encode(session); err != nil {
-		http.Error(w, "Failed to encode data", http.StatusInternalServerError)
-	}
+	serverUtils.HandleRedirect(w, r, fmt.Sprintf("/app/session/%d", session.Id))
 }
 
 func (mux *SessionMux) handleSessionMakerPage(w http.ResponseWriter, r *http.Request) {

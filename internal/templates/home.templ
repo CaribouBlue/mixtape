@@ -8,17 +8,24 @@ import (
 
 templ Home(u user.User) {
 	@Root(RootProps{Title: "Home", IsAuthenticated: true}) {
-		<div class="grid grid-cols-1 gap-4">
-			<h1>Home</h1>
-			<div>
-				<h2 class="pb-2">Game Sessions</h2>
-				<div
-					hx-get="/app/session/"
-					hx-trigger="load"
-					hx-swap="outerHTML"
-				>
-					@spinner(SpinnerOpts{Size: SpinnerSizeS})
-				</div>
+		<div class="grid grid-cols-2 gap-4">
+			<h1 class="text-2xl col-span-2">Home</h1>
+			<h1 class="text-lg pb-2">Game Sessions</h1>
+			<div class="justify-self-end">
+				<button
+					hx-get="/app/session/maker"
+					hx-push-url="true"
+					hx-trigger="click"
+					hx-target="body"
+					class="btn btn-wide"
+				>Make New Session</button>
+			</div>
+			<div
+				hx-get="/app/session/"
+				hx-trigger="load"
+				class="col-span-2"
+			>
+				@spinner(SpinnerOpts{Size: SpinnerSizeS})
 			</div>
 		</div>
 	}
@@ -30,13 +37,14 @@ templ UserSessions(u user.User, sessions []session.Session) {
 			<tbody>
 				for _, session := range sessions {
 					<tr
-						_="on mouseenter add .bg-gray-100 to me
-						on mouseleave remove .bg-gray-100 from me"
 						hx-get={ fmt.Sprintf("/app/session/%d", session.Id) }
 						hx-target="body"
 						hx-push-url="true"
 						hx-disinherit="*"
+						_="on mouseenter add .bg-gray-100 to me
+						on mouseleave remove .bg-gray-100 from me"
 						class="cursor-pointer"
+						style="transition: all 200ms ease-out"
 					>
 						<td>
 							{ session.Name }

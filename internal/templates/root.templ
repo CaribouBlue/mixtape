@@ -23,7 +23,7 @@ templ Root(props RootProps) {
 }
 
 templ AppContainer() {
-	<div class="max-w-screen-lg w-full mx-10">
+	<div class="max-w-screen-lg w-full px-10">
 		{ children... }
 	</div>
 }
@@ -32,16 +32,32 @@ templ Header(isAuthenticated bool) {
 	<header class="w-full flex justify-center items-center py-4">
 		@AppContainer() {
 			<div class="flex justify-between items-center">
-				<h1 class="text-2xl font-bold">Top Spot</h1>
+				<h1
+					hx-get="/app"
+					hx-trigger="click"
+					hx-target="body"
+					hx-push-url="true"
+					class="text-2xl font-bold cursor-pointer"
+				>Top Spot</h1>
 				<nav>
 					if isAuthenticated {
-						<a href="/app/home" class="mx-2">Home</a>
-						<a href="/auth/logout" class="mx-2">Logout</a>
+						@HeaderNavLink("Home", "/app/home")
+						@HeaderNavLink("Logout", "/auth/logout")
 					} else {
-						<a href="/auth/login" class="mx-2">Login</a>
+						@HeaderNavLink("Login", "/auth/login")
 					}
 				</nav>
 			</div>
 		}
 	</header>
+}
+
+templ HeaderNavLink(text, url string) {
+	<a
+		hx-get={ url }
+		hx-trigger="click"
+		hx-target="body"
+		hx-push-url="true"
+		class="mx-2 cursor-pointer"
+	>{ text }</a>
 }
