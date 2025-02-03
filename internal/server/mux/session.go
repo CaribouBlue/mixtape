@@ -549,5 +549,11 @@ func (mux *SessionMux) handleGetSessionResult(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	templates.Result(*session, *result, *submission, *track).Render(r.Context(), w)
+	owner, err := mux.Services.UserService.Get(submission.UserId)
+	if err != nil {
+		http.Error(w, "Failed to get owner", http.StatusInternalServerError)
+		return
+	}
+
+	templates.Result(*session, *result, *submission, *track, *owner).Render(r.Context(), w)
 }

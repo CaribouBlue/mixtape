@@ -270,7 +270,7 @@ templ LazyLoadResult(s session.Session, result session.Result) {
 	></tr>
 }
 
-templ Result(s session.Session, result session.Result, submission session.Submission, track music.Track) {
+templ Result(s session.Session, result session.Result, submission session.Submission, track music.Track, owner user.User) {
 	<tr>
 		<td>{ fmt.Sprint(result.Place) }</td>
 		<td>
@@ -279,7 +279,7 @@ templ Result(s session.Session, result session.Result, submission session.Submis
 				target="_blank"
 			>{ fmt.Sprint(track.Name) + " | " + utils.MapJoin(track.Artists, ", ", func(artist music.Artist) string {return artist.Name} ) }</a>
 		</td>
-		<td>{ fmt.Sprint(submission.UserId) }</td>
+		<td>{ fmt.Sprint(owner.Username) }</td>
 	</tr>
 }
 
