@@ -3,7 +3,10 @@ package mux
 import (
 	"net/http"
 
+	"github.com/CaribouBlue/top-spot/internal/entities/user"
 	"github.com/CaribouBlue/top-spot/internal/server/middleware"
+	"github.com/CaribouBlue/top-spot/internal/server/utils"
+	"github.com/CaribouBlue/top-spot/internal/templates"
 )
 
 type AppMux struct {
@@ -33,6 +36,12 @@ func NewAppMux(opts AppMuxOpts, services AppMuxServices, mw []middleware.Middlew
 		children,
 		mw,
 	}
+
+	mux.Handle("/home", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user := r.Context().Value(middleware.UserCtxKey).(*user.User)
+
+		utils.HandleHtmlResponse(r, w, templates.Home(*user))
+	}))
 
 	sessionPathPrefix := mux.Children.SessionMux.Opts.PathPrefix
 	mux.Handle(sessionPathPrefix+"/", http.StripPrefix(sessionPathPrefix, mux.Children.SessionMux))

@@ -89,8 +89,11 @@ func (mux *SessionMux) handleSessionListPage(w http.ResponseWriter, r *http.Requ
 		http.Error(w, "Failed to get sessions", http.StatusInternalServerError)
 		return
 	}
+	sessionValues := utils.Map(sessions, func(session *session.Session) session.Session { return *session })
 
-	component := templates.Home(*user, utils.Map(sessions, func(session *session.Session) session.Session { return *session }))
+	log.Default().Println(sessionValues)
+
+	component := templates.UserSessions(*user, sessionValues)
 	serverUtils.HandleHtmlResponse(r, w, component)
 }
 

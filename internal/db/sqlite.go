@@ -142,7 +142,7 @@ func (sqlite *sqliteJsonDb) GetUser(userId int64) (*user.User, error) {
 }
 
 func (sqlite *sqliteJsonDb) GetUserByUsername(username string) (*user.User, error) {
-	data, err := sqlite.QueryRow(fmt.Sprintf("select data from %s where data->>'userName' = '%s'", sqlite.UserTable, username))
+	data, err := sqlite.QueryRow(fmt.Sprintf("select data from %s where data->>'username' = '%s'", sqlite.UserTable, username))
 	if err == sql.ErrNoRows {
 		return nil, user.ErrNoUserFound
 	} else if err != nil {
@@ -157,7 +157,7 @@ func (sqlite *sqliteJsonDb) GetUserByUsername(username string) (*user.User, erro
 func (sqlite *sqliteJsonDb) SearchUsers(q string) (*[]user.User, error) {
 	var users []user.User = make([]user.User, 0)
 
-	query := fmt.Sprintf("SELECT data FROM %s WHERE data->>'userName' LIKE '%%%s%%' LIMIT 10", sqlite.UserTable, q)
+	query := fmt.Sprintf("SELECT data FROM %s WHERE data->>'username' LIKE '%%%s%%' LIMIT 10", sqlite.UserTable, q)
 	rows, err := sqlite.db.Query(query)
 	if err != nil {
 		return &users, err
@@ -271,7 +271,18 @@ func (sqlite *sqliteJsonDb) UpdateSession(session *session.Session) error {
 		return err
 	}
 
-	return sqlite.Update(sqlite.SessionTable, session.Id, data)
+	stmt, err := sqlite.db.Prepare(fmt.Sprintf("UPDATE %s SET data = ? WHERE id = ?", sqlite.SessionTable))
+	if err != nil {
+		return err
+	}
+
+	defer stmt.Close()
+	_, err = stmt.Exec(data, session.Id)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (sqlite *sqliteJsonDb) CreateSession(session *session.Session) error {

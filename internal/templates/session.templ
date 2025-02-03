@@ -20,7 +20,7 @@ const (
 
 // Session Page Templates
 templ SessionPage(s session.Session, u user.User) {
-	@Root(RootProps{Title: "Session " + s.Name}) {
+	@Root(RootProps{Title: "Session " + s.Name, IsAuthenticated: true}) {
 		<div
 			id={ SessionDetailsId }
 		>
@@ -299,5 +299,7 @@ func PhaseDurationDisplay(s session.Session) string {
 }
 
 templ SessionPhaseDuration(s session.Session) {
-	<p>{ PhaseDurationDisplay(s) } remaining</p>
+	if s.Phase() != session.ResultPhase {
+		{ PhaseDurationDisplay(s) } remaining
+	}
 }

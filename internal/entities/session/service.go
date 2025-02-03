@@ -20,6 +20,7 @@ type SessionService interface {
 	GetAll() ([]*Session, error)
 	GetOne(sessionId int64) (*Session, error)
 	Create(creator *user.User, name string) (*Session, error)
+	Update(session *Session) error
 
 	GetSubmissions(sessionId int64) ([]Submission, error)
 	GetSubmission(sessionId int64, submissionId string) (*Submission, error)
@@ -80,6 +81,10 @@ func (s *sessionService) Create(creator *user.User, name string) (*Session, erro
 	newSession := NewSession(name)
 	newSession.CreatedBy = creator.Id
 	return newSession, s.repo.CreateSession(newSession)
+}
+
+func (s *sessionService) Update(session *Session) error {
+	return s.repo.UpdateSession(session)
 }
 
 func (s *sessionService) GetSubmissions(sessionId int64) ([]Submission, error) {

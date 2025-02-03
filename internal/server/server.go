@@ -55,7 +55,7 @@ func StartServer() {
 			AuthMux: mux.NewAuthMux(
 				mux.AuthMuxOpts{
 					PathPrefix:       "/auth",
-					LoginSuccessPath: "/app",
+					LoginSuccessPath: "/app/home",
 				},
 				mux.AuthMuxServices{
 					UserService:  userService,
@@ -66,6 +66,19 @@ func StartServer() {
 						DefaultUserId: 6666,
 						UserService:   userService,
 					}),
+					middleware.WithCustomNotFoundHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+						isHxRequest := r.Header.Get("HX-Request") != ""
+						var statusCode int
+						if isHxRequest {
+							statusCode = http.StatusNotFound
+						} else {
+							statusCode = http.StatusFound
+						}
+
+						redirect := "/auth/login"
+						w.Header().Add("HX-Redirect", redirect)
+						http.Redirect(w, r, redirect, statusCode)
+					})),
 				},
 				mux.AuthMuxChildren{},
 			),
@@ -84,7 +97,17 @@ func StartServer() {
 						UserService:                 userService,
 					}),
 					middleware.WithCustomNotFoundHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-						http.Redirect(w, r, "/app/session/", http.StatusFound)
+						isHxRequest := r.Header.Get("HX-Request") != ""
+						var statusCode int
+						if isHxRequest {
+							statusCode = http.StatusNotFound
+						} else {
+							statusCode = http.StatusFound
+						}
+
+						redirect := "/app/home"
+						w.Header().Add("HX-Redirect", redirect)
+						http.Redirect(w, r, redirect, statusCode)
 					})),
 				},
 				mux.AppMuxChildren{

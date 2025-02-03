@@ -10,9 +10,9 @@ import (
 type SessionPhase string
 
 const (
-	SubmissionPhase SessionPhase = "submission"
-	VotePhase       SessionPhase = "vote"
-	ResultPhase     SessionPhase = "result"
+	SubmissionPhase SessionPhase = "submissions"
+	VotePhase       SessionPhase = "voting"
+	ResultPhase     SessionPhase = "results"
 )
 
 type Submission struct {

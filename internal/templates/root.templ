@@ -1,7 +1,8 @@
 package templates
 
 type RootProps struct {
-	Title string
+	Title           string
+	IsAuthenticated bool
 }
 
 templ Root(props RootProps) {
@@ -10,12 +11,38 @@ templ Root(props RootProps) {
 			<title>Top Spot | { props.Title }</title>
 			<script src="https://unpkg.com/htmx.org@2.0.3" integrity="sha384-0895/pl2MU10Hqc6jd4RvrthNlDiE9U1tWmX7WRESftEDRosgxNsQG/Ze9YMRzHq" crossorigin="anonymous"></script>
 			<script src="https://unpkg.com/hyperscript.org@0.9.14"></script>
+			<link href="https://cdn.jsdelivr.net/npm/daisyui@4.12.23/dist/full.min.css" rel="stylesheet" type="text/css"/>
 			<script src="https://cdn.tailwindcss.com"></script>
 		</head>
-		<body class="w-screen h-screen flex justify-center">
-			<div class="max-w-screen-lg w-full mx-10">
+		<body class="w-screen h-screen flex flex-col items-center">
+			@Header(props.IsAuthenticated)
+			@AppContainer() {
 				{ children... }
-			</div>
+			}
 		</body>
 	</html>
+}
+
+templ AppContainer() {
+	<div class="max-w-screen-lg w-full mx-10">
+		{ children... }
+	</div>
+}
+
+templ Header(isAuthenticated bool) {
+	<header class="w-full flex justify-center items-center py-4">
+		@AppContainer() {
+			<div class="flex justify-between items-center">
+				<h1 class="text-2xl font-bold">Top Spot</h1>
+				<nav>
+					if isAuthenticated {
+						<a href="/app/home" class="mx-2">Home</a>
+						<a href="/auth/logout" class="mx-2">Logout</a>
+					} else {
+						<a href="/auth/login" class="mx-2">Login</a>
+					}
+				</nav>
+			</div>
+		}
+	</header>
 }

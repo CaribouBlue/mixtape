@@ -13,7 +13,7 @@ var (
 )
 
 templ SessionMakerPage(u user.User) {
-	@Root(RootProps{Title: "Session Maker"}) {
+	@Root(RootProps{Title: "Session Maker", IsAuthenticated: true}) {
 		<div
 			id={ IdSessionMaker }
 		>

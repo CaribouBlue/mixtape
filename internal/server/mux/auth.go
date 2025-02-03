@@ -88,6 +88,7 @@ func (mux *AuthMux) handleUserLoginSubmit(w http.ResponseWriter, r *http.Request
 	password := r.FormValue("password")
 	u, err := mux.Services.UserService.Login(username, password)
 	if err != nil {
+		log.Default().Println(err)
 		http.Error(w, "Failed to log in user", http.StatusInternalServerError)
 		return
 	}

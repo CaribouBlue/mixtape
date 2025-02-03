@@ -145,31 +145,36 @@ func addTestUsers(userService user.UserService) error {
 }
 
 func addTestSessions(sessionService session.SessionService) error {
-	s := session.NewSession("New Session")
-	s.Id = 0
-	s.CreatedBy = 1
-	err := sessionService.Create(s)
+	_, err := sessionService.Create(&user.User{
+		Id: 1,
+	}, "New Session")
 	if err != nil {
 		return err
 	}
 
-	s = session.NewSession("Vote Session")
-	s.Id = 1
-	s.CreatedBy = 1
+	s, err := sessionService.Create(&user.User{
+		Id: 1,
+	}, "Vote Session")
+	if err != nil {
+		return err
+	}
 	s.Submissions = MockSubmissions
 	s.StartAt = s.StartAt.Add(-s.SubmissionDuration)
-	err = sessionService.Create(s)
+	err = sessionService.Update(s)
 	if err != nil {
 		return err
 	}
 
-	s = session.NewSession("Results Session")
-	s.Id = 2
-	s.CreatedBy = 1
+	s, err = sessionService.Create(&user.User{
+		Id: 1,
+	}, "Results Session")
+	if err != nil {
+		return err
+	}
 	s.Submissions = MockSubmissions
 	s.Votes = MockVotes
 	s.StartAt = s.StartAt.Add(-s.SubmissionDuration - s.VoteDuration)
-	err = sessionService.Create(s)
+	err = sessionService.Update(s)
 	if err != nil {
 		return err
 	}

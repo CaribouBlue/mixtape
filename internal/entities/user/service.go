@@ -83,16 +83,10 @@ func (s *userService) SignUp(username string, password string) (*User, error) {
 }
 
 func (s *userService) Login(username string, password string) (*User, error) {
-	log.Default().Println("logging in user")
-
 	user, err := s.repo.GetUserByUsername(username)
 	if err != nil {
 		return nil, err
 	}
-
-	log.Default().Println("got user: ", user.Id, user.Username)
-
-	log.Default().Println("comparing password")
 
 	if err := bcrypt.CompareHashAndPassword(user.PasswordHash, []byte(password)); err != nil {
 		if err == bcrypt.ErrMismatchedHashAndPassword {

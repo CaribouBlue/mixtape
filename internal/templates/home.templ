@@ -6,20 +6,53 @@ import (
 	"github.com/CaribouBlue/top-spot/internal/entities/user"
 )
 
-templ Home(u user.User, sessions []session.Session) {
-	@Root(RootProps{Title: "Home"}) {
-		<h1>Home</h1>
-		<h2>Game Sessions</h2>
-		<ul hx-boost="true">
-			for _, session := range sessions {
-				<li>
-					<a href={ templ.URL(fmt.Sprintf("/app/session/%d", session.Id)) }>{ session.Name }</a>
-				</li>
-			}
-		</ul>
-		<a
-			href="/app/session/maker"
-			hx-boost="true"
-		>Create Session</a>
+templ Home(u user.User) {
+	@Root(RootProps{Title: "Home", IsAuthenticated: true}) {
+		<div class="grid grid-cols-1 gap-4">
+			<h1>Home</h1>
+			<div>
+				<h2 class="pb-2">Game Sessions</h2>
+				<div
+					hx-get="/app/session/"
+					hx-trigger="load"
+					hx-swap="outerHTML"
+				>
+					@spinner(SpinnerOpts{Size: SpinnerSizeS})
+				</div>
+			</div>
+		</div>
 	}
+}
+
+templ UserSessions(u user.User, sessions []session.Session) {
+	<div class="overflow-x-auto">
+		<table class="table">
+			<tbody>
+				for _, session := range sessions {
+					<tr
+						_="on mouseenter add .bg-gray-100 to me
+						on mouseleave remove .bg-gray-100 from me"
+						hx-get={ fmt.Sprintf("/app/session/%d", session.Id) }
+						hx-target="body"
+						hx-push-url="true"
+						hx-disinherit="*"
+						class="cursor-pointer"
+					>
+						<td>
+							{ session.Name }
+						</td>
+						<td>
+							{ string(session.Phase()) }
+						</td>
+						<td>
+							<div
+								hx-get={ fmt.Sprintf("/app/session/%d/phase-duration", session.Id) }
+								hx-trigger="load, every 1m"
+							></div>
+						</td>
+					</tr>
+				}
+			</tbody>
+		</table>
+	</div>
 }
