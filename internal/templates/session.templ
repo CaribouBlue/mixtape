@@ -23,8 +23,10 @@ templ SessionPage(s session.Session, u user.User) {
 	@Root(RootProps{Title: "Session " + s.Name, IsAuthenticated: true}) {
 		<div
 			id={ SessionDetailsId }
+			class="grid grid-cols-1 gap-4"
 		>
-			<h1>Session: { s.Name }</h1>
+			<h1 class="text-2xl">{ s.Name }</h1>
+			@SessionTimeline(s)
 			switch s.Phase() {
 				case session.SubmissionPhase:
 					@SubmissionPhaseView(s, u)
@@ -37,13 +39,108 @@ templ SessionPage(s session.Session, u user.User) {
 	}
 }
 
+templ SessionTimeline(s session.Session) {
+	<ul class="timeline">
+		<li class="grow">
+			if s.Phase() == session.SubmissionPhase {
+				<div class="timeline-start">
+					<p
+						hx-get={ fmt.Sprintf("/app/session/%d/phase-duration", s.Id) }
+						hx-trigger="load, every 1m"
+					></p>
+				</div>
+			}
+			<div class="timeline-middle">
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					viewBox="0 0 20 20"
+					fill="currentColor"
+					class="text-primary h-5 w-5"
+				>
+					<path
+						fill-rule="evenodd"
+						d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
+						clip-rule="evenodd"
+					></path>
+				</svg>
+			</div>
+			<div class="timeline-end timeline-box">Submissions</div>
+			<hr
+				if s.Phase() != session.SubmissionPhase {
+					class="bg-primary"
+				}
+			/>
+		</li>
+		<li class="grow">
+			<hr
+				if s.Phase() != session.SubmissionPhase {
+					class="bg-primary"
+				}
+			/>
+			if s.Phase() == session.VotePhase {
+				<div class="timeline-start">
+					<p
+						hx-get={ fmt.Sprintf("/app/session/%d/phase-duration", s.Id) }
+						hx-trigger="load, every 1m"
+					></p>
+				</div>
+			}
+			<div class="timeline-middle">
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					viewBox="0 0 20 20"
+					fill="currentColor"
+					if s.Phase() != session.SubmissionPhase {
+						class="text-primary h-5 w-5"
+					} else {
+						class="h-5 w-5"
+					}
+				>
+					<path
+						fill-rule="evenodd"
+						d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
+						clip-rule="evenodd"
+					></path>
+				</svg>
+			</div>
+			<div class="timeline-end timeline-box">Voting</div>
+			<hr
+				if s.Phase() == session.ResultPhase {
+					class="bg-primary"
+				}
+			/>
+		</li>
+		<li class="grow">
+			<hr
+				if s.Phase() == session.ResultPhase {
+					class="bg-primary"
+				}
+			/>
+			<div class="timeline-middle">
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					viewBox="0 0 20 20"
+					fill="currentColor"
+					if s.Phase() == session.ResultPhase {
+						class="text-primary h-5 w-5"
+					} else {
+						class="h-5 w-5"
+					}
+				>
+					<path
+						fill-rule="evenodd"
+						d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.857-9.809a.75.75 0 00-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 10-1.06 1.061l2.5 2.5a.75.75 0 001.137-.089l4-5.5z"
+						clip-rule="evenodd"
+					></path>
+				</svg>
+			</div>
+			<div class="timeline-end timeline-box">Results</div>
+		</li>
+	</ul>
+}
+
 // Submission Phase View Templates
 templ SubmissionPhaseView(s session.Session, u user.User) {
-	<h2>Phase: Submission</h2>
-	<h3
-		hx-get={ fmt.Sprintf("/app/session/%d/phase-duration", s.Id) }
-		hx-trigger="load, every 1m"
-	></h3>
 	@SubmissionCounter(s, u, "")
 	<ul
 		id={ SubmissionListId }
@@ -153,11 +250,6 @@ templ DeleteSubmission(s session.Session, u user.User) {
 
 // Vote Phase View Templates
 templ VotePhaseView(s session.Session) {
-	<h2>Phase: Vote</h2>
-	<h3
-		hx-get={ fmt.Sprintf("/app/session/%d/phase-duration", s.Id) }
-		hx-trigger="load, every 1m"
-	></h3>
 	@LazyLoadPlaylistButton(s)
 	<ul>
 		for _, submission := range s.Submissions {
@@ -247,7 +339,6 @@ templ VoteCandidate(s session.Session, u user.User, submission session.Submissio
 
 // Results Phase View Templates
 templ ResultsPhaseView(s session.Session) {
-	<h2>Phase: Results</h2>
 	@LazyLoadPlaylistButton(s)
 	<br/>
 	<table>
@@ -300,6 +391,6 @@ func PhaseDurationDisplay(s session.Session) string {
 
 templ SessionPhaseDuration(s session.Session) {
 	if s.Phase() != session.ResultPhase {
-		{ PhaseDurationDisplay(s) } remaining
+		{ PhaseDurationDisplay(s) }
 	}
 }
