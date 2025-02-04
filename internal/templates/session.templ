@@ -5,17 +5,17 @@ import (
 	"github.com/CaribouBlue/top-spot/internal/entities/music"
 	"github.com/CaribouBlue/top-spot/internal/entities/session"
 	"github.com/CaribouBlue/top-spot/internal/entities/user"
+	serverUtils "github.com/CaribouBlue/top-spot/internal/server/utils"
 	"github.com/CaribouBlue/top-spot/internal/utils"
-	"strconv"
 	"time"
 )
 
 const (
-	SessionDetailsId             string = "session-details"
-	SubmissionListId             string = "submission-list"
-	SubmissionCounterId          string = "submission-counter"
-	SubmissionSearchBarId        string = "submission-search-bar"
-	SubmissionSearchBarResultsId string = "submission-search-bar-results"
+	SessionDetailsId               string = "session-details"
+	IdSubmissionsTable             string = "submissions-table"
+	SubmissionCounterId            string = "submission-counter"
+	SubmissionSearchBarId          string = "submission-search-bar"
+	IdSubmissionSearchResultsTable string = "submission-search-results-table"
 )
 
 // Session Page Templates
@@ -46,8 +46,10 @@ templ SessionTimeline(s session.Session) {
 				<div class="timeline-start">
 					<p
 						hx-get={ fmt.Sprintf("/app/session/%d/phase-duration", s.Id) }
-						hx-trigger="load, every 1m"
-					></p>
+						hx-trigger="every 1m"
+					>
+						@SessionPhaseDuration(s)
+					</p>
 				</div>
 			}
 			<div class="timeline-middle">
@@ -78,12 +80,12 @@ templ SessionTimeline(s session.Session) {
 				}
 			/>
 			if s.Phase() == session.VotePhase {
-				<div class="timeline-start">
-					<p
-						hx-get={ fmt.Sprintf("/app/session/%d/phase-duration", s.Id) }
-						hx-trigger="load, every 1m"
-					></p>
-				</div>
+				<p
+					hx-get={ fmt.Sprintf("/app/session/%d/phase-duration", s.Id) }
+					hx-trigger="every 1m"
+				>
+					@SessionPhaseDuration(s)
+				</p>
 			}
 			<div class="timeline-middle">
 				<svg
@@ -141,50 +143,160 @@ templ SessionTimeline(s session.Session) {
 
 // Submission Phase View Templates
 templ SubmissionPhaseView(s session.Session, u user.User) {
-	@SubmissionCounter(s, u, "")
-	<ul
-		id={ SubmissionListId }
-	>
-		for _, submission := range s.SubmissionsByUser(u.Id) {
-			@LazyLoadSubmissionItem(s, submission)
-		}
-	</ul>
-	@SubmissionSearchBar(s, u, []music.Track{}, "")
+	<div>
+		<h2
+			class="text-lg"
+		>Your Submissions </h2>
+		<p
+			hx-get={ fmt.Sprintf("/app/session/%d/submission-counter", s.Id) }
+			hx-trigger={ fmt.Sprintf("%s from:body, %s from:body", serverUtils.EventNewSubmission, serverUtils.EventDeleteSubmission) }
+			class="text-sm"
+		>
+			@SubmissionCounter(s, u)
+		</p>
+	</div>
+	<div class="overflow-x-auto">
+		<table id={ IdSubmissionsTable } class="table">
+			<tbody>
+				for _, submission := range s.SubmissionsByUser(u.Id) {
+					<tr
+						hx-get={ fmt.Sprintf("/app/session/%d/submission/%s", s.Id, submission.Id) }
+						hx-trigger="load"
+						hx-swap="outerHTML"
+						hx-target="this"
+					></tr>
+				}
+			</tbody>
+		</table>
+	</div>
+	<input
+		hx-get={ fmt.Sprintf("/app/session/%d/tracks/search", s.Id) }
+		hx-trigger="input changed delay:500ms, search"
+		hx-target={ fmt.Sprintf("#%s", IdSubmissionSearchResultsTable) }
+		class="input input-bordered w-full"
+		type="search"
+		name="query"
+		placeholder="Begin Typing To Search Tracks..."
+	/>
+	<div class="overflow-x-auto">
+		<table id={ IdSubmissionSearchResultsTable } class="table"></table>
+	</div>
 }
 
-templ LazyLoadSubmissionItem(s session.Session, submission session.Submission) {
-	<div
-		hx-get={ fmt.Sprintf("/app/session/%d/submission/%s", s.Id, submission.Id) }
-		hx-trigger="load"
-		hx-swap="outerHTML"
-	></div>
+templ SubmissionCounter(s session.Session, u user.User) {
+	{ fmt.Sprintf("%d/%d", len(s.SubmissionsByUser(u.Id)), s.MaxSubmissions) }
+}
+
+templ SubmissionSearchResults(s session.Session, searchResult []music.Track) {
+	<tbody hx-ext="response-targets">
+		for _, track := range searchResult {
+			<tr
+				x-data="{ error: '' }"
+				@error.stop="error = $event.detail?.data"
+				x-effect="error && setTimeout(() => error = '', 2000)"
+			>
+				<td class="w-0">
+					<div
+						role="alert"
+						class="alert alert-error absolute left-0"
+						x-show="!!error"
+						x-transition
+					>
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							class="h-6 w-6 shrink-0 stroke-current"
+							fill="none"
+							viewBox="0 0 24 24"
+						>
+							<path
+								stroke-linecap="round"
+								stroke-linejoin="round"
+								stroke-width="2"
+								d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
+							></path>
+						</svg>
+						<span
+							x-init="
+							const observer = new MutationObserver((mutationRecordArray) => {
+								for (const record of mutationRecordArray) {
+									if (record.addedNodes.length && $el.innerHTML != error) {
+										const data = $el.innerHTML
+										$dispatch('error', { data })
+									}
+								}
+							});
+							observer.observe($el, { attributes: false, childList: true, subtree: true, characterData: true  });
+							"
+						></span>
+					</div>
+					<button
+						hx-post={ fmt.Sprintf("/app/session/%d/submission", s.Id) }
+						hx-vals={ fmt.Sprintf(`{"trackId": "%s"}`, track.Id) }
+						hx-target="closest tr"
+						hx-target-422="previous span"
+						class="btn"
+					>Add</button>
+				</td>
+				<td>
+					<a
+						href={ templ.SafeURL(track.Url) }
+						target="_blank"
+					>
+						{ track.Name }
+					</a>
+				</td>
+				<td>
+					for i, artist := range track.Artists {
+						<a
+							href={ templ.SafeURL(artist.Url) }
+							target="_blank"
+						>
+							if i < len(track.Artists)-1 {
+								{ artist.Name + ", " }
+							} else {
+								{ artist.Name }
+							}
+						</a>
+					}
+				</td>
+			</tr>
+		}
+	</tbody>
 }
 
 templ SubmissionItem(s session.Session, submission session.Submission, track music.Track) {
-	<li class="flex gap-5">
-		<button
-			hx-delete={ fmt.Sprintf("/app/session/%d/submission/%s", s.Id, submission.Id) }
-			hx-target="closest li"
-			hx-swap="delete"
-		>X</button>
-		<div class="flex flex-col">
-			<p>{ track.Name }</p>
-			<p class="text-slate-400">{ utils.MapJoin(track.Artists, ", ", func(artist music.Artist) string {return artist.Name} ) }</p>
-		</div>
-	</li>
-}
-
-templ SubmissionCounter(s session.Session, u user.User, swapOob string) {
-	<h2
-		id={ SubmissionCounterId }
-		hx-swap-oob={ swapOob }
-	>
-		if s.SubmissionsLeft(u.Id) > 0 {
-			{ strconv.Itoa(s.SubmissionsLeft(u.Id)) } submissions left
-		} else {
-			Submissions maxed out, nice
-		}
-	</h2>
+	<tr>
+		<td class="w-0">
+			<button
+				hx-delete={ fmt.Sprintf("/app/session/%d/submission/%s", s.Id, submission.Id) }
+				hx-target="closest tr"
+				hx-swap="delete"
+				class="btn"
+			>Remove</button>
+		</td>
+		<td>
+			<a
+				href={ templ.SafeURL(track.Url) }
+				target="_blank"
+			>
+				{ track.Name }
+			</a>
+		</td>
+		<td>
+			for i, artist := range track.Artists {
+				<a
+					href={ templ.SafeURL(artist.Url) }
+					target="_blank"
+				>
+					if i < len(track.Artists)-1 {
+						{ artist.Name + ", " }
+					} else {
+						{ artist.Name }
+					}
+				</a>
+			}
+		</td>
+	</tr>
 }
 
 templ SubmissionSearchBar(s session.Session, u user.User, searchResult []music.Track, swapOob string) {
@@ -196,8 +308,8 @@ templ SubmissionSearchBar(s session.Session, u user.User, searchResult []music.T
 			<input
 				hx-post={ fmt.Sprintf("/app/session/%d/tracks", s.Id) }
 				hx-trigger="input changed delay:500ms, search"
-				hx-target={ fmt.Sprintf("#%s", SubmissionSearchBarResultsId) }
-				hx-select={ "#" + SubmissionSearchBarResultsId }
+				hx-target={ fmt.Sprintf("#%s", IdSubmissionSearchResultsTable) }
+				hx-select={ "#" + IdSubmissionSearchResultsTable }
 				hx-swap="outerHTML"
 				type="search"
 				name="query"
@@ -205,7 +317,7 @@ templ SubmissionSearchBar(s session.Session, u user.User, searchResult []music.T
 				class="w-full p-2"
 			/>
 			<div
-				id={ SubmissionSearchBarResultsId }
+				id={ IdSubmissionSearchResultsTable }
 			>
 				for _, track := range  searchResult {
 					<div class="flex gap-5">
@@ -214,6 +326,7 @@ templ SubmissionSearchBar(s session.Session, u user.User, searchResult []music.T
 							hx-vals={ fmt.Sprintf(`{"trackId": "%s"}`, track.Id) }
 							hx-target="closest div"
 							hx-swap="delete"
+							class=""
 						>Add</button>
 						<div class="flex flex-col">
 							<p>{ track.Name }</p>
@@ -226,26 +339,19 @@ templ SubmissionSearchBar(s session.Session, u user.User, searchResult []music.T
 	</div>
 }
 
-templ NewSubmission(s session.Session, u user.User, submission session.Submission) {
-	<ul
-		hx-swap-oob={ fmt.Sprintf("beforeend:#%s", SubmissionListId) }
+templ AddSubmission(s session.Session, u user.User, submission session.Submission, track music.Track) {
+	<tbody
+		hx-swap-oob={ fmt.Sprintf("beforeend:#%s tbody", IdSubmissionsTable) }
 	>
-		@LazyLoadSubmissionItem(s, submission)
-	</ul>
-	@SubmissionCounter(s, u, "true")
-	if s.SubmissionsLeft(u.Id) <= 0 {
-		<div
-			id={ SubmissionSearchBarId }
-			hx-swap-oob="true"
-		></div>
-	}
+		@SubmissionItem(s, submission, track)
+	</tbody>
 }
 
 templ DeleteSubmission(s session.Session, u user.User) {
 	if s.SubmissionsLeft(u.Id) == 1 {
 		@SubmissionSearchBar(s, u, []music.Track{}, "true")
 	}
-	@SubmissionCounter(s, u, "true")
+	@SubmissionCounter(s, u)
 }
 
 // Vote Phase View Templates

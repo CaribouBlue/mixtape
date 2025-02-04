@@ -51,7 +51,7 @@ func NewSessionMux(opts SessionMuxOpts, services SessionMuxServices, middleware 
 
 	mux.Handle("GET /{sessionId}", http.HandlerFunc(mux.handleSessionPage))
 
-	mux.Handle("POST /{sessionId}/tracks", http.HandlerFunc(mux.handleCreateSessionTrack))
+	mux.Handle("GET /{sessionId}/tracks/search", http.HandlerFunc(mux.handleSessionTracksSearch))
 
 	mux.Handle("POST /{sessionId}/playlist", http.HandlerFunc(mux.handleCreateSessionPlaylist))
 	mux.Handle("GET /{sessionId}/playlist", http.HandlerFunc(mux.handleGetSessionPlaylist))
@@ -59,6 +59,7 @@ func NewSessionMux(opts SessionMuxOpts, services SessionMuxServices, middleware 
 	mux.Handle("GET /{sessionId}/phase-duration", http.HandlerFunc(mux.handleGetSessionPhaseDuration))
 
 	mux.Handle("POST /{sessionId}/submission", http.HandlerFunc(mux.handleCreateSessionSubmission))
+	mux.Handle("GET /{sessionId}/submission-counter", http.HandlerFunc(mux.handleGetSessionSubmissionCounter))
 
 	mux.Handle("GET /{sessionId}/submission/{submissionId}", http.HandlerFunc(mux.handleGetSessionSubmission))
 	mux.Handle("DELETE /{sessionId}/submission/{submissionId}", http.HandlerFunc(mux.handleDeleteSessionSubmission))
@@ -143,7 +144,7 @@ func (mux *SessionMux) handleSessionPage(w http.ResponseWriter, r *http.Request)
 	}
 }
 
-func (mux *SessionMux) handleCreateSessionTrack(w http.ResponseWriter, r *http.Request) {
+func (mux *SessionMux) handleSessionTracksSearch(w http.ResponseWriter, r *http.Request) {
 	user := r.Context().Value(serverUtils.UserCtxKey).(*user.User)
 	err := mux.Services.MusicService.Authenticate(user)
 	if err != nil {
@@ -178,7 +179,7 @@ func (mux *SessionMux) handleCreateSessionTrack(w http.ResponseWriter, r *http.R
 		})
 	}
 
-	templates.SubmissionSearchBar(*session, *user, searchResults, "").Render(r.Context(), w)
+	serverUtils.HandleHtmlResponse(r, w, templates.SubmissionSearchResults(*session, searchResults))
 }
 
 func (mux *SessionMux) handleCreateSessionPlaylist(w http.ResponseWriter, r *http.Request) {
@@ -276,6 +277,13 @@ func (mux *SessionMux) handleCreateSessionSubmission(w http.ResponseWriter, r *h
 		return
 	}
 
+	subsLeft := s.SubmissionsLeft(user.Id)
+	if subsLeft <= 0 {
+		w.Header().Set("Content-Type", "text/html")
+		http.Error(w, "No submissions left", http.StatusUnprocessableEntity)
+		return
+	}
+
 	r.ParseForm()
 	trackId := r.Form.Get("trackId")
 	submission := &session.Submission{
@@ -288,7 +296,32 @@ func (mux *SessionMux) handleCreateSessionSubmission(w http.ResponseWriter, r *h
 		return
 	}
 
-	templates.NewSubmission(*s, *user, *submission).Render(r.Context(), w)
+	track, err := mux.Services.MusicService.GetTrack(submission.TrackId)
+	if err != nil {
+		http.Error(w, "Failed to get track", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Add("HX-Trigger", serverUtils.EventNewSubmission)
+	serverUtils.HandleHtmlResponse(r, w, templates.AddSubmission(*s, *user, *submission, *track))
+}
+
+func (mux *SessionMux) handleGetSessionSubmissionCounter(w http.ResponseWriter, r *http.Request) {
+	user := r.Context().Value(serverUtils.UserCtxKey).(*user.User)
+
+	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid session ID", http.StatusBadRequest)
+		return
+	}
+
+	session, err := mux.Services.SessionService.GetOne(sessionId)
+	if err != nil {
+		http.Error(w, "Failed to get session", http.StatusInternalServerError)
+		return
+	}
+
+	serverUtils.HandleHtmlResponse(r, w, templates.SubmissionCounter(*session, *user))
 }
 
 func (mux *SessionMux) handleGetSessionPhaseDuration(w http.ResponseWriter, r *http.Request) {
@@ -369,6 +402,7 @@ func (mux *SessionMux) handleDeleteSessionSubmission(w http.ResponseWriter, r *h
 		return
 	}
 
+	w.Header().Add("HX-Trigger", serverUtils.EventDeleteSubmission)
 	templates.DeleteSubmission(*session, *user).Render(r.Context(), w)
 }
 

@@ -42,12 +42,14 @@ func (s *spotifyMusicService) SearchTracks(query string) ([]*Track, error) {
 			Id:      track.Id,
 			Name:    track.Name,
 			Artists: make([]Artist, len(track.Artists)),
+			Url:     track.ExternalUrls.Spotify,
 		}
 
 		for j, artist := range track.Artists {
 			tracks[i].Artists[j] = Artist{
 				Id:   artist.Id,
 				Name: artist.Name,
+				Url:  artist.ExternalUrls.Spotify,
 			}
 		}
 	}

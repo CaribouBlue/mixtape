@@ -3,6 +3,7 @@ package music
 type Artist struct {
 	Id   string
 	Name string
+	Url  string
 }
 
 type Track struct {
