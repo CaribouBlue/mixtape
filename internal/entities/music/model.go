@@ -6,11 +6,19 @@ type Artist struct {
 	Url  string
 }
 
+type Album struct {
+	Id   string
+	Name string
+	Url  string
+}
+
 type Track struct {
-	Id      string
-	Name    string
-	Artists []Artist
-	Url     string
+	Id       string
+	Name     string
+	Artists  []Artist
+	Album    Album
+	Explicit bool
+	Url      string
 }
 
 type Playlist struct {

@@ -8,12 +8,14 @@ import (
 )
 
 var (
-	ErrSubmissionNotFound = errors.New("submission not found")
-	ErrVoteNotFound       = errors.New("vote not found")
-	ErrVoteExists         = errors.New("vote already exists")
-	ErrPlaylistNotFound   = errors.New("playlist not found")
-	ErrPlaylistExists     = errors.New("playlist already exists")
-	ErrResultNotFound     = errors.New("result not found")
+	ErrSubmissionNotFound  = errors.New("submission not found")
+	ErrNoSubmissionsLeft   = errors.New("no submissions left")
+	ErrDuplicateSubmission = errors.New("user has already submitted this song")
+	ErrVoteNotFound        = errors.New("vote not found")
+	ErrVoteExists          = errors.New("vote already exists")
+	ErrPlaylistNotFound    = errors.New("playlist not found")
+	ErrPlaylistExists      = errors.New("playlist already exists")
+	ErrResultNotFound      = errors.New("result not found")
 )
 
 type SessionService interface {
@@ -115,6 +117,17 @@ func (s *sessionService) AddSubmission(sessionId int64, submission *Submission) 
 	session, err := s.repo.GetSession(sessionId)
 	if err != nil {
 		return nil, err
+	}
+
+	subsLeft := session.SubmissionsLeft(submission.UserId)
+	if subsLeft <= 0 {
+		return nil, ErrNoSubmissionsLeft
+	}
+
+	for _, sub := range session.SubmissionsByUser(submission.UserId) {
+		if sub.TrackId == submission.TrackId {
+			return nil, ErrDuplicateSubmission
+		}
 	}
 
 	submission.Id = uuid.New().String()

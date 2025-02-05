@@ -80,12 +80,14 @@ templ SessionTimeline(s session.Session) {
 				}
 			/>
 			if s.Phase() == session.VotePhase {
-				<p
-					hx-get={ fmt.Sprintf("/app/session/%d/phase-duration", s.Id) }
-					hx-trigger="every 1m"
-				>
-					@SessionPhaseDuration(s)
-				</p>
+				<div class="timeline-start">
+					<p
+						hx-get={ fmt.Sprintf("/app/session/%d/phase-duration", s.Id) }
+						hx-trigger="every 1m"
+					>
+						@SessionPhaseDuration(s)
+					</p>
+				</div>
 			}
 			<div class="timeline-middle">
 				<svg
@@ -238,11 +240,27 @@ templ SubmissionSearchResults(s session.Session, searchResult []music.Track) {
 					>Add</button>
 				</td>
 				<td>
+					<div class="flex items-center gap-2">
+						<a
+							href={ templ.SafeURL(track.Url) }
+							target="_blank"
+						>
+							{ track.Name }
+						</a>
+						if track.Explicit {
+							<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-explicit" viewBox="0 0 16 16">
+								<path d="M6.826 10.88H10.5V12h-5V4.002h5v1.12H6.826V7.4h3.457v1.073H6.826z"></path>
+								<path d="M2.5 0A2.5 2.5 0 0 0 0 2.5v11A2.5 2.5 0 0 0 2.5 16h11a2.5 2.5 0 0 0 2.5-2.5v-11A2.5 2.5 0 0 0 13.5 0zM1 2.5A1.5 1.5 0 0 1 2.5 1h11A1.5 1.5 0 0 1 15 2.5v11a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 13.5z"></path>
+							</svg>
+						}
+					</div>
+				</td>
+				<td>
 					<a
-						href={ templ.SafeURL(track.Url) }
+						href={ templ.SafeURL(track.Album.Url) }
 						target="_blank"
 					>
-						{ track.Name }
+						{ track.Album.Name }
 					</a>
 				</td>
 				<td>
@@ -275,11 +293,27 @@ templ SubmissionItem(s session.Session, submission session.Submission, track mus
 			>Remove</button>
 		</td>
 		<td>
+			<div class="flex items-center gap-2">
+				<a
+					href={ templ.SafeURL(track.Url) }
+					target="_blank"
+				>
+					{ track.Name }
+				</a>
+				if track.Explicit {
+					<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-explicit" viewBox="0 0 16 16">
+						<path d="M6.826 10.88H10.5V12h-5V4.002h5v1.12H6.826V7.4h3.457v1.073H6.826z"></path>
+						<path d="M2.5 0A2.5 2.5 0 0 0 0 2.5v11A2.5 2.5 0 0 0 2.5 16h11a2.5 2.5 0 0 0 2.5-2.5v-11A2.5 2.5 0 0 0 13.5 0zM1 2.5A1.5 1.5 0 0 1 2.5 1h11A1.5 1.5 0 0 1 15 2.5v11a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 13.5z"></path>
+					</svg>
+				}
+			</div>
+		</td>
+		<td>
 			<a
-				href={ templ.SafeURL(track.Url) }
+				href={ templ.SafeURL(track.Album.Url) }
 				target="_blank"
 			>
-				{ track.Name }
+				{ track.Album.Name }
 			</a>
 		</td>
 		<td>
@@ -299,59 +333,12 @@ templ SubmissionItem(s session.Session, submission session.Submission, track mus
 	</tr>
 }
 
-templ SubmissionSearchBar(s session.Session, u user.User, searchResult []music.Track, swapOob string) {
-	<div
-		id={ SubmissionSearchBarId }
-		hx-swap-oob={ swapOob }
-	>
-		if s.SubmissionsLeft(u.Id) > 0 {
-			<input
-				hx-post={ fmt.Sprintf("/app/session/%d/tracks", s.Id) }
-				hx-trigger="input changed delay:500ms, search"
-				hx-target={ fmt.Sprintf("#%s", IdSubmissionSearchResultsTable) }
-				hx-select={ "#" + IdSubmissionSearchResultsTable }
-				hx-swap="outerHTML"
-				type="search"
-				name="query"
-				placeholder="Begin Typing To Search Tracks..."
-				class="w-full p-2"
-			/>
-			<div
-				id={ IdSubmissionSearchResultsTable }
-			>
-				for _, track := range  searchResult {
-					<div class="flex gap-5">
-						<button
-							hx-post={ fmt.Sprintf("/app/session/%d/submission", s.Id) }
-							hx-vals={ fmt.Sprintf(`{"trackId": "%s"}`, track.Id) }
-							hx-target="closest div"
-							hx-swap="delete"
-							class=""
-						>Add</button>
-						<div class="flex flex-col">
-							<p>{ track.Name }</p>
-							<p class="text-slate-400">{ utils.MapJoin(track.Artists, ", ", func(artist music.Artist) string {return artist.Name} ) }</p>
-						</div>
-					</div>
-				}
-			</div>
-		}
-	</div>
-}
-
 templ AddSubmission(s session.Session, u user.User, submission session.Submission, track music.Track) {
 	<tbody
 		hx-swap-oob={ fmt.Sprintf("beforeend:#%s tbody", IdSubmissionsTable) }
 	>
 		@SubmissionItem(s, submission, track)
 	</tbody>
-}
-
-templ DeleteSubmission(s session.Session, u user.User) {
-	if s.SubmissionsLeft(u.Id) == 1 {
-		@SubmissionSearchBar(s, u, []music.Track{}, "true")
-	}
-	@SubmissionCounter(s, u)
 }
 
 // Vote Phase View Templates

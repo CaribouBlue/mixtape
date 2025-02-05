@@ -277,13 +277,6 @@ func (mux *SessionMux) handleCreateSessionSubmission(w http.ResponseWriter, r *h
 		return
 	}
 
-	subsLeft := s.SubmissionsLeft(user.Id)
-	if subsLeft <= 0 {
-		w.Header().Set("Content-Type", "text/html")
-		http.Error(w, "No submissions left", http.StatusUnprocessableEntity)
-		return
-	}
-
 	r.ParseForm()
 	trackId := r.Form.Get("trackId")
 	submission := &session.Submission{
@@ -291,7 +284,13 @@ func (mux *SessionMux) handleCreateSessionSubmission(w http.ResponseWriter, r *h
 		TrackId: trackId,
 	}
 	s, err = mux.Services.SessionService.AddSubmission(s.Id, submission)
-	if err != nil {
+	if err == session.ErrNoSubmissionsLeft {
+		http.Error(w, "No submissions left", http.StatusUnprocessableEntity)
+		return
+	} else if err == session.ErrDuplicateSubmission {
+		http.Error(w, "This song was already submitted", http.StatusUnprocessableEntity)
+		return
+	} else if err != nil {
 		http.Error(w, "Failed to add submission", http.StatusInternalServerError)
 		return
 	}
@@ -382,8 +381,6 @@ func (mux *SessionMux) handleGetSessionSubmission(w http.ResponseWriter, r *http
 }
 
 func (mux *SessionMux) handleDeleteSessionSubmission(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(serverUtils.UserCtxKey).(*user.User)
-
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
 		http.Error(w, "Invalid session ID", http.StatusBadRequest)
@@ -396,14 +393,14 @@ func (mux *SessionMux) handleDeleteSessionSubmission(w http.ResponseWriter, r *h
 		return
 	}
 
-	session, err := mux.Services.SessionService.RemoveSubmission(sessionId, submissionId)
+	_, err = mux.Services.SessionService.RemoveSubmission(sessionId, submissionId)
 	if err != nil {
 		http.Error(w, "Failed to delete submission", http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Add("HX-Trigger", serverUtils.EventDeleteSubmission)
-	templates.DeleteSubmission(*session, *user).Render(r.Context(), w)
+	w.WriteHeader(http.StatusOK)
 }
 
 func (mux *SessionMux) handleGetSessionSubmissionCandidate(w http.ResponseWriter, r *http.Request) {

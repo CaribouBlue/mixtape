@@ -42,7 +42,13 @@ func (s *spotifyMusicService) SearchTracks(query string) ([]*Track, error) {
 			Id:      track.Id,
 			Name:    track.Name,
 			Artists: make([]Artist, len(track.Artists)),
-			Url:     track.ExternalUrls.Spotify,
+			Album: Album{
+				Id:   track.Album.Id,
+				Name: track.Album.Name,
+				Url:  track.Album.ExternalUrls.Spotify,
+			},
+			Explicit: track.Explicit,
+			Url:      track.ExternalUrls.Spotify,
 		}
 
 		for j, artist := range track.Artists {
@@ -67,7 +73,13 @@ func (s *spotifyMusicService) GetTrack(trackId string) (*Track, error) {
 		Id:      t.Id,
 		Name:    t.Name,
 		Artists: make([]Artist, len(t.Artists)),
-		Url:     t.ExternalUrls.Spotify,
+		Album: Album{
+			Id:   t.Album.Id,
+			Name: t.Album.Name,
+			Url:  t.Album.ExternalUrls.Spotify,
+		},
+		Explicit: t.Explicit,
+		Url:      t.ExternalUrls.Spotify,
 	}
 
 	for i, artist := range t.Artists {

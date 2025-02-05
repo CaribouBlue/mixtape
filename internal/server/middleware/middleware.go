@@ -120,24 +120,19 @@ func WithUser(opts WithUserOpts) Middleware {
 				return
 			}
 
-			userCtx := &user.User{}
-
-			userCtx, err := utils.ParseAuthCookie(w, r)
+			ctxUser := &user.User{}
+			authCookieUser, err := utils.ParseAuthCookie(w, r)
 			if err == nil {
-				storedUser, err := opts.UserService.Get(userCtx.Id)
-				if err == user.ErrNoUserFound {
-					userCtx = &user.User{}
-				} else if err == nil {
-					userCtx = storedUser
-				} else {
+				storedUser, err := opts.UserService.Get(authCookieUser.Id)
+				if err == nil {
+					ctxUser = storedUser
+				} else if err != user.ErrNoUserFound {
 					http.Error(w, "Failed to get user", http.StatusInternalServerError)
 					return
 				}
-			} else {
-				userCtx = &user.User{}
 			}
 
-			ctx = context.WithValue(ctx, utils.UserCtxKey, userCtx)
+			ctx = context.WithValue(ctx, utils.UserCtxKey, ctxUser)
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})

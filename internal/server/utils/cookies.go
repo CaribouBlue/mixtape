@@ -27,11 +27,13 @@ type AuthorizationCookie struct {
 const secretKey = "super secret"
 
 func SetAuthCookie(w http.ResponseWriter, u *user.User) error {
+	expirationDuration := time.Hour * 24
+
 	// Create a new token object, specifying signing method and the claims
 	// you would like it to contain.
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"userId":  u.Id,
-		"expires": time.Now().Add(time.Hour * 24).Unix(),
+		"expires": time.Now().Add(expirationDuration).Unix(),
 	})
 
 	// Sign and get the complete encoded token as a string using the secret
@@ -44,7 +46,7 @@ func SetAuthCookie(w http.ResponseWriter, u *user.User) error {
 		Name:     CookieAuthorization,
 		Value:    tokenString,
 		Path:     "/",
-		MaxAge:   3600,
+		MaxAge:   int(expirationDuration.Seconds()),
 		HttpOnly: true,
 		Secure:   true,
 		SameSite: http.SameSiteDefaultMode,
