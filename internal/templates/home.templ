@@ -41,8 +41,8 @@ templ UserSessions(u user.User, sessions []session.Session) {
 						hx-target="body"
 						hx-push-url="true"
 						hx-disinherit="*"
-						_="on mouseenter add .bg-gray-100 to me
-						on mouseleave remove .bg-gray-100 from me"
+						@mouseenter="$el.classList.add('bg-gray-100')"
+						@mouseleave="$el.classList.remove('bg-gray-100')"
 						class="cursor-pointer"
 						style="transition: all 200ms ease-out"
 					>

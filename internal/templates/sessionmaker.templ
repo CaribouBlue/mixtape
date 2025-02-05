@@ -25,12 +25,14 @@ templ SessionMakerPage(u user.User) {
 				hx-trigger="submit"
 				class="grid grid-cols-1 gap-4"
 			>
-				<label class="form-control w-full max-w-xs">
+				<label
+					class="form-control w-full max-w-xs"
+				>
 					<div class="label">
 						<span class="label-text">Session Name</span>
 					</div>
 					<input
-						_="on keydown[key is 'Enter'] halt the event"
+						@keydown.enter.stop.prevent=""
 						class="input input-bordered w-full max-w-xs"
 						type="text"
 						name="name"
@@ -114,9 +116,12 @@ templ SessionMakerUser(u user.User) {
 	<div
 		hx-swap-oob={ fmt.Sprintf("beforeend:#%s", IdNewSessionUsers) }
 	>
-		<div>
+		<div
+			x-data="{ isRemoved: false }"
+			x-if="!isRemoved"
+		>
 			<button
-				_="on click remove closest <div/>"
+				@click="isRemoved = true"
 				type="button"
 			>x</button>
 			<label
