@@ -6,7 +6,6 @@ import (
 	"github.com/CaribouBlue/top-spot/internal/entities/session"
 	"github.com/CaribouBlue/top-spot/internal/entities/user"
 	serverUtils "github.com/CaribouBlue/top-spot/internal/server/utils"
-	"github.com/CaribouBlue/top-spot/internal/utils"
 	"time"
 )
 
@@ -31,7 +30,7 @@ templ SessionPage(s session.Session, u user.User) {
 				case session.SubmissionPhase:
 					@SubmissionPhaseView(s, u)
 				case session.VotePhase:
-					@VotePhaseView(s)
+					@VotePhaseView(s, u)
 				case session.ResultPhase:
 					@ResultsPhaseView(s)
 			}
@@ -342,22 +341,80 @@ templ AddSubmission(s session.Session, u user.User, submission session.Submissio
 }
 
 // Vote Phase View Templates
-templ VotePhaseView(s session.Session) {
-	@LazyLoadPlaylistButton(s)
-	<ul>
-		for _, submission := range s.Submissions {
-			@LazyLoadVoteCandidate(s, submission.Id)
-		}
-	</ul>
-}
-
-templ LazyLoadPlaylistButton(s session.Session) {
-	<div
+templ VotePhaseView(s session.Session, u user.User) {
+	<button
 		hx-get={ fmt.Sprintf("/app/session/%d/playlist", s.Id) }
 		hx-trigger="load"
 		hx-swap="outerHTML"
+		class="btn btn-wide w-full"
+		disabled
 	>
 		@spinner(SpinnerOpts{Size: SpinnerSizeS})
+	</button>
+	<div
+		x-data="{ open: false }"
+		class="collapse collapse-arrow bg-base-200"
+	>
+		<input
+			x-bind:checked="open"
+			@click="open = !open"
+			type="radio"
+			name="session-accordion"
+			class="cursor-pointer"
+		/>
+		<div
+			class="collapse-title text-lg"
+		>Your Submissions</div>
+		<div class="collapse-content">
+			<div class="overflow-x-auto">
+				<table class="table">
+					<tbody>
+						for _, sub := range s.SubmissionsByUser(u.Id) {
+							<tr
+								hx-get={ fmt.Sprintf("/app/session/%d/submission/%s/candidate", s.Id, sub.Id) }
+								hx-trigger="load"
+								hx-swap="outerHTML"
+							>
+								<td>
+									@spinner(SpinnerOpts{Size: SpinnerSizeS})
+								</td>
+							</tr>
+						}
+					</tbody>
+				</table>
+			</div>
+		</div>
+	</div>
+	<div>
+		<h1 class="text-xl">Your Ballot</h1>
+		<p
+			hx-get={ fmt.Sprintf("/app/session/%d/vote-counter", s.Id) }
+			hx-trigger={ fmt.Sprintf("%s from:body, %s from:body", serverUtils.EventNewVote, serverUtils.EventDeleteVote) }
+			class="text-sm"
+		>
+			@VoteCounter(s, u)
+		</p>
+	</div>
+	<div class="overflow-x-auto">
+		<table
+			class="table"
+		>
+			<tbody hx-ext="response-targets">
+				for _, sub := range s.Submissions {
+					if sub.UserId != u.Id {
+						<tr
+							hx-get={ fmt.Sprintf("/app/session/%d/submission/%s/candidate", s.Id, sub.Id) }
+							hx-trigger="load"
+							hx-swap="outerHTML"
+						>
+							<td>
+								@spinner(SpinnerOpts{Size: SpinnerSizeS})
+							</td>
+						</tr>
+					}
+				}
+			</tbody>
+		</table>
 	</div>
 }
 
@@ -366,6 +423,7 @@ templ PlaylistButton(s session.Session, playlist music.Playlist) {
 		<a
 			href={ templ.SafeURL(playlist.Url) }
 			target="_blank"
+			class="btn btn-wide w-full"
 		>
 			Open Playlist
 		</a>
@@ -373,6 +431,7 @@ templ PlaylistButton(s session.Session, playlist music.Playlist) {
 		<button
 			hx-post={ fmt.Sprintf("/app/session/%d/playlist", s.Id) }
 			hx-swap="outerHTML"
+			class="btn btn-wide w-full"
 		>
 			@requestSpinner(SpinnerOpts{Size: SpinnerSizeS}) {
 				Create Playlist
@@ -381,89 +440,224 @@ templ PlaylistButton(s session.Session, playlist music.Playlist) {
 	}
 }
 
-templ LazyLoadVoteCandidate(s session.Session, submissionId string) {
-	<div
-		hx-get={ fmt.Sprintf("/app/session/%d/submission/%s/candidate", s.Id, submissionId) }
-		hx-trigger="load"
-		hx-swap="outerHTML"
+templ VoteCandidate(s session.Session, u user.User, submission session.Submission, track music.Track) {
+	<tr
+		x-data="{ error: '' }"
+		@error.stop="error = $event.detail?.data"
+		x-effect="error && setTimeout(() => error = '', 2000)"
 	>
-		<li class="flex gap-5">
-			@spinner(SpinnerOpts{Size: SpinnerSizeS})
-		</li>
-	</div>
+		<td>
+			<div
+				role="alert"
+				class="alert alert-error absolute left-0"
+				x-show="!!error"
+				x-transition
+			>
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					class="h-6 w-6 shrink-0 stroke-current"
+					fill="none"
+					viewBox="0 0 24 24"
+				>
+					<path
+						stroke-linecap="round"
+						stroke-linejoin="round"
+						stroke-width="2"
+						d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"
+					></path>
+				</svg>
+				<span
+					x-init="
+							const observer = new MutationObserver((mutationRecordArray) => {
+								for (const record of mutationRecordArray) {
+									if (record.addedNodes.length && $el.innerHTML != error) {
+										const data = $el.innerHTML
+										$dispatch('error', { data })
+									}
+								}
+							});
+							observer.observe($el, { attributes: false, childList: true, subtree: true, characterData: true  });
+							"
+				></span>
+			</div>
+			if u.Id == submission.UserId {
+				<button
+					disabled
+				></button>
+			} else if vote := s.SubmissionVoteByUser(u.Id, submission.Id); vote.Id != "" {
+				<button
+					hx-delete={ fmt.Sprintf("/app/session/%d/vote/%s", s.Id, vote.Id) }
+					hx-target="closest tr"
+					hx-target-422="previous span"
+					hx-swap="outerHTML"
+					hx-disabled-elt="this"
+					class="btn btn-wide btn-success"
+				>
+					@requestSpinner(SpinnerOpts{Size: SpinnerSizeXs}) {
+						<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-check" viewBox="0 0 16 16">
+							<path d="M10.97 4.97a.75.75 0 0 1 1.07 1.05l-3.99 4.99a.75.75 0 0 1-1.08.02L4.324 8.384a.75.75 0 1 1 1.06-1.06l2.094 2.093 3.473-4.425z"></path>
+						</svg>
+					}
+				</button>
+			} else {
+				<button
+					hx-post={ fmt.Sprintf("/app/session/%d/vote", s.Id) }
+					hx-vals={ fmt.Sprintf(`{"submissionId": "%s"}`, submission.Id) }
+					hx-target="closest tr"
+					hx-target-422="previous span"
+					hx-swap="outerHTML"
+					hx-disabled-elt="this"
+					class="btn btn-wide"
+				>
+					@requestSpinner(SpinnerOpts{Size: SpinnerSizeXs}) {
+						Vote
+					}
+				</button>
+			}
+		</td>
+		<td>
+			<div class="flex items-center gap-2">
+				<a
+					href={ templ.SafeURL(track.Url) }
+					target="_blank"
+				>
+					{ track.Name }
+				</a>
+				if track.Explicit {
+					<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-explicit" viewBox="0 0 16 16">
+						<path d="M6.826 10.88H10.5V12h-5V4.002h5v1.12H6.826V7.4h3.457v1.073H6.826z"></path>
+						<path d="M2.5 0A2.5 2.5 0 0 0 0 2.5v11A2.5 2.5 0 0 0 2.5 16h11a2.5 2.5 0 0 0 2.5-2.5v-11A2.5 2.5 0 0 0 13.5 0zM1 2.5A1.5 1.5 0 0 1 2.5 1h11A1.5 1.5 0 0 1 15 2.5v11a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 13.5z"></path>
+					</svg>
+				}
+			</div>
+		</td>
+		<td>
+			<a
+				href={ templ.SafeURL(track.Album.Url) }
+				target="_blank"
+			>
+				{ track.Album.Name }
+			</a>
+		</td>
+		<td>
+			for i, artist := range track.Artists {
+				<a
+					href={ templ.SafeURL(artist.Url) }
+					target="_blank"
+				>
+					if i < len(track.Artists)-1 {
+						{ artist.Name + ", " }
+					} else {
+						{ artist.Name }
+					}
+				</a>
+			}
+		</td>
+	</tr>
 }
 
-templ VoteCandidate(s session.Session, u user.User, submission session.Submission, track music.Track) {
-	<li class="flex gap-5">
-		if u.Id == submission.UserId {
-			<button
-				disabled
-			></button>
-		} else if vote := s.SubmissionVoteByUser(u.Id, submission.Id); vote.Id != "" {
-			<button
-				hx-delete={ fmt.Sprintf("/app/session/%d/vote/%s", s.Id, vote.Id) }
-				hx-target="closest li"
-				hx-swap="outerHTML"
-				hx-disabled-elt="this"
-			>
-				@requestSpinner(SpinnerOpts{Size: SpinnerSizeXs}) {
-					★
-				}
-			</button>
-		} else {
-			<button
-				hx-post={ fmt.Sprintf("/app/session/%d/vote", s.Id) }
-				hx-vals={ fmt.Sprintf(`{"submissionId": "%s"}`, submission.Id) }
-				hx-target="closest li"
-				hx-swap="outerHTML"
-				hx-disabled-elt="this"
-			>
-				@requestSpinner(SpinnerOpts{Size: SpinnerSizeXs}) {
-					☆
-				}
-			</button>
-		}
-		<div class="flex flex-col">
-			<p>{ track.Name }</p>
-			<p class="text-slate-400">{ utils.MapJoin(track.Artists, ", ", func(artist music.Artist) string {return artist.Name} ) }</p>
-		</div>
-	</li>
+templ VoteCounter(s session.Session, u user.User) {
+	{ fmt.Sprintf("%d/%d", s.MaxVotes()-s.UserVotesRemaining(u.Id), s.MaxVotes()) }
 }
 
 // Results Phase View Templates
 templ ResultsPhaseView(s session.Session) {
-	@LazyLoadPlaylistButton(s)
-	<br/>
-	<table>
-		<tr>
-			<th>Place </th>
-			<th>Track </th>
-			<th>User </th>
-		</tr>
-		for _, result := range s.Results {
-			@LazyLoadResult(s, result)
-		}
-	</table>
-}
-
-templ LazyLoadResult(s session.Session, result session.Result) {
-	<tr
-		hx-get={ fmt.Sprintf("/app/session/%d/result/%s", s.Id, result.Id) }
+	<div
+		hx-get={ fmt.Sprintf("/app/session/%d/playlist", s.Id) }
 		hx-trigger="load"
 		hx-swap="outerHTML"
-	></tr>
+		class="btn btn-wide w-full"
+		disabled
+	>
+		@spinner(SpinnerOpts{Size: SpinnerSizeS})
+	</div>
+	<br/>
+	<h1 class="text-xl">Final Results</h1>
+	<div class="overflow-x-auto">
+		<table class="table">
+			<tbody>
+				for _, result := range s.Results {
+					<tr
+						hx-get={ fmt.Sprintf("/app/session/%d/result/%s", s.Id, result.Id) }
+						hx-trigger="load"
+						hx-swap="outerHTML"
+					>
+						<td>
+							@spinner(SpinnerOpts{Size: SpinnerSizeS})
+						</td>
+					</tr>
+				}
+			</tbody>
+		</table>
+	</div>
+}
+
+func PlaceDisplayText(place int) string {
+	var ending string
+	simplifiedPlace := place % 100
+
+	if simplifiedPlace > 10 && simplifiedPlace < 20 {
+		ending = "th"
+	} else {
+		switch simplifiedPlace % 10 {
+		case 1:
+			ending = "st"
+		case 2:
+			ending = "nd"
+		case 3:
+			ending = "rd"
+		default:
+			ending = "th"
+		}
+	}
+
+	return fmt.Sprintf("%d%s", place, ending)
 }
 
 templ Result(s session.Session, result session.Result, submission session.Submission, track music.Track, owner user.User) {
 	<tr>
-		<td>{ fmt.Sprint(result.Place) }</td>
-		<td>
-			<a
-				href={ templ.SafeURL(track.Url) }
-				target="_blank"
-			>{ fmt.Sprint(track.Name) + " | " + utils.MapJoin(track.Artists, ", ", func(artist music.Artist) string {return artist.Name} ) }</a>
+		<td class="w-0">
+			{ PlaceDisplayText(result.Place) }
 		</td>
 		<td>{ fmt.Sprint(owner.Username) }</td>
+		<td>
+			<div class="flex items-center gap-2">
+				<a
+					href={ templ.SafeURL(track.Url) }
+					target="_blank"
+				>
+					{ track.Name }
+				</a>
+				if track.Explicit {
+					<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-explicit" viewBox="0 0 16 16">
+						<path d="M6.826 10.88H10.5V12h-5V4.002h5v1.12H6.826V7.4h3.457v1.073H6.826z"></path>
+						<path d="M2.5 0A2.5 2.5 0 0 0 0 2.5v11A2.5 2.5 0 0 0 2.5 16h11a2.5 2.5 0 0 0 2.5-2.5v-11A2.5 2.5 0 0 0 13.5 0zM1 2.5A1.5 1.5 0 0 1 2.5 1h11A1.5 1.5 0 0 1 15 2.5v11a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 13.5z"></path>
+					</svg>
+				}
+			</div>
+		</td>
+		<td>
+			<a
+				href={ templ.SafeURL(track.Album.Url) }
+				target="_blank"
+			>
+				{ track.Album.Name }
+			</a>
+		</td>
+		<td>
+			for i, artist := range track.Artists {
+				<a
+					href={ templ.SafeURL(artist.Url) }
+					target="_blank"
+				>
+					if i < len(track.Artists)-1 {
+						{ artist.Name + ", " }
+					} else {
+						{ artist.Name }
+					}
+				</a>
+			}
+		</td>
 	</tr>
 }
 

@@ -60,6 +60,7 @@ func NewSessionMux(opts SessionMuxOpts, services SessionMuxServices, middleware 
 
 	mux.Handle("POST /{sessionId}/submission", http.HandlerFunc(mux.handleCreateSessionSubmission))
 	mux.Handle("GET /{sessionId}/submission-counter", http.HandlerFunc(mux.handleGetSessionSubmissionCounter))
+	mux.Handle("GET /{sessionId}/vote-counter", http.HandlerFunc(mux.handleGetSessionVoteCounter))
 
 	mux.Handle("GET /{sessionId}/submission/{submissionId}", http.HandlerFunc(mux.handleGetSessionSubmission))
 	mux.Handle("DELETE /{sessionId}/submission/{submissionId}", http.HandlerFunc(mux.handleDeleteSessionSubmission))
@@ -323,6 +324,24 @@ func (mux *SessionMux) handleGetSessionSubmissionCounter(w http.ResponseWriter, 
 	serverUtils.HandleHtmlResponse(r, w, templates.SubmissionCounter(*session, *user))
 }
 
+func (mux *SessionMux) handleGetSessionVoteCounter(w http.ResponseWriter, r *http.Request) {
+	user := r.Context().Value(serverUtils.UserCtxKey).(*user.User)
+
+	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid session ID", http.StatusBadRequest)
+		return
+	}
+
+	session, err := mux.Services.SessionService.GetOne(sessionId)
+	if err != nil {
+		http.Error(w, "Failed to get session", http.StatusInternalServerError)
+		return
+	}
+
+	serverUtils.HandleHtmlResponse(r, w, templates.VoteCounter(*session, *user))
+}
+
 func (mux *SessionMux) handleGetSessionPhaseDuration(w http.ResponseWriter, r *http.Request) {
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -474,16 +493,17 @@ func (mux *SessionMux) handleCreateSessionVote(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	vote := &session.Vote{
-		UserId:       user.Id,
-		SubmissionId: submissionId,
-	}
-	s, err := mux.Services.SessionService.AddVote(sessionId, vote)
-	if err != nil {
+	s, err := mux.Services.SessionService.AddVote(sessionId, user.Id, submissionId)
+	if err == session.ErrNoVotesLeft {
+		w.Header().Add("HX-Reswap", "innerHTML")
+		http.Error(w, "No votes left", http.StatusUnprocessableEntity)
+		return
+	} else if err != nil {
 		http.Error(w, "Failed to add vote", http.StatusInternalServerError)
 		return
 	}
 
+	w.Header().Add("HX-Trigger", serverUtils.EventNewVote)
 	templates.VoteCandidate(*s, *user, *submission, *track).Render(r.Context(), w)
 }
 
@@ -532,6 +552,7 @@ func (mux *SessionMux) handleDeleteSessionVote(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	w.Header().Add("HX-Trigger", serverUtils.EventDeleteVote)
 	templates.VoteCandidate(*session, *user, *submission, *track).Render(r.Context(), w)
 }
 

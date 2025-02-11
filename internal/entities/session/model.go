@@ -1,6 +1,7 @@
 package session
 
 import (
+	"math"
 	"sort"
 	"time"
 
@@ -52,7 +53,6 @@ type Session struct {
 	Votes              []Vote        `json:"votes"`
 	Playlists          []Playlist    `json:"playlists"`
 	Results            []Result      `json:"result"`
-	Users              []int64       `json:"users"`
 	CreatedBy          int64         `json:"createdBy"`
 	CreatedAt          time.Time     `json:"createdAt"`
 	MaxSubmissions     int           `json:"maxSubmissions"`
@@ -125,6 +125,39 @@ func (s *Session) SubmissionVoteByUser(userId int64, submissionId string) Vote {
 	}
 
 	return Vote{}
+}
+
+func (s *Session) UserVotesRemaining(userId int64) int {
+	votesRemaining := s.MaxVotes()
+	for _, vote := range s.Votes {
+		if vote.UserId == userId {
+			votesRemaining--
+		}
+	}
+
+	return votesRemaining
+}
+
+func (s *Session) MaxVotes() int {
+	maxVotes := math.Floor(float64(s.MaxSubmissions) / 2)
+	if maxVotes > 10 {
+		return 10
+	} else {
+		return int(maxVotes)
+	}
+}
+
+func (s *Session) Users() []int64 {
+	counterUsers := make(map[int64]bool)
+	users := make([]int64, 0)
+	for _, submission := range s.Submissions {
+		if _, ok := counterUsers[submission.UserId]; !ok {
+			counterUsers[submission.UserId] = true
+			users = append(users, submission.UserId)
+		}
+	}
+
+	return users
 }
 
 func (s *Session) DeriveResults() []Result {

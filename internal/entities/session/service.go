@@ -13,6 +13,7 @@ var (
 	ErrDuplicateSubmission = errors.New("user has already submitted this song")
 	ErrVoteNotFound        = errors.New("vote not found")
 	ErrVoteExists          = errors.New("vote already exists")
+	ErrNoVotesLeft         = errors.New("no votes left")
 	ErrPlaylistNotFound    = errors.New("playlist not found")
 	ErrPlaylistExists      = errors.New("playlist already exists")
 	ErrResultNotFound      = errors.New("result not found")
@@ -31,7 +32,7 @@ type SessionService interface {
 
 	GetVotes(sessionId int64) ([]Vote, error)
 	GetVote(sessionId int64, voteId string) (*Vote, error)
-	AddVote(sessionId int64, vote *Vote) (*Session, error)
+	AddVote(sessionId int64, userId int64, submissionId string) (*Session, error)
 	RemoveVote(sessionId int64, voteId string) (*Session, error)
 
 	GetPlaylist(sessionId int64, userId int64) (*Playlist, error)
@@ -179,19 +180,27 @@ func (s *sessionService) GetVote(sessionId int64, voteId string) (*Vote, error) 
 	return nil, ErrVoteNotFound
 }
 
-func (s *sessionService) AddVote(sessionId int64, vote *Vote) (*Session, error) {
+func (s *sessionService) AddVote(sessionId int64, userId int64, submissionId string) (*Session, error) {
 	session, err := s.repo.GetSession(sessionId)
 	if err != nil {
 		return nil, err
 	}
 
 	for _, v := range session.Votes {
-		if v.UserId == vote.UserId && v.SubmissionId == vote.SubmissionId {
+		if v.UserId == userId && v.SubmissionId == submissionId {
 			return nil, ErrVoteExists
 		}
 	}
 
-	vote.Id = uuid.New().String()
+	if session.UserVotesRemaining(userId) <= 0 {
+		return nil, ErrNoVotesLeft
+	}
+
+	vote := &Vote{
+		Id:           uuid.New().String(),
+		UserId:       userId,
+		SubmissionId: submissionId,
+	}
 
 	session.Votes = append(session.Votes, *vote)
 
