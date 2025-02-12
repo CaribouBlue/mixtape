@@ -72,11 +72,30 @@ func (mux *AuthMux) handleUserSignUpPage(w http.ResponseWriter, r *http.Request)
 func (mux *AuthMux) handleUserSignUp(w http.ResponseWriter, r *http.Request) {
 	username := r.FormValue("username")
 	password := r.FormValue("password")
+	confirmPassword := r.FormValue("confirm-password")
 
-	_, err := mux.Services.UserService.SignUp(username, password)
+	_, err := mux.Services.UserService.SignUp(username, password, confirmPassword)
 	if err != nil {
-		http.Error(w, "Failed to sign up user", http.StatusInternalServerError)
-		return
+		userSignUpFormOpts := templates.UserSignUpFormOpts{
+			Username:        username,
+			Password:        password,
+			ConfirmPassword: confirmPassword,
+		}
+
+		if err == user.ErrUsernameExists {
+			userSignUpFormOpts.UsernameError = "Username already exists"
+			utils.HandleHtmlResponse(r, w, templates.UserSignUpForm(userSignUpFormOpts))
+			w.WriteHeader(http.StatusUnprocessableEntity)
+			return
+		} else if err == user.ErrPasswordsDoNotMatch {
+			userSignUpFormOpts.ConfirmPasswordError = "Passwords do not match"
+			utils.HandleHtmlResponse(r, w, templates.UserSignUpForm(userSignUpFormOpts))
+			w.WriteHeader(http.StatusUnprocessableEntity)
+			return
+		} else {
+			http.Error(w, "Failed to sign up user", http.StatusInternalServerError)
+			return
+		}
 	}
 
 	w.Header().Add("HX-Redirect", mux.Opts.PathPrefix+"/user/login")

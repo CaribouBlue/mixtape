@@ -8,8 +8,9 @@ import (
 )
 
 var (
-	ErrUsernameExists    = errors.New("username already exists")
-	ErrIncorrectPassword = errors.New("incorrect password")
+	ErrUsernameExists      = errors.New("username already exists")
+	ErrIncorrectPassword   = errors.New("incorrect password")
+	ErrPasswordsDoNotMatch = errors.New("passwords do not match")
 )
 
 type UserService interface {
@@ -20,7 +21,7 @@ type UserService interface {
 
 	Search(query string) (*[]User, error)
 
-	SignUp(username string, password string) (*User, error)
+	SignUp(username string, password string, confirmPassword string) (*User, error)
 	Login(username string, password string) (*User, error)
 
 	IsAuthenticated(*User) (bool, error)
@@ -56,13 +57,17 @@ func (s *userService) Search(query string) (*[]User, error) {
 	return s.repo.SearchUsers(query)
 }
 
-func (s *userService) SignUp(username string, password string) (*User, error) {
+func (s *userService) SignUp(username string, password string, confirmPassword string) (*User, error) {
 	log.Default().Println("signing up user")
 
 	if _, err := s.repo.GetUserByUsername(username); err == nil {
 		return nil, ErrUsernameExists
 	} else if err != ErrNoUserFound {
 		return nil, err
+	}
+
+	if password != confirmPassword {
+		return nil, ErrPasswordsDoNotMatch
 	}
 
 	log.Default().Println("creating user")

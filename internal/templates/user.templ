@@ -2,19 +2,63 @@ package templates
 
 templ UserLoginPage() {
 	@Root(RootProps{Title: "Login"}) {
-		<div>
-			<h1>Login</h1>
+		<div
+			class="grid grid-cols-1 gap-4 justify-items-center"
+		>
+			<h1
+				class="col-span-1 justify-self-start text-2xl "
+			>Login</h1>
 			<form
 				hx-post="/auth/user/login"
-				hx-boost="true"
+				class="col-span-1 grid grid-cols-subgrid gap-4"
 			>
-				<input type="text" name="username" placeholder="Username"/>
-				<input type="password" name="password" placeholder="Password"/>
-				<button type="submit">Submit</button>
+				<label class="form-control w-full">
+					<label class="input input-bordered flex items-center gap-2">
+						<svg
+							xmlns="http://www.w3.org/2000/svg"
+							width="16"
+							height="16"
+							fill="currentColor"
+							class="bi bi-person-fill"
+							viewBox="0 0 16 16"
+							class="h-4 w-4 opacity-70"
+						>
+							<path d="M3 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1zm5-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6"></path>
+						</svg>
+						<input
+							type="text"
+							class="grow"
+							name="username"
+							placeholder="Username"
+							required
+						/>
+					</label>
+				</label>
+				<label class="form-control w-full">
+					<label class="input input-bordered flex items-center gap-2">
+						<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-key-fill" viewBox="0 0 16 16">
+							<path d="M3.5 11.5a3.5 3.5 0 1 1 3.163-5H14L15.5 8 14 9.5l-1-1-1 1-1-1-1 1-1-1-1 1H6.663a3.5 3.5 0 0 1-3.163 2M2.5 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2"></path>
+						</svg>
+						<input
+							type="password"
+							class="grow"
+							name="password"
+							placeholder="Password"
+							required
+						/>
+					</label>
+				</label>
+				<button
+					type="submit"
+					class="btn btn-wide w-full"
+				>Submit</button>
 			</form>
 			<a
-				href="/auth/user/sign-up"
-				hx-boost="true"
+				hx-get="/auth/user/sign-up"
+				hx-target="body"
+				hx-swap="outerHTML"
+				hx-push-url="true"
+				class="link link-primary w-fit"
 			>
 				Sign Up
 			</a>
@@ -24,21 +68,112 @@ templ UserLoginPage() {
 
 templ UserSignUpPage() {
 	@Root(RootProps{Title: "Sign Up"}) {
-		<div>
-			<h1>Sign Up</h1>
-			<form
-				hx-post="/auth/user/sign-up"
-			>
-				<input type="text" name="username" placeholder="Username"/>
-				<input type="password" name="password" placeholder="Password"/>
-				<button type="submit">Submit</button>
-			</form>
+		<div
+			class="grid grid-cols-1 gap-4 justify-items-center"
+		>
+			<h1
+				class="col-span-1 justify-self-start text-2xl "
+			>Sign Up</h1>
+			@UserSignUpForm(UserSignUpFormOpts{})
 			<a
-				href="/auth/user/login"
-				hx-boost="true"
+				hx-get="/auth/user/login"
+				hx-target="body"
+				hx-swap="outerHTML"
+				hx-push-url="true"
+				class="link link-primary w-fit"
 			>
 				Login
 			</a>
 		</div>
 	}
+}
+
+type UserSignUpFormOpts struct {
+	Username             string
+	UsernameError        string
+	Password             string
+	PasswordError        string
+	ConfirmPassword      string
+	ConfirmPasswordError string
+}
+
+templ UserSignUpForm(opts UserSignUpFormOpts) {
+	<form
+		id="sign-up-form"
+		hx-ext="response-targets,morph"
+		hx-post="/auth/user/sign-up"
+		hx-swap="morph"
+		hx-target-422="this"
+		class="col-span-1 grid grid-cols-subgrid gap-4"
+	>
+		<label class="form-control w-full">
+			<label class="input input-bordered flex items-center gap-2">
+				<svg
+					xmlns="http://www.w3.org/2000/svg"
+					width="16"
+					height="16"
+					fill="currentColor"
+					class="bi bi-person-fill"
+					viewBox="0 0 16 16"
+					class="h-4 w-4 opacity-70"
+				>
+					<path d="M3 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1zm5-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6"></path>
+				</svg>
+				<input
+					type="text"
+					class="grow"
+					name="username"
+					placeholder="Username"
+					value={ opts.Username }
+					required
+				/>
+			</label>
+			if opts.UsernameError != "" {
+				<div class="label">
+					<span class="label-text-alt text-error">{ opts.UsernameError }</span>
+				</div>
+			}
+		</label>
+		<label class="form-control w-full">
+			<label class="input input-bordered flex items-center gap-2">
+				<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-key-fill" viewBox="0 0 16 16">
+					<path d="M3.5 11.5a3.5 3.5 0 1 1 3.163-5H14L15.5 8 14 9.5l-1-1-1 1-1-1-1 1-1-1-1 1H6.663a3.5 3.5 0 0 1-3.163 2M2.5 9a1 1 0 1 0 0-2 1 1 0 0 0 0 2"></path>
+				</svg>
+				<input
+					type="password"
+					class="grow"
+					name="password"
+					placeholder="Password"
+					value={ opts.Password }
+					required
+				/>
+			</label>
+			if opts.PasswordError != "" {
+				<div class="label">
+					<span class="label-text-alt text-error">{ opts.PasswordError }</span>
+				</div>
+			}
+		</label>
+		<label class="form-control w-full">
+			<label class="input input-bordered flex items-center gap-2">
+				<input
+					type="password"
+					class="grow"
+					name="confirm-password"
+					placeholder="Confirm Password"
+					value={ opts.ConfirmPassword }
+					required
+				/>
+			</label>
+			if opts.ConfirmPasswordError != "" {
+				<div class="label">
+					<span class="label-text-alt text-error">{ opts.ConfirmPasswordError }</span>
+				</div>
+			}
+		</label>
+		<button
+			type="submit"
+			class="btn btn-wide w-full"
+		>Submit</button>
+	</form>
 }
