@@ -3,7 +3,7 @@ package mux
 import (
 	"net/http"
 
-	"github.com/CaribouBlue/top-spot/internal/entities/user"
+	"github.com/CaribouBlue/top-spot/internal/core"
 	"github.com/CaribouBlue/top-spot/internal/server/middleware"
 	"github.com/CaribouBlue/top-spot/internal/server/utils"
 	"github.com/CaribouBlue/top-spot/internal/templates"
@@ -12,7 +12,6 @@ import (
 type AppMux struct {
 	*http.ServeMux
 	Opts       AppMuxOpts
-	Services   AppMuxServices
 	Children   AppMuxChildren
 	Middleware []middleware.Middleware
 }
@@ -21,24 +20,21 @@ type AppMuxOpts struct {
 	PathPrefix string
 }
 
-type AppMuxServices struct{}
-
 type AppMuxChildren struct {
 	SessionMux *SessionMux
 	ProfileMux *ProfileMux
 }
 
-func NewAppMux(opts AppMuxOpts, services AppMuxServices, mw []middleware.Middleware, children AppMuxChildren) *AppMux {
+func NewAppMux(opts AppMuxOpts, mw []middleware.Middleware, children AppMuxChildren) *AppMux {
 	mux := &AppMux{
 		http.NewServeMux(),
 		opts,
-		services,
 		children,
 		mw,
 	}
 
 	mux.Handle("/home", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		user := r.Context().Value(utils.UserCtxKey).(*user.User)
+		user := r.Context().Value(utils.UserCtxKey).(*core.UserEntity)
 
 		utils.HandleHtmlResponse(r, w, templates.Home(*user))
 	}))

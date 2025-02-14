@@ -9,8 +9,6 @@ import (
 type StaticMux struct {
 	*http.ServeMux
 	Opts       StaticMuxOpts
-	Services   StaticMuxServices
-	Children   StaticMuxChildren
 	Middleware []middleware.Middleware
 }
 
@@ -18,18 +16,10 @@ type StaticMuxOpts struct {
 	PathPrefix string
 }
 
-type StaticMuxServices struct {
-}
-
-type StaticMuxChildren struct {
-}
-
-func NewStaticMux(opts StaticMuxOpts, services StaticMuxServices, middleware []middleware.Middleware, children StaticMuxChildren) *StaticMux {
+func NewStaticMux(opts StaticMuxOpts, middleware []middleware.Middleware) *StaticMux {
 	mux := &StaticMux{
 		ServeMux:   http.NewServeMux(),
 		Opts:       opts,
-		Services:   services,
-		Children:   children,
 		Middleware: middleware,
 	}
 

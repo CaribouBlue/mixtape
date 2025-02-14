@@ -7,13 +7,12 @@ import (
 	"os"
 
 	"github.com/CaribouBlue/top-spot/internal/appdata"
-	"github.com/CaribouBlue/top-spot/internal/db"
-	"github.com/CaribouBlue/top-spot/internal/entities/music"
-	"github.com/CaribouBlue/top-spot/internal/entities/session"
-	"github.com/CaribouBlue/top-spot/internal/entities/user"
+	"github.com/CaribouBlue/top-spot/internal/core"
 	"github.com/CaribouBlue/top-spot/internal/server/middleware"
 	"github.com/CaribouBlue/top-spot/internal/server/mux"
 	"github.com/CaribouBlue/top-spot/internal/server/utils"
+	"github.com/CaribouBlue/top-spot/internal/spotify"
+	"github.com/CaribouBlue/top-spot/internal/storage"
 )
 
 func StartServer() {
@@ -24,15 +23,13 @@ func StartServer() {
 	}
 
 	dbPath := appDataDir + "/top-spot.db"
-	db, err := db.NewSqliteJsonDb(dbPath)
+	db, err := storage.NewSqliteDb(dbPath)
 	if err != nil {
 		log.Fatal("Error creating SQLite JSON DB:", err)
 	}
 
 	// Initialize services
-	userService := user.NewUserService(db)
-	musicService := music.NewSpotifyMusicService()
-	sessionService := session.NewSessionService(db)
+	userService := core.NewUserService(db)
 
 	// Initialize server
 	port := os.Getenv("PORT")
@@ -57,11 +54,9 @@ func StartServer() {
 				mux.StaticMuxOpts{
 					PathPrefix: "/static",
 				},
-				mux.StaticMuxServices{},
 				[]middleware.Middleware{
 					middleware.WithRequestMetadata(),
 				},
-				mux.StaticMuxChildren{},
 			),
 			AuthMux: mux.NewAuthMux(
 				mux.AuthMuxOpts{
@@ -69,25 +64,23 @@ func StartServer() {
 					LoginSuccessPath: "/app/home",
 				},
 				mux.AuthMuxServices{
-					UserService:  userService,
-					MusicService: musicService,
+					UserService: userService,
 				},
 				[]middleware.Middleware{
 					middleware.WithUser(middleware.WithUserOpts{
 						DefaultUserId: 6666,
 						UserService:   userService,
 					}),
+					middleware.WithSpotifyClient(),
 					middleware.WithCustomNotFoundHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 						utils.HandleRedirect(w, r, "/auth/login")
 					})),
 				},
-				mux.AuthMuxChildren{},
 			),
 			AppMux: mux.NewAppMux(
 				mux.AppMuxOpts{
 					PathPrefix: "/app",
 				},
-				mux.AppMuxServices{},
 				[]middleware.Middleware{
 					middleware.WithUser(middleware.WithUserOpts{
 						DefaultUserId: 6666,
@@ -97,6 +90,7 @@ func StartServer() {
 						UnauthenticatedRedirectPath: "/auth/login",
 						UserService:                 userService,
 					}),
+					middleware.WithSpotifyClient(),
 					middleware.WithCustomNotFoundHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 						utils.HandleRedirect(w, r, "/app/home")
 					})),
@@ -106,21 +100,18 @@ func StartServer() {
 						mux.SessionMuxOpts{
 							PathPrefix: "/session",
 						},
-						mux.SessionMuxServices{
-							SessionService: sessionService,
-							MusicService:   musicService,
-							UserService:    userService,
+						mux.SessionMuxRepos{
+							SessionRepo:      db,
+							MusicRepoFactory: musicRepoFactory,
+							UserRepo:         db,
 						},
 						[]middleware.Middleware{},
-						mux.SessionMuxChildren{},
 					),
 					ProfileMux: mux.NewProfileMux(
 						mux.ProfileMuxOpts{
 							PathPrefix: "/profile",
 						},
-						mux.ProfileMuxServices{},
 						[]middleware.Middleware{},
-						mux.ProfileMuxChildren{},
 					),
 				},
 			),
@@ -136,4 +127,16 @@ func StartServer() {
 	if err := server.ListenAndServe(); err != nil {
 		fmt.Println("Error starting server:", err)
 	}
+}
+
+var musicRepoFactory utils.RequestBasedFactory[core.MusicRepository] = func(r *http.Request) core.MusicRepository {
+	user := r.Context().Value(utils.UserCtxKey).(*core.UserEntity)
+	spotifyClient := spotify.NewDefaultClient()
+
+	// TODO: handle invalid token
+	if user.SpotifyToken != "" {
+		spotifyClient.Reauthenticate(user.SpotifyToken)
+	}
+
+	return spotifyClient
 }

@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/CaribouBlue/top-spot/internal/entities/user"
+	"github.com/CaribouBlue/top-spot/internal/core"
 	"github.com/CaribouBlue/top-spot/internal/server/middleware"
 	"github.com/CaribouBlue/top-spot/internal/server/utils"
 )
@@ -12,8 +12,6 @@ import (
 type ProfileMux struct {
 	*http.ServeMux
 	Opts       ProfileMuxOpts
-	Services   ProfileMuxServices
-	Children   ProfileMuxChildren
 	Middleware []middleware.Middleware
 }
 
@@ -21,16 +19,10 @@ type ProfileMuxOpts struct {
 	PathPrefix string
 }
 
-type ProfileMuxServices struct{}
-
-type ProfileMuxChildren struct{}
-
-func NewProfileMux(opts ProfileMuxOpts, services ProfileMuxServices, middleware []middleware.Middleware, children ProfileMuxChildren) *ProfileMux {
+func NewProfileMux(opts ProfileMuxOpts, middleware []middleware.Middleware) *ProfileMux {
 	mux := &ProfileMux{
 		http.NewServeMux(),
 		opts,
-		services,
-		children,
 		middleware,
 	}
 
@@ -44,7 +36,7 @@ func (mux *ProfileMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func (mux *ProfileMux) handleProfilePage(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(utils.UserCtxKey).(*user.User)
+	user := r.Context().Value(utils.UserCtxKey).(*core.UserEntity)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)

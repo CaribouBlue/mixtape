@@ -16,7 +16,9 @@ func (c ContextKey) String() string {
 
 var (
 	UserCtxKey            ContextKey = ContextKey{"user"}
+	SpotifyClientCtxKey   ContextKey = ContextKey{"spotify_client"}
 	RequestMetaDataCtxKey ContextKey = ContextKey{"request_meta_data"}
+	MusicServiceCtxKey    ContextKey = ContextKey{"music_service"}
 )
 
 type RequestMetadata struct {

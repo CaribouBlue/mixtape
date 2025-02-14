@@ -2,11 +2,10 @@ package templates
 
 import (
 	"fmt"
-	"github.com/CaribouBlue/top-spot/internal/entities/session"
-	"github.com/CaribouBlue/top-spot/internal/entities/user"
+	"github.com/CaribouBlue/top-spot/internal/core"
 )
 
-templ Home(u user.User) {
+templ Home(u core.UserEntity) {
 	@Root(RootProps{Title: "Home", IsAuthenticated: true}) {
 		<div class="grid grid-cols-2 gap-4">
 			<h1 class="text-2xl col-span-2">Home</h1>
@@ -31,7 +30,7 @@ templ Home(u user.User) {
 	}
 }
 
-templ UserSessions(u user.User, sessions []session.Session) {
+templ UserSessions(u core.UserEntity, sessions []core.SessionEntity) {
 	<div class="overflow-x-auto">
 		<table class="table">
 			<tbody>

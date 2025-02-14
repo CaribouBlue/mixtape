@@ -4,11 +4,8 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"strings"
 
-	"github.com/CaribouBlue/top-spot/internal/entities/music"
-	"github.com/CaribouBlue/top-spot/internal/entities/session"
-	"github.com/CaribouBlue/top-spot/internal/entities/user"
+	"github.com/CaribouBlue/top-spot/internal/core"
 	"github.com/CaribouBlue/top-spot/internal/server/middleware"
 	serverUtils "github.com/CaribouBlue/top-spot/internal/server/utils"
 	"github.com/CaribouBlue/top-spot/internal/templates"
@@ -18,8 +15,8 @@ import (
 type SessionMux struct {
 	*http.ServeMux
 	Opts       SessionMuxOpts
-	Services   SessionMuxServices
-	Children   SessionMuxChildren
+	Repos      SessionMuxRepos
+	services   sessionMuxServices
 	Middleware []middleware.Middleware
 }
 
@@ -27,29 +24,33 @@ type SessionMuxOpts struct {
 	PathPrefix string
 }
 
-type SessionMuxServices struct {
-	SessionService session.SessionService
-	MusicService   music.MusicService
-	UserService    user.UserService
+type SessionMuxRepos struct {
+	SessionRepo      core.SessionRepository
+	MusicRepoFactory serverUtils.RequestBasedFactory[core.MusicRepository]
+	UserRepo         core.UserRepository
 }
 
-type SessionMuxChildren struct{}
+type sessionMuxServices struct {
+	SessionService *core.SessionService
+	MusicService   *core.MusicService
+	UserService    *core.UserService
+}
 
-func NewSessionMux(opts SessionMuxOpts, services SessionMuxServices, middleware []middleware.Middleware, children SessionMuxChildren) *SessionMux {
+func NewSessionMux(opts SessionMuxOpts, repos SessionMuxRepos, middleware []middleware.Middleware) *SessionMux {
 	mux := &SessionMux{
 		http.NewServeMux(),
 		opts,
-		services,
-		children,
+		repos,
+		sessionMuxServices{},
 		middleware,
 	}
 
-	mux.Handle("GET /", http.HandlerFunc(mux.handleSessionListPage))
+	mux.Handle("GET /", http.HandlerFunc(mux.handlePageSessions))
 	mux.Handle("POST /", http.HandlerFunc(mux.handleCreateSession))
 
-	mux.Handle("GET /maker", http.HandlerFunc(mux.handleSessionMakerPage))
+	mux.Handle("GET /maker", http.HandlerFunc(mux.handlePageSessionMaker))
 
-	mux.Handle("GET /{sessionId}", http.HandlerFunc(mux.handleSessionPage))
+	mux.Handle("GET /{sessionId}", http.HandlerFunc(mux.handlePageSession))
 
 	mux.Handle("GET /{sessionId}/tracks/search", http.HandlerFunc(mux.handleSessionTracksSearch))
 
@@ -76,26 +77,40 @@ func NewSessionMux(opts SessionMuxOpts, services SessionMuxServices, middleware 
 	return mux
 }
 
-func (mux *SessionMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	middleware.Apply(mux.ServeMux, mux.Middleware...).ServeHTTP(w, r)
+func (mux *SessionMux) beforeEveryRequest(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		musicRepo := mux.Repos.MusicRepoFactory(r)
+		userRepo := mux.Repos.UserRepo
+		sessionRepo := mux.Repos.SessionRepo
+
+		mux.services.MusicService = core.NewMusicService(musicRepo)
+		mux.services.UserService = core.NewUserService(userRepo)
+		mux.services.SessionService = core.NewSessionService(sessionRepo, mux.services.MusicService)
+
+		next.ServeHTTP(w, r)
+	})
 }
 
-func (mux *SessionMux) handleSessionListPage(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(serverUtils.UserCtxKey).(*user.User)
+func (mux *SessionMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	middleware.Apply(mux.ServeMux, append(mux.Middleware, mux.beforeEveryRequest)...).ServeHTTP(w, r)
+}
 
-	sessions, err := mux.Services.SessionService.GetAll()
+func (mux *SessionMux) handlePageSessions(w http.ResponseWriter, r *http.Request) {
+	user := r.Context().Value(serverUtils.UserCtxKey).(*core.UserEntity)
+
+	sessions, err := mux.services.SessionService.GetSessionsList()
 	if err != nil {
 		http.Error(w, "Failed to get sessions", http.StatusInternalServerError)
 		return
 	}
-	sessionValues := utils.Map(sessions, func(session *session.Session) session.Session { return *session })
+	sessionValues := utils.Map(*sessions, func(session core.SessionEntity) core.SessionEntity { return session })
 
 	component := templates.UserSessions(*user, sessionValues)
 	serverUtils.HandleHtmlResponse(r, w, component)
 }
 
 func (mux *SessionMux) handleCreateSession(w http.ResponseWriter, r *http.Request) {
-	u := r.Context().Value(serverUtils.UserCtxKey).(*user.User)
+	u := r.Context().Value(serverUtils.UserCtxKey).(*core.UserEntity)
 
 	err := r.ParseForm()
 	if err != nil {
@@ -105,7 +120,7 @@ func (mux *SessionMux) handleCreateSession(w http.ResponseWriter, r *http.Reques
 
 	name := r.Form.Get("name")
 
-	session, err := mux.Services.SessionService.Create(u, name)
+	session, err := mux.services.SessionService.CreateSession(core.NewSessionEntity(name, u.Id))
 	if err != nil {
 		http.Error(w, "Failed to create session", http.StatusInternalServerError)
 		return
@@ -114,13 +129,13 @@ func (mux *SessionMux) handleCreateSession(w http.ResponseWriter, r *http.Reques
 	serverUtils.HandleRedirect(w, r, fmt.Sprintf("/app/session/%d", session.Id))
 }
 
-func (mux *SessionMux) handleSessionMakerPage(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(serverUtils.UserCtxKey).(*user.User)
+func (mux *SessionMux) handlePageSessionMaker(w http.ResponseWriter, r *http.Request) {
+	user := r.Context().Value(serverUtils.UserCtxKey).(*core.UserEntity)
 	serverUtils.HandleHtmlResponse(r, w, templates.SessionMakerPage(*user))
 }
 
-func (mux *SessionMux) handleSessionPage(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(serverUtils.UserCtxKey).(*user.User)
+func (mux *SessionMux) handlePageSession(w http.ResponseWriter, r *http.Request) {
+	user := r.Context().Value(serverUtils.UserCtxKey).(*core.UserEntity)
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -128,68 +143,46 @@ func (mux *SessionMux) handleSessionPage(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	session, err := mux.Services.SessionService.GetOne(sessionId)
+	sessionView, err := mux.services.SessionService.GetSessionView(sessionId, user.Id)
 	if err != nil {
-		http.Error(w, "Failed to get session", http.StatusInternalServerError)
+		http.Error(w, "Failed to get session view", http.StatusInternalServerError)
 		return
 	}
 
-	acceptHeader := r.Header.Get("Accept")
-	switch strings.ToLower(acceptHeader) {
-	case "application/json":
-		serverUtils.HandleJsonResponse(w, session)
-	case "text/html":
-	default:
-		component := templates.SessionPage(*session, *user)
-		serverUtils.HandleHtmlResponse(r, w, component)
-	}
+	component := templates.SessionPage(*sessionView, *user)
+	serverUtils.HandleHtmlResponse(r, w, component)
 }
 
 func (mux *SessionMux) handleSessionTracksSearch(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(serverUtils.UserCtxKey).(*user.User)
-	err := mux.Services.MusicService.Authenticate(user)
-	if err != nil {
-		http.Error(w, "Failed to authenticate user", http.StatusInternalServerError)
-		return
-	}
-
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
 		http.Error(w, "Invalid session ID", http.StatusBadRequest)
-		return
-	}
-
-	session, err := mux.Services.SessionService.GetOne(sessionId)
-	if err != nil {
-		http.Error(w, "Failed to get session", http.StatusInternalServerError)
 		return
 	}
 
 	r.ParseForm()
 	query := r.Form.Get("query")
 
-	searchResults := make([]music.Track, 0)
-	if query != "" {
-		tracks, err := mux.Services.MusicService.SearchTracks(query)
-		if err != nil {
-			http.Error(w, "Failed to search Spotify", http.StatusInternalServerError)
-			return
-		}
-		searchResults = utils.Map(tracks, func(track *music.Track) music.Track {
-			return *track
-		})
+	candidates, err := mux.services.SessionService.SearchSubmissionTracks(sessionId, query)
+	if err != nil {
+		http.Error(w, "Failed to search tracks", http.StatusInternalServerError)
+		return
 	}
 
-	serverUtils.HandleHtmlResponse(r, w, templates.SubmissionSearchResults(*session, searchResults))
+	// for _, c := range *candidates {
+	// 	log.Default().Println("track: ", c.Track.Id, c.Track.Name)
+	// }
+
+	serverUtils.HandleHtmlResponse(r, w, templates.SubmissionSearchResults(*candidates))
 }
 
 func (mux *SessionMux) handleCreateSessionPlaylist(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(serverUtils.UserCtxKey).(*user.User)
-	err := mux.Services.MusicService.Authenticate(user)
-	if err != nil {
-		http.Error(w, "Failed to authenticate user", http.StatusInternalServerError)
-		return
-	}
+	// user := r.Context().Value(serverUtils.UserCtxKey).(*core.UserEntity)
+	// err := mux.Services.MusicService.Authenticate(user)
+	// if err != nil {
+	// 	http.Error(w, "Failed to authenticate user", http.StatusInternalServerError)
+	// 	return
+	// }
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -197,41 +190,58 @@ func (mux *SessionMux) handleCreateSessionPlaylist(w http.ResponseWriter, r *htt
 		return
 	}
 
-	session, err := mux.Services.SessionService.GetOne(sessionId)
+	session, err := mux.services.SessionService.GetSession(sessionId)
 	if err != nil {
 		http.Error(w, "Failed to get session", http.StatusInternalServerError)
 		return
 	}
 
-	playlist := &music.Playlist{
-		Name: fmt.Sprintf("Top Spot Session: %s", session.Name),
+	submissions, err := mux.services.SessionService.GetAllSubmissions(sessionId)
+	if err != nil {
+		http.Error(w, "Failed to get submissions", http.StatusInternalServerError)
+		return
 	}
-	trackIds := make([]string, len(session.Submissions))
-	for i, submission := range session.Submissions {
+
+	trackIds := make([]string, len(*submissions))
+	for i, submission := range *submissions {
 		trackIds[i] = submission.TrackId
 	}
-	err = mux.Services.MusicService.CreatePlaylist(playlist, trackIds)
+
+	playlist, err := mux.services.MusicService.CreatePlaylist(fmt.Sprintf("Top Spot Session: %s", session.Name), trackIds)
 	if err != nil {
 		http.Error(w, "Failed to create playlist", http.StatusInternalServerError)
 		return
 	}
 
-	session, err = mux.Services.SessionService.AddPlaylist(sessionId, playlist.Id, user.Id)
-	if err != nil {
-		http.Error(w, "Failed to add playlist to session", http.StatusInternalServerError)
-		return
-	}
+	// playlist := &music.Playlist{
+	// 	Name: fmt.Sprintf("Top Spot Session: %s", session.Name),
+	// }
+	// trackIds := make([]string, len(session.Submissions))
+	// for i, submission := range session.Submissions {
+	// 	trackIds[i] = submission.TrackId
+	// }
+	// err = mux.Services.MusicService.CreatePlaylist(playlist, trackIds)
+	// if err != nil {
+	// 	http.Error(w, "Failed to create playlist", http.StatusInternalServerError)
+	// 	return
+	// }
+
+	// session, err = mux.Services.SessionService.AddPlaylist(sessionId, playlist.Id, user.Id)
+	// if err != nil {
+	// 	http.Error(w, "Failed to add playlist to session", http.StatusInternalServerError)
+	// 	return
+	// }
 
 	serverUtils.HandleHtmlResponse(r, w, templates.PlaylistButton(*session, *playlist))
 }
 
 func (mux *SessionMux) handleGetSessionPlaylist(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(serverUtils.UserCtxKey).(*user.User)
-	err := mux.Services.MusicService.Authenticate(user)
-	if err != nil {
-		http.Error(w, "Failed to authenticate user", http.StatusInternalServerError)
-		return
-	}
+	user := r.Context().Value(serverUtils.UserCtxKey).(*core.UserEntity)
+	// err := mux.Services.MusicService.Authenticate(user)
+	// if err != nil {
+	// 	http.Error(w, "Failed to authenticate user", http.StatusInternalServerError)
+	// 	return
+	// }
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -239,21 +249,21 @@ func (mux *SessionMux) handleGetSessionPlaylist(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	s, err := mux.Services.SessionService.GetOne(sessionId)
+	s, err := mux.services.SessionService.GetSession(sessionId)
 	if err != nil {
 		http.Error(w, "Failed to get session", http.StatusInternalServerError)
 		return
 	}
 
-	var playlist *music.Playlist
-	sessionPlaylist, err := mux.Services.SessionService.GetPlaylist(sessionId, user.Id)
-	if err == session.ErrPlaylistNotFound {
-		playlist = &music.Playlist{}
+	var playlist *core.PlaylistEntity
+	sessionPlaylist, err := mux.services.SessionService.GetUserPlaylist(sessionId, user.Id)
+	if err == core.ErrPlaylistNotFound {
+		playlist = &core.PlaylistEntity{}
 	} else if err != nil {
 		http.Error(w, "Failed to get playlist from session", http.StatusInternalServerError)
 		return
 	} else {
-		playlist, err = mux.Services.MusicService.GetPlaylist(sessionPlaylist.Id)
+		playlist, err = mux.services.MusicService.GetPlaylistById(sessionPlaylist.PlaylistId)
 		if err != nil {
 			http.Error(w, "Failed to get playlist", http.StatusInternalServerError)
 			return
@@ -264,7 +274,7 @@ func (mux *SessionMux) handleGetSessionPlaylist(w http.ResponseWriter, r *http.R
 }
 
 func (mux *SessionMux) handleCreateSessionSubmission(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(serverUtils.UserCtxKey).(*user.User)
+	user := r.Context().Value(serverUtils.UserCtxKey).(*core.UserEntity)
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -272,7 +282,7 @@ func (mux *SessionMux) handleCreateSessionSubmission(w http.ResponseWriter, r *h
 		return
 	}
 
-	s, err := mux.Services.SessionService.GetOne(sessionId)
+	session, err := mux.services.SessionService.GetSession(sessionId)
 	if err != nil {
 		http.Error(w, "Failed to get session", http.StatusInternalServerError)
 		return
@@ -280,15 +290,11 @@ func (mux *SessionMux) handleCreateSessionSubmission(w http.ResponseWriter, r *h
 
 	r.ParseForm()
 	trackId := r.Form.Get("trackId")
-	submission := &session.Submission{
-		UserId:  user.Id,
-		TrackId: trackId,
-	}
-	s, err = mux.Services.SessionService.AddSubmission(s.Id, submission)
-	if err == session.ErrNoSubmissionsLeft {
+	submission, err := mux.services.SessionService.AddUserSubmission(session.Id, user.Id, trackId)
+	if err == core.ErrNoSubmissionsLeft {
 		http.Error(w, "No submissions left", http.StatusUnprocessableEntity)
 		return
-	} else if err == session.ErrDuplicateSubmission {
+	} else if err == core.ErrDuplicateSubmission {
 		http.Error(w, "This song was already submitted", http.StatusUnprocessableEntity)
 		return
 	} else if err != nil {
@@ -296,18 +302,18 @@ func (mux *SessionMux) handleCreateSessionSubmission(w http.ResponseWriter, r *h
 		return
 	}
 
-	track, err := mux.Services.MusicService.GetTrack(submission.TrackId)
+	track, err := mux.services.MusicService.GetTrackById(submission.TrackId)
 	if err != nil {
 		http.Error(w, "Failed to get track", http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Add("HX-Trigger", serverUtils.EventNewSubmission)
-	serverUtils.HandleHtmlResponse(r, w, templates.AddSubmission(*s, *user, *submission, *track))
+	serverUtils.HandleHtmlResponse(r, w, templates.AddSubmission(*session, *user, *submission, *track))
 }
 
 func (mux *SessionMux) handleGetSessionSubmissionCounter(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(serverUtils.UserCtxKey).(*user.User)
+	user := r.Context().Value(serverUtils.UserCtxKey).(*core.UserEntity)
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -315,17 +321,17 @@ func (mux *SessionMux) handleGetSessionSubmissionCounter(w http.ResponseWriter, 
 		return
 	}
 
-	session, err := mux.Services.SessionService.GetOne(sessionId)
+	sessionView, err := mux.services.SessionService.GetSessionView(sessionId, user.Id)
 	if err != nil {
-		http.Error(w, "Failed to get session", http.StatusInternalServerError)
+		http.Error(w, "Failed to get session view", http.StatusInternalServerError)
 		return
 	}
 
-	serverUtils.HandleHtmlResponse(r, w, templates.SubmissionCounter(*session, *user))
+	serverUtils.HandleHtmlResponse(r, w, templates.SubmissionCounter(*sessionView))
 }
 
 func (mux *SessionMux) handleGetSessionVoteCounter(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(serverUtils.UserCtxKey).(*user.User)
+	user := r.Context().Value(serverUtils.UserCtxKey).(*core.UserEntity)
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -333,13 +339,13 @@ func (mux *SessionMux) handleGetSessionVoteCounter(w http.ResponseWriter, r *htt
 		return
 	}
 
-	session, err := mux.Services.SessionService.GetOne(sessionId)
+	sessionView, err := mux.services.SessionService.GetSessionView(sessionId, user.Id)
 	if err != nil {
-		http.Error(w, "Failed to get session", http.StatusInternalServerError)
+		http.Error(w, "Failed to get session view", http.StatusInternalServerError)
 		return
 	}
 
-	serverUtils.HandleHtmlResponse(r, w, templates.VoteCounter(*session, *user))
+	serverUtils.HandleHtmlResponse(r, w, templates.VoteCounter(*sessionView))
 }
 
 func (mux *SessionMux) handleGetSessionPhaseDuration(w http.ResponseWriter, r *http.Request) {
@@ -349,7 +355,7 @@ func (mux *SessionMux) handleGetSessionPhaseDuration(w http.ResponseWriter, r *h
 		return
 	}
 
-	session, err := mux.Services.SessionService.GetOne(sessionId)
+	session, err := mux.services.SessionService.GetSession(sessionId)
 	if err != nil {
 		http.Error(w, "Failed to get session", http.StatusInternalServerError)
 		return
@@ -359,12 +365,12 @@ func (mux *SessionMux) handleGetSessionPhaseDuration(w http.ResponseWriter, r *h
 }
 
 func (mux *SessionMux) handleGetSessionSubmission(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(serverUtils.UserCtxKey).(*user.User)
-	err := mux.Services.MusicService.Authenticate(user)
-	if err != nil {
-		http.Error(w, "Failed to authenticate user", http.StatusInternalServerError)
-		return
-	}
+	// user := r.Context().Value(serverUtils.UserCtxKey).(*core.UserEntity)
+	// err := mux.Services.MusicService.Authenticate(user)
+	// if err != nil {
+	// 	http.Error(w, "Failed to authenticate user", http.StatusInternalServerError)
+	// 	return
+	// }
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -372,25 +378,26 @@ func (mux *SessionMux) handleGetSessionSubmission(w http.ResponseWriter, r *http
 		return
 	}
 
-	submissionId := r.PathValue("submissionId")
-	if submissionId == "" {
+	submissionIdParam := r.PathValue("submissionId")
+	submissionId, err := strconv.ParseInt(submissionIdParam, 10, 64)
+	if err != nil {
 		http.Error(w, "Invalid submission ID", http.StatusBadRequest)
 		return
 	}
 
-	session, err := mux.Services.SessionService.GetOne(sessionId)
+	session, err := mux.services.SessionService.GetSession(sessionId)
 	if err != nil {
 		http.Error(w, "Failed to get session", http.StatusInternalServerError)
 		return
 	}
 
-	submission, err := mux.Services.SessionService.GetSubmission(sessionId, submissionId)
+	submission, err := mux.services.SessionService.GetSubmissionById(sessionId, submissionId)
 	if err != nil {
 		http.Error(w, "Failed to get submission", http.StatusInternalServerError)
 		return
 	}
 
-	track, err := mux.Services.MusicService.GetTrack(submission.TrackId)
+	track, err := mux.services.MusicService.GetTrackById(submission.TrackId)
 	if err != nil {
 		http.Error(w, "Failed to get track", http.StatusInternalServerError)
 		return
@@ -400,19 +407,22 @@ func (mux *SessionMux) handleGetSessionSubmission(w http.ResponseWriter, r *http
 }
 
 func (mux *SessionMux) handleDeleteSessionSubmission(w http.ResponseWriter, r *http.Request) {
+	user := r.Context().Value(serverUtils.UserCtxKey).(*core.UserEntity)
+
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
 		http.Error(w, "Invalid session ID", http.StatusBadRequest)
 		return
 	}
 
-	submissionId := r.PathValue("submissionId")
-	if submissionId == "" {
+	submissionIdParam := r.PathValue("submissionId")
+	submissionId, err := strconv.ParseInt(submissionIdParam, 10, 64)
+	if err != nil {
 		http.Error(w, "Invalid submission ID", http.StatusBadRequest)
 		return
 	}
 
-	_, err = mux.Services.SessionService.RemoveSubmission(sessionId, submissionId)
+	err = mux.services.SessionService.RemoveUserSubmission(sessionId, user.Id, submissionId)
 	if err != nil {
 		http.Error(w, "Failed to delete submission", http.StatusInternalServerError)
 		return
@@ -423,13 +433,13 @@ func (mux *SessionMux) handleDeleteSessionSubmission(w http.ResponseWriter, r *h
 }
 
 func (mux *SessionMux) handleGetSessionSubmissionCandidate(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(serverUtils.UserCtxKey).(*user.User)
+	user := r.Context().Value(serverUtils.UserCtxKey).(*core.UserEntity)
 
-	err := mux.Services.MusicService.Authenticate(user)
-	if err != nil {
-		http.Error(w, "Failed to authenticate user", http.StatusInternalServerError)
-		return
-	}
+	// err := mux.Services.MusicService.Authenticate(user)
+	// if err != nil {
+	// 	http.Error(w, "Failed to authenticate user", http.StatusInternalServerError)
+	// 	return
+	// }
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -437,41 +447,41 @@ func (mux *SessionMux) handleGetSessionSubmissionCandidate(w http.ResponseWriter
 		return
 	}
 
-	submissionId := r.PathValue("submissionId")
-	if submissionId == "" {
+	submissionIdParam := r.PathValue("submissionId")
+	submissionId, err := strconv.ParseInt(submissionIdParam, 10, 64)
+	if err != nil {
 		http.Error(w, "Invalid submission ID", http.StatusBadRequest)
 		return
 	}
 
-	session, err := mux.Services.SessionService.GetOne(sessionId)
+	session, err := mux.services.SessionService.GetSession(sessionId)
 	if err != nil {
 		http.Error(w, "Failed to get session", http.StatusInternalServerError)
 		return
 	}
 
-	submission, err := mux.Services.SessionService.GetSubmission(sessionId, submissionId)
+	candidate, err := mux.services.SessionService.GetUserCandidate(sessionId, user.Id, submissionId)
 	if err != nil {
 		http.Error(w, "Failed to get submission", http.StatusInternalServerError)
 		return
 	}
-
-	track, err := mux.Services.MusicService.GetTrack(submission.TrackId)
+	track, err := mux.services.MusicService.GetTrackById(candidate.Submission.TrackId)
 	if err != nil {
 		http.Error(w, "Failed to get track", http.StatusInternalServerError)
 		return
 	}
 
-	templates.VoteCandidate(*session, *user, *submission, *track).Render(r.Context(), w)
+	templates.VoteCandidate(*session, *user, *candidate, *track).Render(r.Context(), w)
 }
 
 func (mux *SessionMux) handleCreateSessionVote(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(serverUtils.UserCtxKey).(*user.User)
+	user := r.Context().Value(serverUtils.UserCtxKey).(*core.UserEntity)
 
-	err := mux.Services.MusicService.Authenticate(user)
-	if err != nil {
-		http.Error(w, "Failed to authenticate user", http.StatusInternalServerError)
-		return
-	}
+	// err := mux.Services.MusicService.Authenticate(user)
+	// if err != nil {
+	// 	http.Error(w, "Failed to authenticate user", http.StatusInternalServerError)
+	// 	return
+	// }
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -479,22 +489,22 @@ func (mux *SessionMux) handleCreateSessionVote(w http.ResponseWriter, r *http.Re
 		return
 	}
 
+	session, err := mux.services.SessionService.GetSession(sessionId)
+	if err != nil {
+		http.Error(w, "Failed to get session", http.StatusInternalServerError)
+		return
+	}
+
 	r.ParseForm()
-	submissionId := r.Form.Get("submissionId")
-	submission, err := mux.Services.SessionService.GetSubmission(sessionId, submissionId)
+	submissionIdParam := r.Form.Get("submissionId")
+	submissionId, err := strconv.ParseInt(submissionIdParam, 10, 64)
 	if err != nil {
-		http.Error(w, "Failed to get submission", http.StatusInternalServerError)
+		http.Error(w, "Invalid submission ID", http.StatusBadRequest)
 		return
 	}
 
-	track, err := mux.Services.MusicService.GetTrack(submission.TrackId)
-	if err != nil {
-		http.Error(w, "Failed to get track", http.StatusInternalServerError)
-		return
-	}
-
-	s, err := mux.Services.SessionService.AddVote(sessionId, user.Id, submissionId)
-	if err == session.ErrNoVotesLeft {
+	candidate, err := mux.services.SessionService.VoteForCandidate(sessionId, user.Id, submissionId)
+	if err == core.ErrNoVotesLeft {
 		w.Header().Add("HX-Reswap", "innerHTML")
 		http.Error(w, "No votes left", http.StatusUnprocessableEntity)
 		return
@@ -502,68 +512,24 @@ func (mux *SessionMux) handleCreateSessionVote(w http.ResponseWriter, r *http.Re
 		http.Error(w, "Failed to add vote", http.StatusInternalServerError)
 		return
 	}
-
-	w.Header().Add("HX-Trigger", serverUtils.EventNewVote)
-	templates.VoteCandidate(*s, *user, *submission, *track).Render(r.Context(), w)
-}
-
-func (mux *SessionMux) handleDeleteSessionVote(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(serverUtils.UserCtxKey).(*user.User)
-
-	err := mux.Services.MusicService.Authenticate(user)
-	if err != nil {
-		http.Error(w, "Failed to authenticate user", http.StatusInternalServerError)
-		return
-	}
-
-	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
-	if err != nil {
-		http.Error(w, "Invalid session ID", http.StatusBadRequest)
-		return
-	}
-
-	voteId := r.PathValue("voteId")
-	if voteId == "" {
-		http.Error(w, "Invalid vote ID", http.StatusBadRequest)
-		return
-	}
-
-	vote, err := mux.Services.SessionService.GetVote(sessionId, voteId)
-	if err != nil {
-		http.Error(w, "Failed to get vote", http.StatusInternalServerError)
-		return
-	}
-
-	submission, err := mux.Services.SessionService.GetSubmission(sessionId, vote.SubmissionId)
-	if err != nil {
-		http.Error(w, "Failed to get submission", http.StatusInternalServerError)
-		return
-	}
-
-	track, err := mux.Services.MusicService.GetTrack(submission.TrackId)
+	track, err := mux.services.MusicService.GetTrackById(candidate.Submission.TrackId)
 	if err != nil {
 		http.Error(w, "Failed to get track", http.StatusInternalServerError)
 		return
 	}
 
-	session, err := mux.Services.SessionService.RemoveVote(sessionId, voteId)
-	if err != nil {
-		http.Error(w, "Failed to delete vote", http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Add("HX-Trigger", serverUtils.EventDeleteVote)
-	templates.VoteCandidate(*session, *user, *submission, *track).Render(r.Context(), w)
+	w.Header().Add("HX-Trigger", serverUtils.EventNewVote)
+	templates.VoteCandidate(*session, *user, *candidate, *track).Render(r.Context(), w)
 }
 
-func (mux *SessionMux) handleGetSessionResult(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(serverUtils.UserCtxKey).(*user.User)
+func (mux *SessionMux) handleDeleteSessionVote(w http.ResponseWriter, r *http.Request) {
+	user := r.Context().Value(serverUtils.UserCtxKey).(*core.UserEntity)
 
-	err := mux.Services.MusicService.Authenticate(user)
-	if err != nil {
-		http.Error(w, "Failed to authenticate user", http.StatusInternalServerError)
-		return
-	}
+	// err := mux.Services.MusicService.Authenticate(user)
+	// if err != nil {
+	// 	http.Error(w, "Failed to authenticate user", http.StatusInternalServerError)
+	// 	return
+	// }
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
@@ -571,37 +537,92 @@ func (mux *SessionMux) handleGetSessionResult(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	resultId := r.PathValue("resultId")
-	if resultId == "" {
-		http.Error(w, "Invalid result ID", http.StatusBadRequest)
-		return
-	}
-
-	session, err := mux.Services.SessionService.GetOne(sessionId)
+	session, err := mux.services.SessionService.GetSession(sessionId)
 	if err != nil {
 		http.Error(w, "Failed to get session", http.StatusInternalServerError)
 		return
 	}
 
-	result, err := mux.Services.SessionService.GetResult(sessionId, resultId)
+	submissionIdParam := r.PathValue("submissionId")
+	submissionId, err := strconv.ParseInt(submissionIdParam, 10, 64)
 	if err != nil {
-		http.Error(w, "Failed to get result", http.StatusInternalServerError)
+		http.Error(w, "Invalid submission ID", http.StatusBadRequest)
 		return
 	}
 
-	submission, err := mux.Services.SessionService.GetSubmission(sessionId, result.SubmissionId)
+	candidate, err := mux.services.SessionService.RemoveVoteForCandidate(sessionId, user.Id, submissionId)
 	if err != nil {
-		http.Error(w, "Failed to get submission", http.StatusInternalServerError)
+		http.Error(w, "Failed to remove vote", http.StatusInternalServerError)
 		return
 	}
-
-	track, err := mux.Services.MusicService.GetTrack(submission.TrackId)
+	track, err := mux.services.MusicService.GetTrackById(candidate.Submission.TrackId)
 	if err != nil {
 		http.Error(w, "Failed to get track", http.StatusInternalServerError)
 		return
 	}
 
-	owner, err := mux.Services.UserService.Get(submission.UserId)
+	w.Header().Add("HX-Trigger", serverUtils.EventDeleteVote)
+	templates.VoteCandidate(*session, *user, *candidate, *track).Render(r.Context(), w)
+}
+
+func (mux *SessionMux) handleGetSessionResult(w http.ResponseWriter, r *http.Request) {
+	// user := r.Context().Value(serverUtils.UserCtxKey).(*core.UserEntity)
+
+	// err := mux.Services.MusicService.Authenticate(user)
+	// if err != nil {
+	// 	http.Error(w, "Failed to authenticate user", http.StatusInternalServerError)
+	// 	return
+	// }
+
+	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid session ID", http.StatusBadRequest)
+		return
+	}
+
+	resultId, err := strconv.ParseInt(r.PathValue("resultId"), 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid result ID", http.StatusBadRequest)
+		return
+	}
+
+	session, err := mux.services.SessionService.GetSession(sessionId)
+	if err != nil {
+		http.Error(w, "Failed to get session", http.StatusInternalServerError)
+		return
+	}
+
+	results, err := mux.services.SessionService.GetResults(sessionId)
+	if err != nil {
+		http.Error(w, "Failed to get result", http.StatusInternalServerError)
+		return
+	}
+
+	var result *core.ResultDto
+	for _, r := range *results {
+		if r.Submission.Id == resultId {
+			result = &r
+			break
+		}
+	}
+
+	if result == nil {
+		http.Error(w, "Result not found", http.StatusNotFound)
+		return
+	}
+
+	submission, err := mux.services.SessionService.GetSubmissionById(sessionId, result.Submission.Id)
+	if err != nil {
+		http.Error(w, "Failed to get submission", http.StatusInternalServerError)
+		return
+	}
+	track, err := mux.services.MusicService.GetTrackById(submission.TrackId)
+	if err != nil {
+		http.Error(w, "Failed to get track", http.StatusInternalServerError)
+		return
+	}
+
+	owner, err := mux.services.UserService.GetUserById(submission.UserId)
 	if err != nil {
 		http.Error(w, "Failed to get owner", http.StatusInternalServerError)
 		return

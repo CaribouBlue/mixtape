@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/CaribouBlue/top-spot/internal/entities/user"
+	"github.com/CaribouBlue/top-spot/internal/core"
 	jwt "github.com/golang-jwt/jwt/v5"
 )
 
@@ -26,7 +26,7 @@ type AuthorizationCookie struct {
 
 const secretKey = "super secret"
 
-func SetAuthCookie(w http.ResponseWriter, u *user.User) error {
+func SetAuthCookie(w http.ResponseWriter, u *core.UserEntity) error {
 	expirationDuration := time.Hour * 24
 
 	// Create a new token object, specifying signing method and the claims
@@ -55,7 +55,7 @@ func SetAuthCookie(w http.ResponseWriter, u *user.User) error {
 	return nil
 }
 
-func ParseAuthCookie(w http.ResponseWriter, r *http.Request) (*user.User, error) {
+func ParseAuthCookie(w http.ResponseWriter, r *http.Request) (*core.UserEntity, error) {
 	cookie, err := r.Cookie(CookieAuthorization)
 	if err != nil {
 		return nil, err
@@ -83,7 +83,7 @@ func ParseAuthCookie(w http.ResponseWriter, r *http.Request) (*user.User, error)
 		}
 
 		userId := int64(claims["userId"].(float64))
-		return &user.User{Id: userId}, nil
+		return &core.UserEntity{Id: userId}, nil
 	} else {
 		return nil, ErrInvalidToken
 	}

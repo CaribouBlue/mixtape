@@ -3,7 +3,7 @@ package mux
 import (
 	"net/http"
 
-	"github.com/CaribouBlue/top-spot/internal/entities/user"
+	"github.com/CaribouBlue/top-spot/internal/core"
 	"github.com/CaribouBlue/top-spot/internal/server/middleware"
 )
 
@@ -15,7 +15,7 @@ type RootMux struct {
 }
 
 type RootMuxServices struct {
-	UserService user.UserService
+	UserService *core.UserService
 }
 
 type RootMuxChildren struct {

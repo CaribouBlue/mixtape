@@ -2,7 +2,7 @@ package templates
 
 import (
 	"fmt"
-	"github.com/CaribouBlue/top-spot/internal/entities/user"
+	"github.com/CaribouBlue/top-spot/internal/core"
 )
 
 var (
@@ -12,7 +12,7 @@ var (
 	IdNewSessionName       string = "new-session-name"
 )
 
-templ SessionMakerPage(u user.User) {
+templ SessionMakerPage(u core.UserEntity) {
 	@Root(RootProps{Title: "Session Maker", IsAuthenticated: true}) {
 		<div
 			id={ IdSessionMaker }
@@ -55,7 +55,7 @@ templ SessionMakerPage(u user.User) {
 	}
 }
 
-templ SessionMakerDialog(u user.User) {
+templ SessionMakerDialog(u core.UserEntity) {
 	<dialog>
 		<p>New Session</p>
 		<form
@@ -97,7 +97,7 @@ templ SessionMakerUsersInput() {
 	></div>
 }
 
-templ SessionMakerUserSearchResults(users []user.User) {
+templ SessionMakerUserSearchResults(users []core.UserEntity) {
 	for _, user := range  users {
 		<div class="flex gap-5">
 			<button
@@ -107,12 +107,12 @@ templ SessionMakerUserSearchResults(users []user.User) {
 				hx-swap="delete"
 				type="button"
 			>Add</button>
-			<p name="users">{ user.Username }</p>
+			<p name="users">{ user.DisplayName }</p>
 		</div>
 	}
 }
 
-templ SessionMakerUser(u user.User) {
+templ SessionMakerUser(u core.UserEntity) {
 	<div
 		hx-swap-oob={ fmt.Sprintf("beforeend:#%s", IdNewSessionUsers) }
 	>

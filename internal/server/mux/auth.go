@@ -4,8 +4,7 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/CaribouBlue/top-spot/internal/entities/music"
-	"github.com/CaribouBlue/top-spot/internal/entities/user"
+	"github.com/CaribouBlue/top-spot/internal/core"
 	"github.com/CaribouBlue/top-spot/internal/server/middleware"
 	"github.com/CaribouBlue/top-spot/internal/server/utils"
 	"github.com/CaribouBlue/top-spot/internal/spotify"
@@ -16,7 +15,6 @@ type AuthMux struct {
 	*http.ServeMux
 	Opts       AuthMuxOpts
 	Services   AuthMuxServices
-	Children   AuthMuxChildren
 	Middleware []middleware.Middleware
 }
 
@@ -26,19 +24,14 @@ type AuthMuxOpts struct {
 }
 
 type AuthMuxServices struct {
-	UserService  user.UserService
-	MusicService music.MusicService
+	UserService *core.UserService
 }
 
-type AuthMuxChildren struct {
-}
-
-func NewAuthMux(opts AuthMuxOpts, services AuthMuxServices, middleware []middleware.Middleware, children AuthMuxChildren) *AuthMux {
+func NewAuthMux(opts AuthMuxOpts, services AuthMuxServices, middleware []middleware.Middleware) *AuthMux {
 	mux := &AuthMux{
 		http.NewServeMux(),
 		opts,
 		services,
-		children,
 		middleware,
 	}
 
@@ -74,7 +67,7 @@ func (mux *AuthMux) handleUserSignUp(w http.ResponseWriter, r *http.Request) {
 	password := r.FormValue("password")
 	confirmPassword := r.FormValue("confirm-password")
 
-	_, err := mux.Services.UserService.SignUp(username, password, confirmPassword)
+	_, err := mux.Services.UserService.SignUpNewUser(username, password, confirmPassword)
 	if err != nil {
 		userSignUpFormOpts := templates.UserSignUpFormOpts{
 			Username:        username,
@@ -82,12 +75,12 @@ func (mux *AuthMux) handleUserSignUp(w http.ResponseWriter, r *http.Request) {
 			ConfirmPassword: confirmPassword,
 		}
 
-		if err == user.ErrUsernameExists {
+		if err == core.ErrUsernameAlreadyExists {
 			userSignUpFormOpts.UsernameError = "Username already exists"
 			utils.HandleHtmlResponse(r, w, templates.UserSignUpForm(userSignUpFormOpts))
 			w.WriteHeader(http.StatusUnprocessableEntity)
 			return
-		} else if err == user.ErrPasswordsDoNotMatch {
+		} else if err == core.ErrPasswordsDoNotMatch {
 			userSignUpFormOpts.ConfirmPasswordError = "Passwords do not match"
 			utils.HandleHtmlResponse(r, w, templates.UserSignUpForm(userSignUpFormOpts))
 			w.WriteHeader(http.StatusUnprocessableEntity)
@@ -105,7 +98,7 @@ func (mux *AuthMux) handleUserSignUp(w http.ResponseWriter, r *http.Request) {
 func (mux *AuthMux) handleUserLoginSubmit(w http.ResponseWriter, r *http.Request) {
 	username := r.FormValue("username")
 	password := r.FormValue("password")
-	u, err := mux.Services.UserService.Login(username, password)
+	u, err := mux.Services.UserService.LoginUser(username, password)
 	if err != nil {
 		log.Default().Println(err)
 		http.Error(w, "Failed to log in user", http.StatusInternalServerError)
@@ -119,7 +112,13 @@ func (mux *AuthMux) handleUserLoginSubmit(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	err = mux.Services.MusicService.Authenticate(u)
+	spotify, ok := r.Context().Value(utils.SpotifyClientCtxKey).(*spotify.Client)
+	if !ok || spotify == nil {
+		http.Error(w, "Failed to get Spotify client", http.StatusInternalServerError)
+		return
+	}
+
+	_, err = spotify.Reauthenticate(u.SpotifyToken)
 	if err != nil {
 		w.Header().Add("HX-Redirect", mux.Opts.PathPrefix+"/spotify")
 		w.WriteHeader(http.StatusOK)
@@ -132,15 +131,26 @@ func (mux *AuthMux) handleUserLoginSubmit(w http.ResponseWriter, r *http.Request
 }
 
 func (mux *AuthMux) handleLogin(w http.ResponseWriter, r *http.Request) {
-	u := r.Context().Value(utils.UserCtxKey).(*user.User)
+	u := r.Context().Value(utils.UserCtxKey).(*core.UserEntity)
+
+	log.Default().Println("User login:", u.Id, u.Username)
 
 	if u.Id == 0 {
 		utils.HandleRedirect(w, r, mux.Opts.PathPrefix+"/user/login")
 		return
 	}
 
-	err := mux.Services.MusicService.Authenticate(u)
+	spotify, ok := r.Context().Value(utils.SpotifyClientCtxKey).(*spotify.Client)
+	if !ok || spotify == nil {
+		http.Error(w, "Failed to get Spotify client", http.StatusInternalServerError)
+		return
+	}
+
+	log.Default().Println("Reauthenticating Spotify client for user:", u.Username, u.SpotifyToken)
+
+	_, err := spotify.Reauthenticate(u.SpotifyToken)
 	if err != nil {
+		log.Default().Println("Failed to reauthenticate Spotify client:", err)
 		utils.HandleRedirect(w, r, mux.Opts.PathPrefix+"/spotify")
 		return
 	} else {
@@ -155,7 +165,12 @@ func (mux *AuthMux) handleLogout(w http.ResponseWriter, r *http.Request) {
 }
 
 func (mux *AuthMux) handleSpotifyAuth(w http.ResponseWriter, r *http.Request) {
-	spotify := spotify.DefaultClient()
+	spotify, ok := r.Context().Value(utils.SpotifyClientCtxKey).(*spotify.Client)
+	if !ok || spotify == nil {
+		http.Error(w, "Failed to get Spotify client", http.StatusInternalServerError)
+		return
+	}
+
 	userAuthUrl, err := spotify.GetUserAuthUrl()
 	if err != nil {
 		http.Error(w, "Failed to get user auth url", http.StatusInternalServerError)
@@ -166,13 +181,19 @@ func (mux *AuthMux) handleSpotifyAuth(w http.ResponseWriter, r *http.Request) {
 }
 
 func (mux *AuthMux) handleSpotifyAuthRedirect(w http.ResponseWriter, r *http.Request) {
-	u := r.Context().Value(utils.UserCtxKey).(*user.User)
-	u, err := mux.Services.UserService.Get(u.Id)
+	u := r.Context().Value(utils.UserCtxKey).(*core.UserEntity)
+
+	u, err := mux.Services.UserService.GetUserById(u.Id)
 	if err != nil {
 		http.Error(w, "Failed to get user", http.StatusInternalServerError)
 		return
 	}
-	spotify := spotify.DefaultClient()
+
+	spotify, ok := r.Context().Value(utils.SpotifyClientCtxKey).(*spotify.Client)
+	if !ok || spotify == nil {
+		http.Error(w, "Failed to get Spotify client", http.StatusInternalServerError)
+		return
+	}
 
 	code := r.URL.Query().Get("code")
 	if code == "" {
@@ -186,18 +207,20 @@ func (mux *AuthMux) handleSpotifyAuthRedirect(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	err = spotify.GetNewAccessToken(code)
+	token, err := spotify.Authenticate(code)
 	if err != nil {
 		http.Error(w, "Failed to get new access token", http.StatusBadRequest)
 		return
 	}
 
-	u.SpotifyAccessToken, err = spotify.GetValidAccessToken()
+	u.SpotifyToken = token.RefreshToken
+	_, err = mux.Services.UserService.AuthenticateSpotify(u.Id, u.SpotifyToken)
 	if err != nil {
-		http.Error(w, "Failed to get valid access token", http.StatusInternalServerError)
+		http.Error(w, "Failed to authenticate Spotify", http.StatusInternalServerError)
 		return
 	}
-	mux.Services.UserService.Update(u)
+
+	log.Default().Println("Authenticated Spotify user:", u.Username, u.SpotifyToken)
 
 	utils.HandleRedirect(w, r, mux.Opts.PathPrefix+"/login")
 }

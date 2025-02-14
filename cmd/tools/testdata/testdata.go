@@ -131,12 +131,12 @@ func main() {
 }
 
 func addTestUsers(userService user.UserService) error {
-	_, err := userService.SignUp("bob", "pwd")
+	_, err := userService.SignUp("bob", "pwd", "pwd")
 	if err != nil {
 		return err
 	}
 
-	_, err = userService.SignUp("alice", "pwd")
+	_, err = userService.SignUp("alice", "pwd", "pwd")
 	if err != nil {
 		return err
 	}

@@ -6,8 +6,9 @@ import (
 	"net/http"
 	"slices"
 
-	"github.com/CaribouBlue/top-spot/internal/entities/user"
+	"github.com/CaribouBlue/top-spot/internal/core"
 	"github.com/CaribouBlue/top-spot/internal/server/utils"
+	"github.com/CaribouBlue/top-spot/internal/spotify"
 )
 
 type Middleware func(http.Handler) http.Handler
@@ -106,7 +107,7 @@ func WithRequestMetadata() Middleware {
 
 type WithUserOpts struct {
 	DefaultUserId int64
-	UserService   user.UserService
+	UserService   *core.UserService
 }
 
 func WithUser(opts WithUserOpts) Middleware {
@@ -114,19 +115,20 @@ func WithUser(opts WithUserOpts) Middleware {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 
-			_, ok := ctx.Value(utils.UserCtxKey).(*user.User)
+			_, ok := ctx.Value(utils.UserCtxKey).(*core.UserEntity)
 			if ok {
 				next.ServeHTTP(w, r)
 				return
 			}
 
-			ctxUser := &user.User{}
+			ctxUser := &core.UserEntity{}
 			authCookieUser, err := utils.ParseAuthCookie(w, r)
 			if err == nil {
-				storedUser, err := opts.UserService.Get(authCookieUser.Id)
+				storedUser, err := opts.UserService.GetUserById(authCookieUser.Id)
 				if err == nil {
 					ctxUser = storedUser
-				} else if err != user.ErrNoUserFound {
+				} else if err != core.ErrUserNotFound {
+					log.Default().Println("Failed to get user by ID:", err)
 					http.Error(w, "Failed to get user", http.StatusInternalServerError)
 					return
 				}
@@ -139,9 +141,33 @@ func WithUser(opts WithUserOpts) Middleware {
 	}
 }
 
+func WithSpotifyClient() Middleware {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ctx := r.Context()
+
+			spotifyClient := spotify.NewDefaultClient()
+
+			// TODO: handle token updates/invalidation
+			user, ok := ctx.Value(utils.UserCtxKey).(*core.UserEntity)
+			if ok && user != nil && user.SpotifyToken != "" {
+				_, err := spotifyClient.Reauthenticate(user.SpotifyToken)
+				if err != nil {
+					log.Default().Println("Failed to reauthenticate Spotify client:", err)
+				}
+
+			}
+
+			ctx = context.WithValue(ctx, utils.SpotifyClientCtxKey, spotifyClient)
+
+			next.ServeHTTP(w, r.WithContext(ctx))
+		})
+	}
+}
+
 type WithEnforcedAuthenticationOpts struct {
 	UnauthenticatedRedirectPath string
-	UserService                 user.UserService
+	UserService                 *core.UserService
 }
 
 func WithEnforcedAuthentication(opts WithEnforcedAuthenticationOpts) Middleware {
@@ -149,7 +175,7 @@ func WithEnforcedAuthentication(opts WithEnforcedAuthenticationOpts) Middleware 
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 
-			u, ok := ctx.Value(utils.UserCtxKey).(*user.User)
+			u, ok := ctx.Value(utils.UserCtxKey).(*core.UserEntity)
 			if !ok || u == nil {
 				http.Error(w, "User not found in context, may need to apply WithUser middleware", http.StatusInternalServerError)
 				return

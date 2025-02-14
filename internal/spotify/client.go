@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"os"
 
+	"github.com/CaribouBlue/top-spot/internal/core"
 	"github.com/CaribouBlue/top-spot/internal/utils"
 	"github.com/google/uuid"
 )
@@ -26,7 +27,7 @@ func NewClient(clientId string, clientSecret string, redirectUri string, scope s
 	}
 }
 
-func DefaultClient() *Client {
+func NewDefaultClient() *Client {
 	clientId := os.Getenv("SPOTIFY_CLIENT_ID")
 	clientSecret := os.Getenv("SPOTIFY_CLIENT_SECRET")
 	redirectUri := os.Getenv("SPOTIFY_REDIRECT_URI")
@@ -46,7 +47,7 @@ func (s *Client) GetUserAuthUrl() (string, error) {
 	})
 }
 
-func (s *Client) GetNewAccessToken(code string) error {
+func (s *Client) Authenticate(code string) (AccessToken, error) {
 	newAccessToken, err := GetAccessToken(AccessTokenRequestOptions{
 		Code:         code,
 		ClientId:     s.ClientId,
@@ -55,10 +56,10 @@ func (s *Client) GetNewAccessToken(code string) error {
 		GrantType:    AuthorizationCodeGrantType,
 	})
 	if err != nil {
-		return err
+		return AccessToken{}, err
 	}
 	s.accessToken = *newAccessToken
-	return nil
+	return s.GetValidAccessToken()
 }
 
 func (s *Client) refreshAccessToken() error {
@@ -75,6 +76,16 @@ func (s *Client) refreshAccessToken() error {
 	return nil
 }
 
+func (s *Client) Reauthenticate(refreshToken string) (AccessToken, error) {
+	s.accessToken.RefreshToken = refreshToken
+	err := s.refreshAccessToken()
+	if err != nil {
+		return AccessToken{}, err
+	}
+
+	return s.GetValidAccessToken()
+}
+
 func (s *Client) GetValidAccessToken() (AccessToken, error) {
 	if s.accessToken.IsExpired() {
 		err := s.refreshAccessToken()
@@ -86,8 +97,12 @@ func (s *Client) GetValidAccessToken() (AccessToken, error) {
 	return s.accessToken, nil
 }
 
-func (s *Client) SetAccessToken(accessToken AccessToken) {
-	s.accessToken = accessToken
+func (s *Client) AuthenticateUser(user *core.UserEntity) error {
+	_, err := s.Reauthenticate(user.SpotifyToken)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *Client) NewRequest(opts SpotifyRequestOptions) (*http.Request, error) {
@@ -122,81 +137,125 @@ func (s *Client) CurrentUser() *UserProfile {
 	return s.currentUser
 }
 
-func (s *Client) SearchTracks(query string) (*SearchResult, error) {
+func (s *Client) SearchTracks(query string) ([]core.TrackEntity, error) {
 	accessToken, err := s.GetValidAccessToken()
 	if err != nil {
 		return nil, err
 	}
 
-	return getSearchResult(GetSearchResultRequestOptions{
+	results, err := getSearchResult(GetSearchResultRequestOptions{
 		accessToken: accessToken,
 		query:       query,
 		itemTypes:   []ItemType{TrackItemType},
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	tracks := make([]core.TrackEntity, len(results.Tracks.Items))
+	for i, track := range results.Tracks.Items {
+		tracks[i] = core.TrackEntity{
+			Id:   track.Id,
+			Name: track.Name,
+			Artists: utils.Map(track.Artists, func(artist SearchResultArtist) core.ArtistEntity {
+				return core.ArtistEntity{Id: artist.Id, Name: artist.Name, Url: artist.ExternalUrls.Spotify}
+			}),
+			Album:    core.AlbumEntity{Id: track.Album.Id, Name: track.Album.Name, Url: track.Album.ExternalUrls.Spotify},
+			Explicit: track.Explicit,
+			Url:      track.ExternalUrls.Spotify,
+		}
+	}
+	return tracks, nil
 }
 
-func (s *Client) GetTrack(id string) (*Track, error) {
+func (s *Client) GetTrackById(id string) (*core.TrackEntity, error) {
 	accessToken, err := s.GetValidAccessToken()
 	if err != nil {
 		return nil, err
 	}
 
-	return getTrack(GetTrackRequestOptions{
+	track, err := getTrack(GetTrackRequestOptions{
 		accessToken: accessToken,
 		id:          id,
 	})
+	if err != nil {
+		return nil, err
+	}
+
+	return &core.TrackEntity{
+		Id:   track.Id,
+		Name: track.Name,
+		Artists: utils.Map(track.Artists, func(artist TrackArtist) core.ArtistEntity {
+			return core.ArtistEntity{Id: artist.Id, Name: artist.Name, Url: artist.ExternalUrls.Spotify}
+		}),
+		Album:    core.AlbumEntity{Id: track.Album.Id, Name: track.Album.Name, Url: track.Album.ExternalUrls.Spotify},
+		Explicit: track.Explicit,
+		Url:      track.ExternalUrls.Spotify,
+	}, nil
 }
 
-func (s *Client) CreatePlaylist(name string) (*Playlist, error) {
+func (s *Client) CreatePlaylist(name string, trackIds []string) (*core.PlaylistEntity, error) {
 	accessToken, err := s.GetValidAccessToken()
 	if err != nil {
 		return nil, err
 	}
 
-	return createPlaylist(CreatePlaylistRequestOptions{
+	playlist, err := createPlaylist(CreatePlaylistRequestOptions{
 		accessToken: accessToken,
 		userId:      s.CurrentUser().Id,
 		name:        name,
 	})
-}
-
-func (s *Client) AddTracksToPlaylist(playlistId string, trackIds []string) error {
-	accessToken, err := s.GetValidAccessToken()
 	if err != nil {
-		return err
+		return nil, err
+	}
+
+	playlistEntity := &core.PlaylistEntity{
+		Id:   playlist.Id,
+		Name: playlist.Name,
+		Url:  playlist.ExternalUrls.Spotify,
 	}
 
 	uris := utils.Map(trackIds, func(id string) string {
 		return "spotify:track:" + id
 	})
 
-	return addItemsToPlaylist(AddItemsToPlaylistRequestOptions{
+	err = addItemsToPlaylist(AddItemsToPlaylistRequestOptions{
 		accessToken: accessToken,
-		playlistId:  playlistId,
+		playlistId:  playlistEntity.Id,
 		uris:        uris,
 	})
+	if err != nil {
+		rollbackErr := unfollowPlaylist(UnfollowPlaylistRequestOptions{
+			accessToken: accessToken,
+			playlistId:  playlistEntity.Id,
+		})
+		if rollbackErr != nil {
+			return playlistEntity, err
+		} else {
+			return nil, err
+		}
+	}
+
+	return playlistEntity, nil
 }
 
-func (s *Client) GetPlaylist(playlistId string) (*Playlist, error) {
+func (s *Client) GetPlaylistById(playlistId string) (*core.PlaylistEntity, error) {
 	accessToken, err := s.GetValidAccessToken()
 	if err != nil {
 		return nil, err
 	}
 
-	return getPlaylist(GetPlaylistRequestOptions{
+	playlist, err := getPlaylist(GetPlaylistRequestOptions{
 		accessToken: accessToken,
 		playlistId:  playlistId,
 	})
-}
-
-func (s *Client) UnfollowPlaylist(playlistId string) error {
-	accessToken, err := s.GetValidAccessToken()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
-	return unfollowPlaylist(UnfollowPlaylistRequestOptions{
-		accessToken: accessToken,
-		playlistId:  playlistId,
-	})
+	return &core.PlaylistEntity{
+		Id:   playlist.Id,
+		Name: playlist.Name,
+		Url:  playlist.ExternalUrls.Spotify,
+	}, nil
 }

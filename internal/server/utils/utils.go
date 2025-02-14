@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/CaribouBlue/top-spot/internal/entities/user"
-	"github.com/CaribouBlue/top-spot/internal/spotify"
 	"github.com/a-h/templ"
 )
 
@@ -21,12 +19,6 @@ func HandleHtmlResponse(r *http.Request, w http.ResponseWriter, component templ.
 	w.Header().Set("Content-Type", "text/html")
 	w.WriteHeader(http.StatusOK)
 	component.Render(r.Context(), w)
-}
-
-func AuthorizedSpotifyClient(user *user.User) *spotify.Client {
-	spotify := spotify.DefaultClient()
-	spotify.SetAccessToken(user.SpotifyAccessToken)
-	return spotify
 }
 
 func HandleRedirect(w http.ResponseWriter, r *http.Request, redirect string) {

@@ -29,3 +29,7 @@ func Values[T comparable, U any](dict map[T]U) []U {
 	}
 	return values
 }
+
+func Prepend[T any](slice []T, val T) []T {
+	return append([]T{val}, slice...)
+}

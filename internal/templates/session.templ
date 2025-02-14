@@ -2,10 +2,9 @@ package templates
 
 import (
 	"fmt"
-	"github.com/CaribouBlue/top-spot/internal/entities/music"
-	"github.com/CaribouBlue/top-spot/internal/entities/session"
-	"github.com/CaribouBlue/top-spot/internal/entities/user"
+	"github.com/CaribouBlue/top-spot/internal/core"
 	serverUtils "github.com/CaribouBlue/top-spot/internal/server/utils"
+	"github.com/CaribouBlue/top-spot/internal/utils"
 	"time"
 )
 
@@ -18,30 +17,30 @@ const (
 )
 
 // Session Page Templates
-templ SessionPage(s session.Session, u user.User) {
-	@Root(RootProps{Title: "Session " + s.Name, IsAuthenticated: true}) {
+templ SessionPage(s core.SessionViewDto, u core.UserEntity) {
+	@Root(RootProps{Title: "Session " + s.Session.Name, IsAuthenticated: true}) {
 		<div
 			id={ SessionDetailsId }
 			class="grid grid-cols-1 gap-4"
 		>
-			<h1 class="text-2xl">{ s.Name }</h1>
-			@SessionTimeline(s)
-			switch s.Phase() {
-				case session.SubmissionPhase:
+			<h1 class="text-2xl">{ s.Session.Name }</h1>
+			@SessionTimeline(*s.Session)
+			switch s.Session.Phase() {
+				case core.SubmissionPhase:
 					@SubmissionPhaseView(s, u)
-				case session.VotePhase:
+				case core.VotePhase:
 					@VotePhaseView(s, u)
-				case session.ResultPhase:
+				case core.ResultPhase:
 					@ResultsPhaseView(s)
 			}
 		</div>
 	}
 }
 
-templ SessionTimeline(s session.Session) {
+templ SessionTimeline(s core.SessionEntity) {
 	<ul class="timeline">
 		<li class="grow">
-			if s.Phase() == session.SubmissionPhase {
+			if s.Phase() == core.SubmissionPhase {
 				<div class="timeline-start">
 					<p
 						hx-get={ fmt.Sprintf("/app/session/%d/phase-duration", s.Id) }
@@ -67,18 +66,18 @@ templ SessionTimeline(s session.Session) {
 			</div>
 			<div class="timeline-end timeline-box">Submissions</div>
 			<hr
-				if s.Phase() != session.SubmissionPhase {
+				if s.Phase() != core.SubmissionPhase {
 					class="bg-primary"
 				}
 			/>
 		</li>
 		<li class="grow">
 			<hr
-				if s.Phase() != session.SubmissionPhase {
+				if s.Phase() != core.SubmissionPhase {
 					class="bg-primary"
 				}
 			/>
-			if s.Phase() == session.VotePhase {
+			if s.Phase() == core.VotePhase {
 				<div class="timeline-start">
 					<p
 						hx-get={ fmt.Sprintf("/app/session/%d/phase-duration", s.Id) }
@@ -93,7 +92,7 @@ templ SessionTimeline(s session.Session) {
 					xmlns="http://www.w3.org/2000/svg"
 					viewBox="0 0 20 20"
 					fill="currentColor"
-					if s.Phase() != session.SubmissionPhase {
+					if s.Phase() != core.SubmissionPhase {
 						class="text-primary h-5 w-5"
 					} else {
 						class="h-5 w-5"
@@ -108,14 +107,14 @@ templ SessionTimeline(s session.Session) {
 			</div>
 			<div class="timeline-end timeline-box">Voting</div>
 			<hr
-				if s.Phase() == session.ResultPhase {
+				if s.Phase() == core.ResultPhase {
 					class="bg-primary"
 				}
 			/>
 		</li>
 		<li class="grow">
 			<hr
-				if s.Phase() == session.ResultPhase {
+				if s.Phase() == core.ResultPhase {
 					class="bg-primary"
 				}
 			/>
@@ -124,7 +123,7 @@ templ SessionTimeline(s session.Session) {
 					xmlns="http://www.w3.org/2000/svg"
 					viewBox="0 0 20 20"
 					fill="currentColor"
-					if s.Phase() == session.ResultPhase {
+					if s.Phase() == core.ResultPhase {
 						class="text-primary h-5 w-5"
 					} else {
 						class="h-5 w-5"
@@ -143,25 +142,25 @@ templ SessionTimeline(s session.Session) {
 }
 
 // Submission Phase View Templates
-templ SubmissionPhaseView(s session.Session, u user.User) {
+templ SubmissionPhaseView(s core.SessionViewDto, u core.UserEntity) {
 	<div>
 		<h2
 			class="text-lg"
 		>Your Submissions </h2>
 		<p
-			hx-get={ fmt.Sprintf("/app/session/%d/submission-counter", s.Id) }
+			hx-get={ fmt.Sprintf("/app/session/%d/submission-counter", s.Session.Id) }
 			hx-trigger={ fmt.Sprintf("%s from:body, %s from:body", serverUtils.EventNewSubmission, serverUtils.EventDeleteSubmission) }
 			class="text-sm"
 		>
-			@SubmissionCounter(s, u)
+			@SubmissionCounter(s)
 		</p>
 	</div>
 	<div class="overflow-x-auto">
 		<table id={ IdSubmissionsTable } class="table">
 			<tbody>
-				for _, submission := range s.SubmissionsByUser(u.Id) {
+				for _, submission := range *s.UserSubmissions {
 					<tr
-						hx-get={ fmt.Sprintf("/app/session/%d/submission/%s", s.Id, submission.Id) }
+						hx-get={ fmt.Sprintf("/app/session/%d/submission/%d", s.Session.Id, submission.Id) }
 						hx-trigger="load"
 						hx-swap="outerHTML"
 						hx-target="this"
@@ -171,7 +170,7 @@ templ SubmissionPhaseView(s session.Session, u user.User) {
 		</table>
 	</div>
 	<input
-		hx-get={ fmt.Sprintf("/app/session/%d/tracks/search", s.Id) }
+		hx-get={ fmt.Sprintf("/app/session/%d/tracks/search", s.Session.Id) }
 		hx-trigger="input changed delay:500ms, search"
 		hx-target={ fmt.Sprintf("#%s", IdSubmissionSearchResultsTable) }
 		class="input input-bordered w-full"
@@ -184,13 +183,13 @@ templ SubmissionPhaseView(s session.Session, u user.User) {
 	</div>
 }
 
-templ SubmissionCounter(s session.Session, u user.User) {
-	{ fmt.Sprintf("%d/%d", len(s.SubmissionsByUser(u.Id)), s.MaxSubmissions) }
+templ SubmissionCounter(s core.SessionViewDto) {
+	{ fmt.Sprintf("%d/%d", len(*s.UserSubmissions), s.Session.MaxSubmissions) }
 }
 
-templ SubmissionSearchResults(s session.Session, searchResult []music.Track) {
+templ SubmissionSearchResults(candidates []core.CandidateDto) {
 	<tbody hx-ext="response-targets">
-		for _, track := range searchResult {
+		for _, candidate := range candidates {
 			<tr
 				x-data="{ error: '' }"
 				@error.stop="error = $event.detail?.data"
@@ -231,8 +230,8 @@ templ SubmissionSearchResults(s session.Session, searchResult []music.Track) {
 						></span>
 					</div>
 					<button
-						hx-post={ fmt.Sprintf("/app/session/%d/submission", s.Id) }
-						hx-vals={ fmt.Sprintf(`{"trackId": "%s"}`, track.Id) }
+						hx-post={ fmt.Sprintf("/app/session/%d/submission", candidate.Submission.SessionId) }
+						hx-vals={ fmt.Sprintf(`{"trackId": "%s"}`, candidate.Track.Id) }
 						hx-target="closest tr"
 						hx-target-422="previous span"
 						class="btn"
@@ -241,12 +240,12 @@ templ SubmissionSearchResults(s session.Session, searchResult []music.Track) {
 				<td>
 					<div class="flex items-center gap-2">
 						<a
-							href={ templ.SafeURL(track.Url) }
+							href={ templ.SafeURL(candidate.Track.Url) }
 							target="_blank"
 						>
-							{ track.Name }
+							{ candidate.Track.Name }
 						</a>
-						if track.Explicit {
+						if candidate.Track.Explicit {
 							<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-explicit" viewBox="0 0 16 16">
 								<path d="M6.826 10.88H10.5V12h-5V4.002h5v1.12H6.826V7.4h3.457v1.073H6.826z"></path>
 								<path d="M2.5 0A2.5 2.5 0 0 0 0 2.5v11A2.5 2.5 0 0 0 2.5 16h11a2.5 2.5 0 0 0 2.5-2.5v-11A2.5 2.5 0 0 0 13.5 0zM1 2.5A1.5 1.5 0 0 1 2.5 1h11A1.5 1.5 0 0 1 15 2.5v11a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 1 13.5z"></path>
@@ -256,19 +255,19 @@ templ SubmissionSearchResults(s session.Session, searchResult []music.Track) {
 				</td>
 				<td>
 					<a
-						href={ templ.SafeURL(track.Album.Url) }
+						href={ templ.SafeURL(candidate.Track.Album.Url) }
 						target="_blank"
 					>
-						{ track.Album.Name }
+						{ candidate.Track.Album.Name }
 					</a>
 				</td>
 				<td>
-					for i, artist := range track.Artists {
+					for i, artist := range candidate.Track.Artists {
 						<a
 							href={ templ.SafeURL(artist.Url) }
 							target="_blank"
 						>
-							if i < len(track.Artists)-1 {
+							if i < len(candidate.Track.Artists)-1 {
 								{ artist.Name + ", " }
 							} else {
 								{ artist.Name }
@@ -281,11 +280,11 @@ templ SubmissionSearchResults(s session.Session, searchResult []music.Track) {
 	</tbody>
 }
 
-templ SubmissionItem(s session.Session, submission session.Submission, track music.Track) {
+templ SubmissionItem(s core.SessionEntity, submission core.SubmissionEntity, track core.TrackEntity) {
 	<tr>
 		<td class="w-0">
 			<button
-				hx-delete={ fmt.Sprintf("/app/session/%d/submission/%s", s.Id, submission.Id) }
+				hx-delete={ fmt.Sprintf("/app/session/%d/submission/%d", s.Id, submission.Id) }
 				hx-target="closest tr"
 				hx-swap="delete"
 				class="btn"
@@ -332,7 +331,7 @@ templ SubmissionItem(s session.Session, submission session.Submission, track mus
 	</tr>
 }
 
-templ AddSubmission(s session.Session, u user.User, submission session.Submission, track music.Track) {
+templ AddSubmission(s core.SessionEntity, u core.UserEntity, submission core.SubmissionEntity, track core.TrackEntity) {
 	<tbody
 		hx-swap-oob={ fmt.Sprintf("beforeend:#%s tbody", IdSubmissionsTable) }
 	>
@@ -341,9 +340,9 @@ templ AddSubmission(s session.Session, u user.User, submission session.Submissio
 }
 
 // Vote Phase View Templates
-templ VotePhaseView(s session.Session, u user.User) {
+templ VotePhaseView(s core.SessionViewDto, u core.UserEntity) {
 	<button
-		hx-get={ fmt.Sprintf("/app/session/%d/playlist", s.Id) }
+		hx-get={ fmt.Sprintf("/app/session/%d/playlist", s.Session.Id) }
 		hx-trigger="load"
 		hx-swap="outerHTML"
 		class="btn btn-wide w-full"
@@ -369,9 +368,9 @@ templ VotePhaseView(s session.Session, u user.User) {
 			<div class="overflow-x-auto">
 				<table class="table">
 					<tbody>
-						for _, sub := range s.SubmissionsByUser(u.Id) {
+						for _, sub := range *s.UserSubmissions {
 							<tr
-								hx-get={ fmt.Sprintf("/app/session/%d/submission/%s/candidate", s.Id, sub.Id) }
+								hx-get={ fmt.Sprintf("/app/session/%d/submission/%d/candidate", s.Session.Id, sub.Id) }
 								hx-trigger="load"
 								hx-swap="outerHTML"
 							>
@@ -388,11 +387,11 @@ templ VotePhaseView(s session.Session, u user.User) {
 	<div>
 		<h1 class="text-xl">Your Ballot</h1>
 		<p
-			hx-get={ fmt.Sprintf("/app/session/%d/vote-counter", s.Id) }
+			hx-get={ fmt.Sprintf("/app/session/%d/vote-counter", s.Session.Id) }
 			hx-trigger={ fmt.Sprintf("%s from:body, %s from:body", serverUtils.EventNewVote, serverUtils.EventDeleteVote) }
 			class="text-sm"
 		>
-			@VoteCounter(s, u)
+			@VoteCounter(s)
 		</p>
 	</div>
 	<div class="overflow-x-auto">
@@ -400,25 +399,23 @@ templ VotePhaseView(s session.Session, u user.User) {
 			class="table"
 		>
 			<tbody hx-ext="response-targets">
-				for _, sub := range s.Submissions {
-					if sub.UserId != u.Id {
-						<tr
-							hx-get={ fmt.Sprintf("/app/session/%d/submission/%s/candidate", s.Id, sub.Id) }
-							hx-trigger="load"
-							hx-swap="outerHTML"
-						>
-							<td>
-								@spinner(SpinnerOpts{Size: SpinnerSizeS})
-							</td>
-						</tr>
-					}
+				for _, candidate := range *s.UserCandidates {
+					<tr
+						hx-get={ fmt.Sprintf("/app/session/%d/submission/%d/candidate", s.Session.Id, candidate.Submission.Id) }
+						hx-trigger="load"
+						hx-swap="outerHTML"
+					>
+						<td>
+							@spinner(SpinnerOpts{Size: SpinnerSizeS})
+						</td>
+					</tr>
 				}
 			</tbody>
 		</table>
 	</div>
 }
 
-templ PlaylistButton(s session.Session, playlist music.Playlist) {
+templ PlaylistButton(s core.SessionEntity, playlist core.PlaylistEntity) {
 	if playlist.Id != "" {
 		<a
 			href={ templ.SafeURL(playlist.Url) }
@@ -440,7 +437,7 @@ templ PlaylistButton(s session.Session, playlist music.Playlist) {
 	}
 }
 
-templ VoteCandidate(s session.Session, u user.User, submission session.Submission, track music.Track) {
+templ VoteCandidate(s core.SessionEntity, u core.UserEntity, candidate core.CandidateDto, track core.TrackEntity) {
 	<tr
 		x-data="{ error: '' }"
 		@error.stop="error = $event.detail?.data"
@@ -480,13 +477,9 @@ templ VoteCandidate(s session.Session, u user.User, submission session.Submissio
 							"
 				></span>
 			</div>
-			if u.Id == submission.UserId {
+			if candidate.HasVote() {
 				<button
-					disabled
-				></button>
-			} else if vote := s.SubmissionVoteByUser(u.Id, submission.Id); vote.Id != "" {
-				<button
-					hx-delete={ fmt.Sprintf("/app/session/%d/vote/%s", s.Id, vote.Id) }
+					hx-delete={ fmt.Sprintf("/app/session/%d/submission/%d/vote", s.Id, candidate.Submission.Id) }
 					hx-target="closest tr"
 					hx-target-422="previous span"
 					hx-swap="outerHTML"
@@ -501,8 +494,7 @@ templ VoteCandidate(s session.Session, u user.User, submission session.Submissio
 				</button>
 			} else {
 				<button
-					hx-post={ fmt.Sprintf("/app/session/%d/vote", s.Id) }
-					hx-vals={ fmt.Sprintf(`{"submissionId": "%s"}`, submission.Id) }
+					hx-post={ fmt.Sprintf("/app/session/%d/submission/%d/vote", s.Id, candidate.Submission.Id) }
 					hx-target="closest tr"
 					hx-target-422="previous span"
 					hx-swap="outerHTML"
@@ -556,14 +548,19 @@ templ VoteCandidate(s session.Session, u user.User, submission session.Submissio
 	</tr>
 }
 
-templ VoteCounter(s session.Session, u user.User) {
-	{ fmt.Sprintf("%d/%d", s.MaxVotes()-s.UserVotesRemaining(u.Id), s.MaxVotes()) }
+templ VoteCounter(s core.SessionViewDto) {
+	{ fmt.Sprintf("%d/%d", s.Session.MaxVotes()-utils.Reduce(*s.UserCandidates, func (count int, candidate core.CandidateDto) int {
+		if candidate.HasVote() {
+			return count + 1
+		}
+		return count
+	}, 0), s.Session.MaxVotes()) }
 }
 
 // Results Phase View Templates
-templ ResultsPhaseView(s session.Session) {
+templ ResultsPhaseView(s core.SessionViewDto) {
 	<div
-		hx-get={ fmt.Sprintf("/app/session/%d/playlist", s.Id) }
+		hx-get={ fmt.Sprintf("/app/session/%d/playlist", s.Session.Id) }
 		hx-trigger="load"
 		hx-swap="outerHTML"
 		class="btn btn-wide w-full"
@@ -576,9 +573,9 @@ templ ResultsPhaseView(s session.Session) {
 	<div class="overflow-x-auto">
 		<table class="table">
 			<tbody>
-				for _, result := range s.Results {
+				for _, result := range *s.Results {
 					<tr
-						hx-get={ fmt.Sprintf("/app/session/%d/result/%s", s.Id, result.Id) }
+						hx-get={ fmt.Sprintf("/app/session/%d/submission/%d/result", s.Session.Id, result.Submission.Id) }
 						hx-trigger="load"
 						hx-swap="outerHTML"
 					>
@@ -593,6 +590,10 @@ templ ResultsPhaseView(s session.Session) {
 }
 
 func PlaceDisplayText(place int) string {
+	if place < 0 {
+		return "-"
+	}
+
 	var ending string
 	simplifiedPlace := place % 100
 
@@ -614,9 +615,11 @@ func PlaceDisplayText(place int) string {
 	return fmt.Sprintf("%d%s", place, ending)
 }
 
-templ Result(s session.Session, result session.Result, submission session.Submission, track music.Track, owner user.User) {
+templ Result(s core.SessionEntity, result core.ResultDto, submission core.SubmissionEntity, track core.TrackEntity, owner core.UserEntity) {
 	<tr>
-		<td class="w-0">
+		<td
+			class="w-0 text-center"
+		>
 			{ PlaceDisplayText(result.Place) }
 		</td>
 		<td>{ fmt.Sprint(owner.Username) }</td>
@@ -662,7 +665,7 @@ templ Result(s session.Session, result session.Result, submission session.Submis
 }
 
 // Shared Templates
-func PhaseDurationDisplay(s session.Session) string {
+func PhaseDurationDisplay(s core.SessionEntity) string {
 	var duration time.Duration = s.RemainingPhaseDuration()
 
 	days := int(duration.Hours()) / 24
@@ -676,8 +679,8 @@ func PhaseDurationDisplay(s session.Session) string {
 	return fmt.Sprintf("%02dd %02dh %02dm", days, hours, minutes)
 }
 
-templ SessionPhaseDuration(s session.Session) {
-	if s.Phase() != session.ResultPhase {
+templ SessionPhaseDuration(s core.SessionEntity) {
+	if s.Phase() != core.ResultPhase {
 		{ PhaseDurationDisplay(s) }
 	}
 }
