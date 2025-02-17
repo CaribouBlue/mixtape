@@ -37,12 +37,17 @@ func main() {
 	log.Println("Database setup completed successfully.")
 	log.Println("Adding test data...")
 
-	userService := core.NewUserService(db)
-	sessionService := core.NewSessionService(db)
+	log.Default().Println("Creating users...")
+	CreateUsers(db)
 
-	CreateUsers(userService)
-	CreateSubmissionPhaseSession(sessionService)
-	CreateVotePhaseSession(sessionService)
+	log.Default().Println("Creating submission phase session...")
+	CreateSubmissionPhaseSession(db)
+
+	log.Default().Println("Creating vote phase session...")
+	CreateVotePhaseSession(db)
+
+	log.Default().Println("Creating result phase session...")
+	CreateResultPhaseSession(db)
 
 	log.Println("Test data added successfully.")
 }
@@ -67,7 +72,7 @@ func CreateTables(db *storage.SqliteStore) {
 			vote_phase_duration INTEGER,
 			FOREIGN KEY (created_by) REFERENCES ` + storage.TableNameUsers + ` (id)
 		);`,
-		`CREATE TABLE IF NOT EXISTS ` + storage.TableNameSubmissions + ` (
+		`CREATE TABLE IF NOT EXISTS ` + storage.TableNameCandidates + ` (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			user_id INTEGER,
 			session_id INTEGER,
@@ -78,10 +83,10 @@ func CreateTables(db *storage.SqliteStore) {
 		`CREATE TABLE IF NOT EXISTS ` + storage.TableNameVotes + ` (
 			session_id INTEGER,
 			user_id INTEGER,
-			submission_id INTEGER,
+			candidate_id INTEGER,
 			FOREIGN KEY (session_id) REFERENCES ` + storage.TableNameSessions + ` (id),
 			FOREIGN KEY (user_id) REFERENCES ` + storage.TableNameUsers + ` (id),
-			FOREIGN KEY (submission_id) REFERENCES ` + storage.TableNameSubmissions + ` (id)
+			FOREIGN KEY (candidate_id) REFERENCES ` + storage.TableNameCandidates + ` (id)
 		);`,
 		`CREATE TABLE IF NOT EXISTS ` + storage.TableNamePlaylists + ` (
 			session_id INTEGER,
@@ -101,19 +106,7 @@ func CreateTables(db *storage.SqliteStore) {
 }
 
 func CreateViews(db *storage.SqliteStore) {
-	views := []string{
-		`CREATE VIEW IF NOT EXISTS ` + storage.ViewNameCandidates + ` AS
-			SELECT s.id AS submission_id,
-				s.user_id AS submission_user_id,
-				s.session_id AS session_id,
-				s.track_id AS track_id,
-				v.submission_id AS vote_submission_id,
-				u.id AS vote_user_id
-			FROM ` + storage.TableNameSubmissions + ` s
-				FULL JOIN ` + storage.TableNameUsers + ` u ON u.id != s.user_id
-				FULL JOIN ` + storage.TableNameVotes + ` v ON s.id = v.submission_id AND u.id = v.user_id;
-`,
-	}
+	views := []string{}
 
 	for _, query := range views {
 		if _, err := db.Exec(query); err != nil {
@@ -122,195 +115,200 @@ func CreateViews(db *storage.SqliteStore) {
 	}
 }
 
-func CreateUsers(userService *core.UserService) {
-	_, err := userService.SignUpNewUser("BoB", "pwd", "pwd")
-	if err != nil && err != core.ErrUsernameAlreadyExists {
-		log.Fatalln("Error creating user BoB:", err)
+func CreateUsers(db *storage.SqliteStore) {
+	defaultHashedPassword, err := core.HashPassword("pwd")
+	if err != nil {
+		log.Fatalln("Error hashing password:", err)
 	}
 
-	_, err = userService.SignUpNewUser("Alice", "pwd", "pwd")
-	if err != nil && err != core.ErrUsernameAlreadyExists {
-		log.Fatalln("Error creating user Alice:", err)
+	_, err = db.CreateUser(&core.UserEntity{
+		Username:       "alice",
+		DisplayName:    "alice",
+		HashedPassword: defaultHashedPassword,
+		SpotifyToken:   "",
+	})
+	if err != nil {
+		log.Fatalln("Error creating user alice:", err)
 	}
 
-	_, err = userService.SignUpNewUser("John", "pwd", "pwd")
-	if err != nil && err != core.ErrUsernameAlreadyExists {
-		log.Fatalln("Error creating user John:", err)
+	_, err = db.CreateUser(&core.UserEntity{
+		Username:       "bob",
+		DisplayName:    "bob",
+		HashedPassword: defaultHashedPassword,
+		SpotifyToken:   "",
+	})
+	if err != nil {
+		log.Fatalln("Error creating user bob:", err)
 	}
 
-	_, err = userService.SignUpNewUser("J A N E", "pwd", "pwd")
-	if err != nil && err != core.ErrUsernameAlreadyExists {
-		log.Fatalln("Error creating user Jane:", err)
+	_, err = db.CreateUser(&core.UserEntity{
+		Username:       "john",
+		DisplayName:    "john",
+		HashedPassword: defaultHashedPassword,
+		SpotifyToken:   "",
+	})
+	if err != nil {
+		log.Fatalln("Error creating user john:", err)
+	}
+
+	_, err = db.CreateUser(&core.UserEntity{
+		Username:       "jane",
+		DisplayName:    "jane",
+		HashedPassword: defaultHashedPassword,
+		SpotifyToken:   "",
+	})
+	if err != nil {
+		log.Fatalln("Error creating user jane:", err)
 	}
 }
 
-func CreateSessions(sessionService *core.SessionService) {
-	_, err := sessionService.CreateSession(core.NewSessionEntity("Test Session 1", 1))
+func CreateSubmissionPhaseSession(db *storage.SqliteStore) {
+	session := core.NewSessionEntity("Submission Phase Session", 1)
+	_, err := db.CreateSession(session)
 	if err != nil {
-		log.Fatalln("Error creating Test Session 1:", err)
-	}
-
-	_, err = sessionService.CreateSession(core.NewSessionEntity("Test Session 2", 1))
-	if err != nil {
-		log.Fatalln("Error creating Test Session 2:", err)
-	}
-
-	_, err = sessionService.CreateSession(core.NewSessionEntity("Test Session 3", 1))
-	if err != nil {
-		log.Fatalln("Error creating Test Session 3:", err)
+		log.Fatalln("Error creating session:", err)
 	}
 }
 
-func CreateSubmissionPhaseSession(sessionService *core.SessionService) {
-	_, err := sessionService.CreateSession(core.NewSessionEntity("Submission Phase Session", 1))
+func CreateVotePhaseSession(db *storage.SqliteStore) {
+	session := core.NewSessionEntity("Vote Phase Session", 1)
+	session.StartAt = session.StartAt.Add(-24 * time.Hour)
+	session.SubmissionPhaseDuration = 24 * time.Hour
+	session.VotePhaseDuration = 24 * time.Hour
+	_, err := db.CreateSession(session)
 	if err != nil {
-		log.Fatalln("Error creating Submission Phase Session:", err)
+		log.Fatalln("Error creating session:", err)
 	}
+
+	candidates := []core.CandidateEntity{
+		{
+			UserId:    1,
+			SessionId: session.Id,
+			TrackId:   "6gH1UKDAhWS6qXzKXB4wuY",
+		},
+		{
+			UserId:    1,
+			SessionId: session.Id,
+			TrackId:   "7qwt4xUIqQWCu1DJf96g2k",
+		},
+		{
+			UserId:    1,
+			SessionId: session.Id,
+			TrackId:   "1rqduvolf1CVHSzY519bPp",
+		},
+		{
+			UserId:    1,
+			SessionId: session.Id,
+			TrackId:   "3sl4dcqSwxHVnLfqwF2jly",
+		},
+		{
+			UserId:    1,
+			SessionId: session.Id,
+			TrackId:   "62PaSfnXSMyLshYJrlTuL3",
+		},
+		{
+			UserId:    2,
+			SessionId: session.Id,
+			TrackId:   "1j8xbu9phaY9wNAaUSAqVf",
+		},
+		{
+			UserId:    2,
+			SessionId: session.Id,
+			TrackId:   "6quGF3Kvzd5WYEEuCmvCe1",
+		},
+		{
+			UserId:    2,
+			SessionId: session.Id,
+			TrackId:   "3HGwI9qwq5XqBDeZBV3zti",
+		},
+		{
+			UserId:    2,
+			SessionId: session.Id,
+			TrackId:   "5Y9HJkaDmUlIfgNZzUYd5x",
+		},
+		{
+			UserId:    2,
+			SessionId: session.Id,
+			TrackId:   "3ApxpM5ghkdjWKhbrQaPLk",
+		},
+	}
+	for _, candidate := range candidates {
+		_, err = db.AddCandidate(session.Id, &candidate)
+		if err != nil {
+			log.Fatalln("Error adding candidate for track ", candidate.TrackId, ": ", err)
+		}
+	}
+
 }
 
-func CreateVotePhaseSession(sessionService *core.SessionService) {
-	session, err := sessionService.CreateSession(core.NewSessionEntity("Vote Phase Session", 1, core.WithSessionStartAt(time.Now().Add(-time.Hour*24)), core.WithSubmissionDuration(time.Hour*24)))
+func CreateResultPhaseSession(db *storage.SqliteStore) {
+	session := core.NewSessionEntity("Result Phase Session", 1)
+	session.StartAt = session.StartAt.Add(-2 * time.Hour)
+	session.SubmissionPhaseDuration = 1 * time.Hour
+	session.VotePhaseDuration = 1 * time.Hour
+	_, err := db.CreateSession(session)
 	if err != nil {
-		log.Fatalln("Error creating Vote Phase Session:", err)
+		log.Fatalln("Error creating session:", err)
 	}
 
-	_, err = sessionService.AddUserSubmission(session.Id, 1, "track_id_1")
-	if err != nil {
-		log.Fatalln("Error creating submission 1:", err, "\nFor session:", session.Id)
+	candidates := []core.CandidateEntity{
+		{
+			UserId:    1,
+			SessionId: session.Id,
+			TrackId:   "6gH1UKDAhWS6qXzKXB4wuY",
+		},
+		{
+			UserId:    1,
+			SessionId: session.Id,
+			TrackId:   "7qwt4xUIqQWCu1DJf96g2k",
+		},
+		{
+			UserId:    1,
+			SessionId: session.Id,
+			TrackId:   "1rqduvolf1CVHSzY519bPp",
+		},
+		{
+			UserId:    1,
+			SessionId: session.Id,
+			TrackId:   "3sl4dcqSwxHVnLfqwF2jly",
+		},
+		{
+			UserId:    1,
+			SessionId: session.Id,
+			TrackId:   "62PaSfnXSMyLshYJrlTuL3",
+		},
+		{
+			UserId:    2,
+			SessionId: session.Id,
+			TrackId:   "1j8xbu9phaY9wNAaUSAqVf",
+		},
+		{
+			UserId:    2,
+			SessionId: session.Id,
+			TrackId:   "6quGF3Kvzd5WYEEuCmvCe1",
+		},
+		{
+			UserId:    2,
+			SessionId: session.Id,
+			TrackId:   "3HGwI9qwq5XqBDeZBV3zti",
+		},
+		{
+			UserId:    2,
+			SessionId: session.Id,
+			TrackId:   "5Y9HJkaDmUlIfgNZzUYd5x",
+		},
+		{
+			UserId:    2,
+			SessionId: session.Id,
+			TrackId:   "3ApxpM5ghkdjWKhbrQaPLk",
+		},
 	}
 
-	_, err = sessionService.AddUserSubmission(session.Id, 1, "track_id_2")
-	if err != nil {
-		log.Fatalln("Error creating submission 2:", err, "\nFor session:", session.Id)
-	}
-
-	_, err = sessionService.AddUserSubmission(session.Id, 1, "track_id_3")
-	if err != nil {
-		log.Fatalln("Error creating submission 3:", err, "\nFor session:", session.Id)
-	}
-
-	_, err = sessionService.AddUserSubmission(session.Id, 1, "track_id_4")
-	if err != nil {
-		log.Fatalln("Error creating submission 4:", err, "\nFor session:", session.Id)
-	}
-
-	_, err = sessionService.AddUserSubmission(session.Id, 1, "track_id_5")
-	if err != nil {
-		log.Fatalln("Error creating submission 5:", err, "\nFor session:", session.Id)
-	}
-
-	_, err = sessionService.AddUserSubmission(session.Id, 2, "track_id_6")
-	if err != nil {
-		log.Fatalln("Error creating submission 6:", err, "\nFor session:", session.Id)
-	}
-
-	_, err = sessionService.AddUserSubmission(session.Id, 2, "track_id_7")
-	if err != nil {
-		log.Fatalln("Error creating submission 7:", err, "\nFor session:", session.Id)
-	}
-
-	_, err = sessionService.AddUserSubmission(session.Id, 2, "track_id_8")
-	if err != nil {
-		log.Fatalln("Error creating submission 8:", err, "\nFor session:", session.Id)
-	}
-
-	_, err = sessionService.AddUserSubmission(session.Id, 2, "track_id_9")
-	if err != nil {
-		log.Fatalln("Error creating submission 9:", err, "\nFor session:", session.Id)
-	}
-
-	_, err = sessionService.AddUserSubmission(session.Id, 2, "track_id_10")
-	if err != nil {
-		log.Fatalln("Error creating submission 10:", err, "\nFor session:", session.Id)
-	}
-}
-
-func CreateSubmissions(sessionService *core.SessionService) {
-	_, err := sessionService.AddUserSubmission(1, 1, "track_id_1")
-	if err != nil {
-		log.Fatalln("Error creating submission 1:", err)
-	}
-
-	_, err = sessionService.AddUserSubmission(1, 1, "track_id_2")
-	if err != nil {
-		log.Fatalln("Error creating submission 2:", err)
-	}
-
-	_, err = sessionService.AddUserSubmission(1, 1, "track_id_3")
-	if err != nil {
-		log.Fatalln("Error creating submission 3:", err)
-	}
-
-	_, err = sessionService.AddUserSubmission(1, 1, "track_id_4")
-	if err != nil {
-		log.Fatalln("Error creating submission 4:", err)
-	}
-
-	_, err = sessionService.AddUserSubmission(1, 1, "track_id_5")
-	if err != nil {
-		log.Fatalln("Error creating submission 5:", err)
-	}
-
-	_, err = sessionService.AddUserSubmission(1, 2, "track_id_6")
-	if err != nil {
-		log.Fatalln("Error creating submission 6:", err)
-	}
-
-	_, err = sessionService.AddUserSubmission(1, 2, "track_id_7")
-	if err != nil {
-		log.Fatalln("Error creating submission 7:", err)
-	}
-
-	_, err = sessionService.AddUserSubmission(1, 2, "track_id_8")
-	if err != nil {
-		log.Fatalln("Error creating submission 8:", err)
-	}
-
-	_, err = sessionService.AddUserSubmission(1, 2, "track_id_9")
-	if err != nil {
-		log.Fatalln("Error creating submission 9:", err)
-	}
-
-	_, err = sessionService.AddUserSubmission(1, 2, "track_id_10")
-	if err != nil {
-		log.Fatalln("Error creating submission 10:", err)
-	}
-}
-
-func CreateVotes(sessionService *core.SessionService) {
-	_, err := sessionService.VoteForCandidate(1, 2, 1)
-	if err != nil {
-		log.Fatalln("Error creating vote 1:", err)
-	}
-
-	_, err = sessionService.VoteForCandidate(1, 2, 2)
-	if err != nil {
-		log.Fatalln("Error creating vote 2:", err)
-	}
-
-	_, err = sessionService.VoteForCandidate(1, 1, 6)
-	if err != nil {
-		log.Fatalln("Error creating vote 3:", err)
-	}
-
-	_, err = sessionService.VoteForCandidate(1, 1, 7)
-	if err != nil {
-		log.Fatalln("Error creating vote 4:", err)
-	}
-
-	_, err = sessionService.VoteForCandidate(1, 3, 1)
-	if err != nil {
-		log.Fatalln("Error creating vote 5:", err)
-	}
-
-	_, err = sessionService.VoteForCandidate(1, 3, 2)
-	if err != nil {
-		log.Fatalln("Error creating vote 6:", err)
-	}
-
-	_, err = sessionService.VoteForCandidate(1, 4, 10)
-	if err != nil {
-		log.Fatalln("Error creating vote 7:", err)
+	for _, candidate := range candidates {
+		_, err = db.AddCandidate(session.Id, &candidate)
+		if err != nil {
+			log.Fatalln("Error adding candidate for track ", candidate.TrackId, ": ", err)
+		}
 	}
 
 }

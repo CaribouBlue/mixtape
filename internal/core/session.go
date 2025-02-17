@@ -2,9 +2,12 @@ package core
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"sort"
 	"time"
+
+	"github.com/CaribouBlue/top-spot/internal/utils"
 )
 
 type SessionPhase string
@@ -108,17 +111,18 @@ func (s *SessionEntity) MaxVotes() int {
 	}
 }
 
-type SubmissionEntity struct {
+type CandidateEntity struct {
 	Id        int64  `json:"id"`
 	SessionId int64  `json:"sessionId"`
 	UserId    int64  `json:"userId"`
 	TrackId   string `json:"trackId"`
+	Votes     int    `json:"votes"`
 }
 
 type VoteEntity struct {
-	SessionId    int64 `json:"sessionId"`
-	SubmissionId int64 `json:"submissionId"`
-	UserId       int64 `json:"userId"`
+	SessionId   int64 `json:"sessionId"`
+	CandidateId int64 `json:"candidateId"`
+	UserId      int64 `json:"userId"`
 }
 
 type SessionPlaylistEntity struct {
@@ -127,22 +131,40 @@ type SessionPlaylistEntity struct {
 	PlaylistId string `json:"playlistId"`
 }
 
-type SessionViewDto struct {
-	Session         *SessionEntity      `json:"session"`
-	UserSubmissions *[]SubmissionEntity `json:"userSubmissions"`
-	UserCandidates  *[]CandidateDto     `json:"candidates"`
-	Results         *ResultsDto         `json:"results"`
+type PlaylistDto struct {
+	SessionPlaylistEntity
+	Name string
+	Url  string
+}
+
+type SessionDto struct {
+	SessionEntity       `json:"session"`
+	SubmittedCandidates *[]CandidateDto `json:"submittedCandidates"`
+	BallotCandidates    *[]CandidateDto `json:"ballotCandidates"`
+	Results             *[]CandidateDto `json:"results"`
+	Playlist            *PlaylistDto    `json:"playlist"`
+}
+
+func (s *SessionDto) VoteCount() int {
+	return utils.Reduce(*s.BallotCandidates, func(count int, candidate CandidateDto) int {
+		if candidate.Vote != nil {
+			return count + 1
+		}
+		return count
+	}, 0)
 }
 
 type CandidateDto struct {
-	Submission *SubmissionEntity `json:"submission"`
-	Track      *TrackEntity      `json:"track"`
-	Vote       *VoteEntity       `json:"vote"`
+	CandidateEntity `json:"candidate"`
+	Track           *TrackEntity `json:"track"`
+	Vote            *VoteEntity  `json:"vote"`
+	Owner           *UserEntity  `json:"owner"`
+	Place           int          `json:"place"`
 }
 
 func NewCandidateDto(sessionId int64) *CandidateDto {
 	return &CandidateDto{
-		Submission: &SubmissionEntity{
+		CandidateEntity: CandidateEntity{
 			SessionId: sessionId,
 		},
 		Vote: &VoteEntity{
@@ -151,65 +173,65 @@ func NewCandidateDto(sessionId int64) *CandidateDto {
 	}
 }
 
-func (c *CandidateDto) HasVote() bool {
-	return c.Vote != nil
-}
+type ByVoteCountDesc []CandidateDto
 
-type ResultDto struct {
-	Submission SubmissionEntity `json:"submission"`
-	Place      int              `json:"place"`
-	Score      int              `json:"score"`
-}
-
-type ByScoreCountDesc []ResultDto
-
-func (a ByScoreCountDesc) Len() int           { return len(a) }
-func (a ByScoreCountDesc) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
-func (a ByScoreCountDesc) Less(i, j int) bool { return a[i].Score > a[j].Score }
-
-type ResultsDto []ResultDto
-
-func NewResultsDto() ResultsDto {
-	return []ResultDto{}
-}
+func (a ByVoteCountDesc) Len() int           { return len(a) }
+func (a ByVoteCountDesc) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
+func (a ByVoteCountDesc) Less(i, j int) bool { return a[i].Votes > a[j].Votes }
 
 type SessionRepository interface {
 	CreateSession(session *SessionEntity) (*SessionEntity, error)
 	GetSessionById(id int64) (*SessionEntity, error)
 	GetAllSessions() (*[]SessionEntity, error)
-	UpdateSession(session *SessionEntity) (*SessionEntity, error)
-	DeleteSession(id int64) error
 
-	AddSubmission(sessionId int64, submission *SubmissionEntity) (*SubmissionEntity, error)
-	GetAllSubmissions(sessionId int64) (*[]SubmissionEntity, error)
-	GetSubmissionsByUserId(sessionId int64, userId int64) (*[]SubmissionEntity, error)
-	GetSubmissionById(sessionId int64, submissionId int64) (*SubmissionEntity, error)
-	DeleteSubmission(sessionId int64, submissionId int64) error
+	AddCandidate(sessionId int64, candidate *CandidateEntity) (*CandidateEntity, error)
+	GetAllCandidates(sessionId int64) (*[]CandidateEntity, error)
+	GetCandidatesByUserId(sessionId int64, userId int64) (*[]CandidateEntity, error)
+	GetCandidateByNotUserId(sessionId int64, userId int64) (*[]CandidateEntity, error)
+	GetCandidateById(sessionId int64, candidateId int64) (*CandidateEntity, error)
+	DeleteCandidate(sessionId int64, candidateId int64) error
 
 	AddVote(sessionId int64, vote *VoteEntity) (*VoteEntity, error)
-	GetAllVotes(sessionId int64) (*[]VoteEntity, error)
 	GetVotesByUserId(sessionId int64, userId int64) (*[]VoteEntity, error)
-	DeleteVote(sessionId int64, userId int64, submissionId int64) error
-
-	GetUserCandidates(sessionId int64, userId int64) (*[]CandidateDto, error)
-	GetCandidate(sessionId int64, userId int64, submissionId int64) (*CandidateDto, error)
-	GetCandidatesWithVotes(sessionId int64) (*[]CandidateDto, error)
+	GetVote(sessionId int64, userId int64, candidateId int64) (*VoteEntity, error)
+	DeleteVote(sessionId int64, userId int64, candidateId int64) error
 
 	AddPlaylist(sessionId int64, playlist *SessionPlaylistEntity) (*SessionPlaylistEntity, error)
 	FindPlaylist(sessionId int64, userId int64) (*SessionPlaylistEntity, error)
-	DeletePlaylist(sessionId int64, userId int64) error
 }
 
 type SessionService struct {
 	sessionRepository SessionRepository
+	userService       *UserService
 	musicService      *MusicService
 }
 
-func NewSessionService(sessionRepository SessionRepository, musicService *MusicService) *SessionService {
+func NewSessionService(sessionRepository SessionRepository, userService *UserService, musicService *MusicService) *SessionService {
 	return &SessionService{
 		sessionRepository: sessionRepository,
+		userService:       userService,
 		musicService:      musicService,
 	}
+}
+
+func (s *SessionService) getCandidateDtoFromEntity(entity *CandidateEntity, userId int64) (*CandidateDto, error) {
+	track, err := s.musicService.GetTrackById(entity.TrackId)
+	if err != nil {
+		return nil, err
+	}
+
+	vote, err := s.sessionRepository.GetVote(entity.SessionId, userId, entity.Id)
+	if err != nil {
+		return nil, err
+	}
+
+	dto := &CandidateDto{
+		CandidateEntity: *entity,
+		Track:           track,
+		Vote:            vote,
+	}
+
+	return dto, nil
 }
 
 func (s *SessionService) CreateSession(session *SessionEntity) (*SessionEntity, error) {
@@ -227,7 +249,7 @@ func (s *SessionService) GetSessionsList() (*[]SessionEntity, error) {
 	return sessions, nil
 }
 
-func (s *SessionService) GetSession(id int64) (*SessionEntity, error) {
+func (s *SessionService) GetSessionData(id int64) (*SessionEntity, error) {
 	session, err := s.sessionRepository.GetSessionById(id)
 	if err != nil {
 		return nil, err
@@ -236,38 +258,164 @@ func (s *SessionService) GetSession(id int64) (*SessionEntity, error) {
 	return session, nil
 }
 
-func (s *SessionService) GetSessionView(sessionId, userId int64) (*SessionViewDto, error) {
+func (s *SessionService) GetSessionView(sessionId, userId int64) (*SessionDto, error) {
 	session, err := s.sessionRepository.GetSessionById(sessionId)
 	if err != nil {
 		return nil, err
 	}
 
-	submissions, err := s.sessionRepository.GetSubmissionsByUserId(sessionId, userId)
-	if err != nil {
-		return nil, err
+	submittedCandidates := []CandidateDto{}
+	ballotCandidates := []CandidateDto{}
+	results := []CandidateDto{}
+	playlist := &PlaylistDto{}
+
+	if session.Phase() != ResultPhase {
+		candidatesSubmittedByUser, err := s.sessionRepository.GetCandidatesByUserId(sessionId, userId)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, candidate := range *candidatesSubmittedByUser {
+			candidateDto, err := s.getCandidateDtoFromEntity(&candidate, userId)
+			if err != nil {
+				return nil, err
+			}
+
+			submittedCandidates = append(submittedCandidates, *candidateDto)
+		}
 	}
 
-	candidates, err := s.sessionRepository.GetUserCandidates(sessionId, userId)
-	if err != nil {
-		return nil, err
+	if session.Phase() != SubmissionPhase {
+		playlistEntity, err := s.sessionRepository.FindPlaylist(sessionId, userId)
+		if err != nil {
+			return nil, err
+		}
+
+		if playlistEntity == nil {
+			candidates, err := s.sessionRepository.GetAllCandidates(sessionId)
+			if err != nil {
+				return nil, err
+			}
+
+			trackIds := make([]string, len(*candidates))
+			for i, candidate := range *candidates {
+				trackIds[i] = candidate.TrackId
+			}
+
+			playlistName := fmt.Sprintf("Top Spot: %s %s", session.Name, session.CreatedAt.Format("02-01-06"))
+			playlistDetails, err := s.musicService.musicRepository.CreatePlaylist(playlistName, trackIds)
+			if err != nil {
+				return nil, err
+			}
+
+			playlistEntity, err = s.sessionRepository.AddPlaylist(sessionId, &SessionPlaylistEntity{
+				SessionId:  sessionId,
+				UserId:     userId,
+				PlaylistId: playlistDetails.Id,
+			})
+			if err != nil {
+				return nil, err
+			}
+
+			playlist = &PlaylistDto{
+				SessionPlaylistEntity: *playlistEntity,
+				Name:                  playlistDetails.Name,
+				Url:                   playlistDetails.Url,
+			}
+		} else {
+			playlistDetails, err := s.musicService.GetPlaylistById(playlistEntity.PlaylistId)
+			if err != nil {
+				return nil, err
+			}
+
+			playlist = &PlaylistDto{
+				SessionPlaylistEntity: *playlistEntity,
+				Name:                  playlistDetails.Name,
+				Url:                   playlistDetails.Url,
+			}
+		}
 	}
 
-	results, err := s.GetResults(sessionId)
-	if err != nil {
-		return nil, err
+	if session.Phase() == VotePhase {
+		candidatesNotSubmittedByUser, err := s.sessionRepository.GetCandidateByNotUserId(sessionId, userId)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, candidate := range *candidatesNotSubmittedByUser {
+			candidateDto, err := s.getCandidateDtoFromEntity(&candidate, userId)
+			if err != nil {
+				return nil, err
+			}
+
+			// log.Default().Println("CandidateDto: ", candidateDto)
+			// log.Default().Println("Vote: ", candidateDto.Vote)
+
+			ballotCandidates = append(submittedCandidates, *candidateDto)
+		}
 	}
 
-	sessionView := &SessionViewDto{
-		Session:         session,
-		UserSubmissions: submissions,
-		UserCandidates:  candidates,
-		Results:         results,
+	if session.Phase() == ResultPhase {
+		candidates, err := s.sessionRepository.GetAllCandidates(sessionId)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, candidate := range *candidates {
+			candidateDto, err := s.getCandidateDtoFromEntity(&candidate, userId)
+			if err != nil {
+				return nil, err
+			}
+
+			results = append(results, *candidateDto)
+		}
+
+		sort.Sort(ByVoteCountDesc(results))
+
+		userCache := make(map[int64]*UserEntity)
+
+		place := 1
+		currentBest := results[0].Votes
+		for i, result := range results {
+			if result.Votes < currentBest {
+				place += 1
+			}
+
+			if result.Votes == 0 {
+				place = -1
+			}
+
+			currentBest = result.Votes
+			result.Place = place
+
+			if user, ok := userCache[result.UserId]; ok {
+				result.Owner = user
+			} else {
+				user, err := s.userService.GetUserById(result.UserId)
+				if err != nil {
+					return nil, err
+				}
+				userCache[result.UserId] = user
+				result.Owner = user
+			}
+
+			results[i] = result
+		}
+
+	}
+
+	sessionView := &SessionDto{
+		SessionEntity:       *session,
+		SubmittedCandidates: &submittedCandidates,
+		BallotCandidates:    &ballotCandidates,
+		Results:             &results,
+		Playlist:            playlist,
 	}
 
 	return sessionView, nil
 }
 
-func (s *SessionService) SearchSubmissionTracks(sessionId int64, query string) (*[]CandidateDto, error) {
+func (s *SessionService) SearchCandidateSubmissions(sessionId int64, query string) (*[]CandidateDto, error) {
 	tracks, err := s.musicService.SearchTracks(query)
 	if err != nil {
 		return nil, err
@@ -276,7 +424,7 @@ func (s *SessionService) SearchSubmissionTracks(sessionId int64, query string) (
 	candidates := make([]CandidateDto, 0)
 	for _, track := range tracks {
 		candidate := NewCandidateDto(sessionId)
-		candidate.Submission.TrackId = track.Id
+		candidate.TrackId = track.Id
 		candidate.Track = &track
 		candidates = append(candidates, *candidate)
 	}
@@ -284,29 +432,29 @@ func (s *SessionService) SearchSubmissionTracks(sessionId int64, query string) (
 	return &candidates, nil
 }
 
-func (s *SessionService) AddUserSubmission(sessionId, userId int64, trackId string) (*SubmissionEntity, error) {
+func (s *SessionService) SubmitCandidate(sessionId, userId int64, trackId string) (*CandidateDto, error) {
 	// TODO: improve validation logic
 	session, err := s.sessionRepository.GetSessionById(sessionId)
 	if err != nil {
 		return nil, err
 	}
 
-	submissions, err := s.sessionRepository.GetSubmissionsByUserId(sessionId, userId)
+	candidates, err := s.sessionRepository.GetCandidatesByUserId(sessionId, userId)
 	if err != nil {
 		return nil, err
 	}
 
-	if session.MaxSubmissions <= len(*submissions) {
+	if session.MaxSubmissions <= len(*candidates) {
 		return nil, ErrNoSubmissionsLeft
 	}
 
-	for _, submission := range *submissions {
-		if submission.TrackId == trackId {
+	for _, candidate := range *candidates {
+		if candidate.TrackId == trackId {
 			return nil, ErrDuplicateSubmission
 		}
 	}
 
-	submission, err := s.sessionRepository.AddSubmission(sessionId, &SubmissionEntity{
+	candidate, err := s.sessionRepository.AddCandidate(sessionId, &CandidateEntity{
 		SessionId: sessionId,
 		UserId:    userId,
 		TrackId:   trackId,
@@ -315,37 +463,16 @@ func (s *SessionService) AddUserSubmission(sessionId, userId int64, trackId stri
 		return nil, err
 	}
 
-	return submission, nil
-}
-
-func (s *SessionService) GetAllSubmissions(sessionId int64) (*[]SubmissionEntity, error) {
-	submissions, err := s.sessionRepository.GetAllSubmissions(sessionId)
-	if err != nil {
-		return nil, err
-	}
-	return submissions, nil
-}
-
-func (s *SessionService) GetUserSubmissions(sessionId, userId int64) (*[]SubmissionEntity, error) {
-	submissions, err := s.sessionRepository.GetSubmissionsByUserId(sessionId, userId)
+	candidateDto, err := s.getCandidateDtoFromEntity(candidate, userId)
 	if err != nil {
 		return nil, err
 	}
 
-	return submissions, nil
+	return candidateDto, nil
 }
 
-func (s *SessionService) GetSubmissionById(sessionId, submissionId int64) (*SubmissionEntity, error) {
-	submission, err := s.sessionRepository.GetSubmissionById(sessionId, submissionId)
-	if err != nil {
-		return nil, err
-	}
-
-	return submission, nil
-}
-
-func (s *SessionService) RemoveUserSubmission(sessionId, userId, submissionId int64) error {
-	err := s.sessionRepository.DeleteSubmission(sessionId, submissionId)
+func (s *SessionService) RemoveCandidate(sessionId, userId, candidateId int64) error {
+	err := s.sessionRepository.DeleteCandidate(sessionId, candidateId)
 	if err != nil {
 		return err
 	}
@@ -353,21 +480,7 @@ func (s *SessionService) RemoveUserSubmission(sessionId, userId, submissionId in
 	return nil
 }
 
-func (s *SessionService) GetUserCandidates(sessionId, userId int64) (*[]CandidateDto, error) {
-	candidates, err := s.sessionRepository.GetUserCandidates(sessionId, userId)
-	return candidates, err
-}
-
-func (s *SessionService) GetUserCandidate(sessionId, userId, submissionId int64) (*CandidateDto, error) {
-	candidate, err := s.sessionRepository.GetCandidate(sessionId, userId, submissionId)
-	if err != nil {
-		return nil, err
-	}
-
-	return candidate, nil
-}
-
-func (s *SessionService) VoteForCandidate(sessionId, userId, submissionId int64) (*CandidateDto, error) {
+func (s *SessionService) VoteForCandidate(sessionId, userId, candidateId int64) (*CandidateDto, error) {
 	// TODO: improve validation logic
 
 	session, err := s.sessionRepository.GetSessionById(sessionId)
@@ -385,106 +498,42 @@ func (s *SessionService) VoteForCandidate(sessionId, userId, submissionId int64)
 	}
 
 	_, err = s.sessionRepository.AddVote(sessionId, &VoteEntity{
-		SessionId:    sessionId,
-		UserId:       userId,
-		SubmissionId: submissionId,
+		SessionId:   sessionId,
+		UserId:      userId,
+		CandidateId: candidateId,
 	})
 	if err != nil {
 		return nil, err
 	}
 
-	candidate, err := s.sessionRepository.GetCandidate(sessionId, userId, submissionId)
+	candidate, err := s.sessionRepository.GetCandidateById(sessionId, candidateId)
 	if err != nil {
 		return nil, err
 	}
 
-	return candidate, nil
+	candidateDto, err := s.getCandidateDtoFromEntity(candidate, userId)
+	if err != nil {
+		return nil, err
+	}
+
+	return candidateDto, nil
 }
 
-func (s *SessionService) RemoveVoteForCandidate(sessionId, userId, submissionId int64) (*CandidateDto, error) {
-	err := s.sessionRepository.DeleteVote(sessionId, userId, submissionId)
+func (s *SessionService) RemoveVoteForCandidate(sessionId, userId, candidateId int64) (*CandidateDto, error) {
+	err := s.sessionRepository.DeleteVote(sessionId, userId, candidateId)
 	if err != nil {
 		return nil, err
 	}
 
-	candidate, err := s.sessionRepository.GetCandidate(sessionId, userId, submissionId)
+	candidate, err := s.sessionRepository.GetCandidateById(sessionId, candidateId)
 	if err != nil {
 		return nil, err
 	}
 
-	return candidate, nil
-}
-
-func (s *SessionService) AddPlaylist(sessionId, userId int64, playlistId string) (*SessionPlaylistEntity, error) {
-	playlist, err := s.sessionRepository.AddPlaylist(sessionId, &SessionPlaylistEntity{
-		SessionId:  sessionId,
-		UserId:     userId,
-		PlaylistId: playlistId,
-	})
+	candidateDto, err := s.getCandidateDtoFromEntity(candidate, userId)
 	if err != nil {
 		return nil, err
 	}
 
-	return playlist, nil
-}
-
-func (s *SessionService) GetUserPlaylist(sessionId, userId int64) (*SessionPlaylistEntity, error) {
-	playlist, err := s.sessionRepository.FindPlaylist(sessionId, userId)
-	if err != nil {
-		return nil, err
-	}
-
-	if playlist == nil {
-		return nil, ErrPlaylistNotFound
-	}
-
-	return playlist, nil
-}
-
-func (s *SessionService) GetResults(sessionId int64) (*ResultsDto, error) {
-	resultsDto := NewResultsDto()
-
-	candidates, err := s.sessionRepository.GetCandidatesWithVotes(int64(sessionId))
-	if err != nil {
-		return nil, err
-	}
-
-	resultMap := make(map[int64]ResultDto)
-	for _, candidate := range *candidates {
-		submission := candidate.Submission
-
-		if result, ok := resultMap[submission.Id]; ok {
-			result.Score++
-		} else {
-			resultMap[submission.Id] = ResultDto{
-				Submission: *submission,
-				Score:      1,
-			}
-		}
-
-	}
-
-	for _, result := range resultMap {
-		resultsDto = append(resultsDto, result)
-	}
-
-	sort.Sort(ByScoreCountDesc(resultsDto))
-
-	place := 1
-	currentBest := 0
-	for i, result := range resultsDto {
-		if result.Score < currentBest {
-			place += 1
-		}
-
-		if result.Score == 0 {
-			place = -1
-		}
-
-		currentBest = result.Score
-		result.Place = place
-		resultsDto[i] = result
-	}
-
-	return &resultsDto, nil
+	return candidateDto, nil
 }

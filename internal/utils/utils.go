@@ -1,6 +1,8 @@
 package utils
 
-import "strings"
+import (
+	"strings"
+)
 
 func Map[T any, U any](list []T, mapper func(T) U) []U {
 	mappedList := make([]U, len(list))

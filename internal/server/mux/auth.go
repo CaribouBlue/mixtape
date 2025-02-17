@@ -216,6 +216,7 @@ func (mux *AuthMux) handleSpotifyAuthRedirect(w http.ResponseWriter, r *http.Req
 	u.SpotifyToken = token.RefreshToken
 	_, err = mux.Services.UserService.AuthenticateSpotify(u.Id, u.SpotifyToken)
 	if err != nil {
+		log.Default().Println("Failed to authenticate Spotify user:", err)
 		http.Error(w, "Failed to authenticate Spotify", http.StatusInternalServerError)
 		return
 	}

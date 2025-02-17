@@ -57,7 +57,7 @@ func (s *UserService) SignUpNewUser(username, password, confirmPassword string) 
 		return nil, ErrPasswordsDoNotMatch
 	}
 
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	hashedPassword, err := HashPassword(password)
 	if err != nil {
 		return nil, err
 	}
@@ -119,4 +119,12 @@ func (s *UserService) GetUserById(userId int64) (*UserEntity, error) {
 		return nil, ErrUserNotFound
 	}
 	return user, nil
+}
+
+func HashPassword(password string) ([]byte, error) {
+	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if err != nil {
+		return nil, err
+	}
+	return hash, nil
 }
