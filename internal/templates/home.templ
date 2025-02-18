@@ -5,6 +5,10 @@ import (
 	"github.com/CaribouBlue/top-spot/internal/core"
 )
 
+const (
+	ClassAttrSessionEntryPoint = "session-entry-point"
+)
+
 templ Home(u core.UserEntity) {
 	@Root(RootProps{Title: "Home", IsAuthenticated: true}) {
 		<div class="grid grid-cols-2 gap-4">
@@ -40,9 +44,10 @@ templ UserSessions(u core.UserEntity, sessions []core.SessionEntity) {
 						hx-target="body"
 						hx-push-url="true"
 						hx-disinherit="*"
+						hx-sync={ fmt.Sprintf(".%s:replace", ClassAttrSessionEntryPoint) }
 						@mouseenter="$el.classList.add('bg-gray-100')"
 						@mouseleave="$el.classList.remove('bg-gray-100')"
-						class="cursor-pointer"
+						class={ fmt.Sprintf("cursor-pointer %s", ClassAttrSessionEntryPoint) }
 						style="transition: all 200ms ease-out"
 					>
 						<td>

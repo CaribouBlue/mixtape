@@ -8,6 +8,7 @@ import (
 
 	"github.com/CaribouBlue/top-spot/internal/appdata"
 	"github.com/CaribouBlue/top-spot/internal/core"
+	"github.com/CaribouBlue/top-spot/internal/mail"
 	"github.com/CaribouBlue/top-spot/internal/server/middleware"
 	"github.com/CaribouBlue/top-spot/internal/server/mux"
 	"github.com/CaribouBlue/top-spot/internal/server/utils"
@@ -28,8 +29,15 @@ func StartServer() {
 		log.Fatal("Error creating SQLite JSON DB:", err)
 	}
 
+	// Initialize Mailer
+	mailer, err := mail.NewGmailMailer(os.Getenv("GMAIL_USERNAME"), os.Getenv("GMAIL_PASSWORD"))
+	if err != nil {
+		log.Fatal("Error creating Gmail mailer:", err)
+	}
+
 	// Initialize services
 	userService := core.NewUserService(db)
+	_ = mail.NewMailService(mailer)
 
 	// Initialize server
 	port := os.Getenv("PORT")
