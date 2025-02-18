@@ -2,7 +2,6 @@ package storage
 
 import (
 	"database/sql"
-	"fmt"
 	"log"
 	"time"
 
@@ -250,8 +249,7 @@ func (store *SqliteStore) AddCandidate(sessionId int64, candidate *core.Candidat
 }
 
 func (store *SqliteStore) GetAllCandidates(sessionId int64) (*[]core.CandidateEntity, error) {
-	conditional := fmt.Sprintf("WHERE c.session_id = %d", sessionId)
-	rows, err := store.db.Query(makeSelectCandidatesQuery(conditional))
+	rows, err := store.db.Query(makeSelectCandidatesQuery("WHERE c.session_id = ?"), sessionId)
 	if err != nil {
 		return nil, err
 	}
@@ -275,8 +273,7 @@ func (store *SqliteStore) GetAllCandidates(sessionId int64) (*[]core.CandidateEn
 }
 
 func (store *SqliteStore) GetCandidateById(sessionId int64, candidateId int64) (*core.CandidateEntity, error) {
-	conditional := fmt.Sprintf("WHERE c.session_id = %d AND c.id = %d", sessionId, candidateId)
-	row := store.db.QueryRow(makeSelectCandidatesQuery(conditional))
+	row := store.db.QueryRow(makeSelectCandidatesQuery("WHERE c.session_id = ? AND c.id = ?"), sessionId, candidateId)
 	candidate := &core.CandidateEntity{}
 	err := row.Scan(&candidate.Id, &candidate.SessionId, &candidate.UserId, &candidate.TrackId, &candidate.Votes)
 	if err == sql.ErrNoRows {
@@ -288,8 +285,7 @@ func (store *SqliteStore) GetCandidateById(sessionId int64, candidateId int64) (
 }
 
 func (store *SqliteStore) GetCandidatesByUserId(sessionId int64, userId int64) (*[]core.CandidateEntity, error) {
-	conditional := fmt.Sprintf("WHERE c.session_id = %d AND c.user_id = %d", sessionId, userId)
-	rows, err := store.db.Query(makeSelectCandidatesQuery(conditional))
+	rows, err := store.db.Query(makeSelectCandidatesQuery("WHERE c.session_id = ? AND c.user_id = ?"), sessionId, userId)
 	if err != nil {
 		log.Default().Println("Error querying candidates: ", err)
 		return nil, err
@@ -314,8 +310,7 @@ func (store *SqliteStore) GetCandidatesByUserId(sessionId int64, userId int64) (
 }
 
 func (store *SqliteStore) GetCandidateByNotUserId(sessionId int64, userId int64) (*[]core.CandidateEntity, error) {
-	conditional := fmt.Sprintf("WHERE c.session_id = %d AND c.user_id != %d", sessionId, userId)
-	rows, err := store.db.Query(makeSelectCandidatesQuery(conditional))
+	rows, err := store.db.Query(makeSelectCandidatesQuery("WHERE c.session_id = ? AND c.user_id != ?"), sessionId, userId)
 	if err != nil {
 		return nil, err
 	}
