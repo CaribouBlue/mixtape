@@ -1,3 +1,42 @@
+
 @startuml
-Alice -> Bob: test
+
+' skinparam linetype ortho
+skinparam nodesep 100
+skinparam ranksep 100
+
+entity Users {
+    id: int <<PK>>
+}
+
+entity Sessions {
+    id: int <<PK>>
+}
+
+entity Candidates {
+    id: int <<PK>>
+    userId: int <<FK>>
+    sessionId: int <<FK>>
+}
+
+Candidates }o--|| Users
+Candidates }o--|| Sessions
+
+entity Votes {
+    sessionId: int <<FK>>
+    userId: int <<FK>>
+    CandidateId: int <<FK>>
+}
+
+Votes }o--|| Users
+Votes }o--|| Candidates
+
+entity Playlists {
+    sessionId: int <<FK>>
+    userId: int <<FK>>
+}
+
+Playlists }o--|| Users
+Playlists }o--|| Sessions
+
 @enduml
