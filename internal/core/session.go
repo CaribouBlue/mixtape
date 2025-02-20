@@ -26,14 +26,14 @@ var (
 )
 
 type SessionEntity struct {
-	Id                      int64         `json:"id"`
-	Name                    string        `json:"name"`
-	CreatedBy               int64         `json:"createdBy"`
-	CreatedAt               time.Time     `json:"createdAt"`
-	MaxSubmissions          int           `json:"maxSubmissions"`
-	StartAt                 time.Time     `json:"startAt"`
-	SubmissionPhaseDuration time.Duration `json:"submissionDuration"`
-	VotePhaseDuration       time.Duration `json:"voteDuration"`
+	Id                      int64
+	Name                    string
+	CreatedBy               int64
+	CreatedAt               time.Time
+	MaxSubmissions          int
+	StartAt                 time.Time
+	SubmissionPhaseDuration time.Duration
+	VotePhaseDuration       time.Duration
 }
 
 type SessionOption func(*SessionEntity)
@@ -112,23 +112,23 @@ func (s *SessionEntity) MaxVotes() int {
 }
 
 type CandidateEntity struct {
-	Id        int64  `json:"id"`
-	SessionId int64  `json:"sessionId"`
-	UserId    int64  `json:"userId"`
-	TrackId   string `json:"trackId"`
-	Votes     int    `json:"votes"`
+	Id        int64
+	SessionId int64
+	UserId    int64
+	TrackId   string
+	Votes     int
 }
 
 type VoteEntity struct {
-	SessionId   int64 `json:"sessionId"`
-	CandidateId int64 `json:"candidateId"`
-	UserId      int64 `json:"userId"`
+	SessionId   int64
+	CandidateId int64
+	UserId      int64
 }
 
 type SessionPlaylistEntity struct {
-	SessionId  int64  `json:"sessionId"`
-	UserId     int64  `json:"userId"`
-	PlaylistId string `json:"playlistId"`
+	SessionId  int64
+	UserId     int64
+	PlaylistId string
 }
 
 type PlaylistDto struct {
@@ -138,11 +138,11 @@ type PlaylistDto struct {
 }
 
 type SessionDto struct {
-	SessionEntity       `json:"session"`
-	SubmittedCandidates *[]CandidateDto `json:"submittedCandidates"`
-	BallotCandidates    *[]CandidateDto `json:"ballotCandidates"`
-	Results             *[]CandidateDto `json:"results"`
-	Playlist            *PlaylistDto    `json:"playlist"`
+	SessionEntity
+	SubmittedCandidates *[]CandidateDto
+	BallotCandidates    *[]CandidateDto
+	Results             *[]CandidateDto
+	Playlist            *PlaylistDto
 }
 
 func (s *SessionDto) VoteCount() int {
@@ -155,11 +155,11 @@ func (s *SessionDto) VoteCount() int {
 }
 
 type CandidateDto struct {
-	CandidateEntity `json:"candidate"`
-	Track           *TrackEntity `json:"track"`
-	Vote            *VoteEntity  `json:"vote"`
-	Owner           *UserEntity  `json:"owner"`
-	Place           int          `json:"place"`
+	CandidateEntity
+	Track *TrackEntity
+	Vote  *VoteEntity
+	Owner *UserEntity
+	Place int
 }
 
 func NewCandidateDto(sessionId int64) *CandidateDto {

@@ -93,16 +93,18 @@ func (store *SqliteStore) CreateUser(user *core.UserEntity) (*core.UserEntity, e
 
 func (store *SqliteStore) GetUserById(userId int64) (*core.UserEntity, error) {
 	user := &core.UserEntity{}
-	query := "SELECT id, username, display_name, spotify_token FROM " + TableNameUsers + " WHERE id = ?"
+	query := "SELECT id, username, display_name, spotify_token, is_admin FROM " + TableNameUsers + " WHERE id = ?"
 	row := store.db.QueryRow(query, userId)
 	var spotifyToken sql.NullString
-	err := row.Scan(&user.Id, &user.Username, &user.DisplayName, &spotifyToken)
+	var isAdmin sql.NullBool
+	err := row.Scan(&user.Id, &user.Username, &user.DisplayName, &spotifyToken, &isAdmin)
 	if err == sql.ErrNoRows {
 		return nil, nil // User not found
 	} else if err != nil {
 		return nil, err
 	}
 
+	user.IsAdmin = isAdmin.Bool
 	if spotifyToken.Valid {
 		user.SpotifyToken = spotifyToken.String
 	}
@@ -112,14 +114,17 @@ func (store *SqliteStore) GetUserById(userId int64) (*core.UserEntity, error) {
 
 func (store *SqliteStore) GetUserByUsername(username string) (*core.UserEntity, error) {
 	user := &core.UserEntity{}
-	query := "SELECT id, username, display_name, hashed_password FROM " + TableNameUsers + " WHERE username = ?"
+	query := "SELECT id, username, display_name, hashed_password, is_admin FROM " + TableNameUsers + " WHERE username = ?"
 	row := store.db.QueryRow(query, username)
-	err := row.Scan(&user.Id, &user.Username, &user.DisplayName, &user.HashedPassword)
+	var isAdmin sql.NullBool
+	err := row.Scan(&user.Id, &user.Username, &user.DisplayName, &user.HashedPassword, &isAdmin)
 	if err == sql.ErrNoRows {
 		return nil, nil // User not found
 	} else if err != nil {
 		return nil, err
 	}
+
+	user.IsAdmin = isAdmin.Bool
 
 	return user, nil
 }

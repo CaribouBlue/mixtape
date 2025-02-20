@@ -19,11 +19,12 @@ var (
 )
 
 type UserEntity struct {
-	Id             int64  `json:"id"`
-	Username       string `json:"username"`
-	DisplayName    string `json:"displayName"`
+	Id             int64
+	Username       string
+	DisplayName    string
 	SpotifyToken   string
 	HashedPassword []byte
+	IsAdmin        bool
 }
 
 func (u *UserEntity) IdString() string {
