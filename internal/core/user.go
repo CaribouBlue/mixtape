@@ -2,6 +2,7 @@ package core
 
 import (
 	"errors"
+	"os"
 	"regexp"
 	"strconv"
 	"strings"
@@ -14,6 +15,7 @@ var (
 	ErrPasswordsDoNotMatch   = errors.New("passwords do not match")
 	ErrIncorrectPassword     = errors.New("incorrect password")
 	ErrUserNotFound          = errors.New("user not found")
+	ErrIncorrectAccessCode   = errors.New("incorrect access code")
 )
 
 type UserEntity struct {
@@ -52,7 +54,11 @@ func (s *UserService) NormalizeUsername(username string) string {
 	return normalizedUsername
 }
 
-func (s *UserService) SignUpNewUser(username, password, confirmPassword string) (*UserEntity, error) {
+func (s *UserService) SignUpNewUser(username, password, confirmPassword, accessCode string) (*UserEntity, error) {
+	if accessCode != os.Getenv("ACCESS_CODE") {
+		return nil, ErrIncorrectAccessCode
+	}
+
 	if password != confirmPassword {
 		return nil, ErrPasswordsDoNotMatch
 	}

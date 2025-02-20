@@ -66,16 +66,23 @@ func (mux *AuthMux) handleUserSignUp(w http.ResponseWriter, r *http.Request) {
 	username := r.FormValue("username")
 	password := r.FormValue("password")
 	confirmPassword := r.FormValue("confirm-password")
+	accessCode := r.FormValue("access-code")
 
-	_, err := mux.Services.UserService.SignUpNewUser(username, password, confirmPassword)
+	_, err := mux.Services.UserService.SignUpNewUser(username, password, confirmPassword, accessCode)
 	if err != nil {
 		userSignUpFormOpts := templates.UserSignUpFormOpts{
 			Username:        username,
 			Password:        password,
 			ConfirmPassword: confirmPassword,
+			AccessCode:      accessCode,
 		}
 
-		if err == core.ErrUsernameAlreadyExists {
+		if err == core.ErrIncorrectAccessCode {
+			userSignUpFormOpts.AccessCodeError = "Invalid access code"
+			utils.HandleHtmlResponse(r, w, templates.UserSignUpForm(userSignUpFormOpts))
+			w.WriteHeader(http.StatusUnprocessableEntity)
+			return
+		} else if err == core.ErrUsernameAlreadyExists {
 			userSignUpFormOpts.UsernameError = "Username already exists"
 			utils.HandleHtmlResponse(r, w, templates.UserSignUpForm(userSignUpFormOpts))
 			w.WriteHeader(http.StatusUnprocessableEntity)
