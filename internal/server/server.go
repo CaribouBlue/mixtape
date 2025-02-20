@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/CaribouBlue/top-spot/internal/appdata"
 	"github.com/CaribouBlue/top-spot/internal/core"
 	"github.com/CaribouBlue/top-spot/internal/mail"
 	"github.com/CaribouBlue/top-spot/internal/server/middleware"
@@ -18,12 +17,7 @@ import (
 
 func StartServer() {
 	// Initialize DB
-	appDataDir, err := appdata.GetAppDataDir()
-	if err != nil {
-		log.Fatal("Error getting app data directory:", err)
-	}
-
-	dbPath := appDataDir + "/top-spot.db"
+	dbPath := os.Getenv("DB_PATH")
 	db, err := storage.NewSqliteDb(dbPath)
 	if err != nil {
 		log.Fatal("Error creating SQLite JSON DB:", err)

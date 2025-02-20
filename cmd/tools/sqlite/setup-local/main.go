@@ -3,22 +3,22 @@ package main
 import (
 	"log"
 	"os"
-	"path"
 	"time"
 
-	"github.com/CaribouBlue/top-spot/internal/appdata"
 	"github.com/CaribouBlue/top-spot/internal/core"
 	"github.com/CaribouBlue/top-spot/internal/storage"
+	"github.com/joho/godotenv"
 )
 
 func main() {
-	log.Println("Setting up the database...")
-	appDataDir, err := appdata.GetAppDataDir()
+	err := godotenv.Load()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Error loading .env file")
 	}
 
-	dbPath := path.Join(appDataDir, "/top-spot.db")
+	log.Println("Setting up the database...")
+
+	dbPath := os.Getenv("DB_PATH")
 	e := os.Remove(dbPath)
 	if e != nil && !os.IsNotExist(e) {
 		log.Fatal(e)

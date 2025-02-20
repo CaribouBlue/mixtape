@@ -3,18 +3,17 @@ package main
 import (
 	"log"
 	"os"
-	"path"
 
-	"github.com/CaribouBlue/top-spot/internal/appdata"
+	"github.com/joho/godotenv"
 )
 
 func main() {
-	appDataDir, err := appdata.GetAppDataDir()
+	err := godotenv.Load()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("Error loading .env file")
 	}
 
-	dbPath := path.Join(appDataDir, "/top-spot.db")
+	dbPath := os.Getenv("DB_PATH")
 	e := os.Remove(dbPath)
 	if e != nil && !os.IsNotExist(e) {
 		log.Fatal(e)
