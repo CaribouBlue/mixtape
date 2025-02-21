@@ -11,17 +11,17 @@ start:
 start-dev:
 	wgo -file=.go -file=.templ -file=input.css -xfile=_templ.go templ generate :: npx tailwindcss -i ./static/css/input.css -o ./static/css/output.css :: go run ./cmd/server
 
-.PHONY: build-container
-build-container:
+.PHONY: container-build
+container-build:
 	docker build -t top-spot .
 
-.PHONY: start-container
-start-container:
-	make build-container
+.PHONY: container-start
+container-start:
+	make container-build
 	docker run --rm --name top-spot -p 8080:80 top-spot
 
-.PHONY: teardown-container
-teardown-container:
+.PHONY: container-teardown
+container-teardown:
 	docker stop top-spot
 	docker rm top-spot
 
