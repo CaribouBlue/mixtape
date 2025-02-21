@@ -34,11 +34,10 @@ func StartServer() {
 	_ = mail.NewMailService(mailer)
 
 	// Initialize server
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
+	serverAddress := os.Getenv("SERVER_ADDRESS")
+	if serverAddress == "" {
+		serverAddress = "localhost:8080"
 	}
-	serverAddr := fmt.Sprintf("localhost:%s", port)
 
 	rootMuxHandler := mux.NewRootMux(
 		mux.RootMuxServices{
@@ -121,11 +120,11 @@ func StartServer() {
 	)
 
 	server := &http.Server{
-		Addr:    serverAddr,
+		Addr:    serverAddress,
 		Handler: rootMuxHandler,
 	}
 
-	fmt.Println("Starting server at", serverAddr)
+	fmt.Println("Starting server at", serverAddress)
 	if err := server.ListenAndServe(); err != nil {
 		fmt.Println("Error starting server:", err)
 	}
