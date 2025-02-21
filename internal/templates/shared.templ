@@ -18,3 +18,31 @@ templ ScreenAlert(text string) {
 		<span>{ text }</span>
 	</div>
 }
+
+templ Alert() {
+	<div
+		x-show="!!error"
+		x-transition
+		x-data="{ error: '' }"
+		x-effect="error && setTimeout(() => error = '', 2000)"
+		@error.stop="error = $event.detail?.data"
+		role="alert"
+		class="alert alert-error"
+	>
+		@XCircleIcon()
+		<span
+			x-init="
+				const observer = new MutationObserver((mutationRecordArray) => {
+					for (const record of mutationRecordArray) {
+						if (record.addedNodes.length && $el.innerHTML != error) {
+							const data = $el.innerHTML
+							$dispatch('error', { data })
+						}
+					}
+				});
+				observer.observe($el, { attributes: false, childList: true, subtree: true, characterData: true  });
+			"
+			class="alert-text"
+		></span>
+	</div>
+}

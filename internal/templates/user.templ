@@ -9,7 +9,9 @@ templ UserLoginPage() {
 				class="col-span-1 justify-self-start text-2xl "
 			>Login</h1>
 			<form
+				hx-ext="response-targets"
 				hx-post="/auth/user/login"
+				hx-target-422="#global-alert .alert-text"
 				class="col-span-1 grid grid-cols-subgrid gap-4"
 			>
 				<label class="form-control w-full">

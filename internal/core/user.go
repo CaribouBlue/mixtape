@@ -91,6 +91,8 @@ func (s *UserService) LoginUser(username string, password string) (*UserEntity, 
 	user, err := s.userRepository.GetUserByUsername(normalizedUsername)
 	if err != nil {
 		return nil, err
+	} else if user == nil {
+		return nil, ErrUserNotFound
 	}
 
 	if err := bcrypt.CompareHashAndPassword(user.HashedPassword, []byte(password)); err != nil {

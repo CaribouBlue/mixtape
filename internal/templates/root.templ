@@ -19,6 +19,9 @@ templ Root(props RootProps) {
 			@Header(props.IsAuthenticated)
 			@AppContainer() {
 				{ children... }
+				<div id="global-alert" class="toast toast-center">
+					@Alert()
+				</div>
 			}
 		</body>
 	</html>

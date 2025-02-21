@@ -106,8 +106,10 @@ func (mux *AuthMux) handleUserLoginSubmit(w http.ResponseWriter, r *http.Request
 	username := r.FormValue("username")
 	password := r.FormValue("password")
 	u, err := mux.Services.UserService.LoginUser(username, password)
-	if err != nil {
-		log.Default().Println(err)
+	if err == core.ErrUserNotFound || err == core.ErrIncorrectPassword {
+		http.Error(w, "Invalid login", http.StatusUnprocessableEntity)
+		return
+	} else if err != nil {
 		http.Error(w, "Failed to log in user", http.StatusInternalServerError)
 		return
 	}
@@ -139,8 +141,6 @@ func (mux *AuthMux) handleUserLoginSubmit(w http.ResponseWriter, r *http.Request
 
 func (mux *AuthMux) handleLogin(w http.ResponseWriter, r *http.Request) {
 	u := r.Context().Value(utils.UserCtxKey).(*core.UserEntity)
-
-	log.Default().Println("User login:", u.Id, u.Username)
 
 	if u.Id == 0 {
 		utils.HandleRedirect(w, r, mux.Opts.PathPrefix+"/user/login")
