@@ -30,7 +30,11 @@ templ Home(u core.UserEntity) {
 				hx-trigger="load"
 				class="col-span-2"
 			>
-				@spinner(SpinnerOpts{Size: SpinnerSizeS})
+				<div
+					class="flex justify-center"
+				>
+					@spinner(SpinnerOpts{Size: SpinnerSizeXl})
+				</div>
 			</div>
 		</div>
 	}
@@ -53,7 +57,9 @@ templ UserSessions(u core.UserEntity, sessions []core.SessionEntity) {
 						style="transition: all 200ms ease-out"
 					>
 						<td>
-							{ session.Name }
+							@requestSpinner(SpinnerOpts{Size: SpinnerSizeXs}) {
+								{ session.Name }
+							}
 						</td>
 						<td>
 							{ string(session.Phase()) }
