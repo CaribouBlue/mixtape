@@ -14,15 +14,17 @@ templ Home(u core.UserEntity) {
 		<div class="grid grid-cols-2 gap-4">
 			<h1 class="text-2xl col-span-2">Home</h1>
 			<h1 class="text-lg pb-2">Game Sessions</h1>
-			<div class="justify-self-end">
-				<button
-					hx-get="/app/session/maker"
-					hx-push-url="true"
-					hx-trigger="click"
-					hx-target="body"
-					class="btn btn-wide"
-				>Make New Session</button>
-			</div>
+			if u.IsAdmin {
+				<div class="justify-self-end">
+					<button
+						hx-get="/app/session/maker"
+						hx-push-url="true"
+						hx-trigger="click"
+						hx-target="body"
+						class="btn btn-wide"
+					>Make New Session</button>
+				</div>
+			}
 			<div
 				hx-get="/app/session/"
 				hx-trigger="load"

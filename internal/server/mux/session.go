@@ -118,6 +118,12 @@ func (mux *SessionMux) handleCreateSession(w http.ResponseWriter, r *http.Reques
 
 func (mux *SessionMux) handlePageSessionMaker(w http.ResponseWriter, r *http.Request) {
 	user := r.Context().Value(serverUtils.UserCtxKey).(*core.UserEntity)
+
+	if !user.IsAdmin {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
 	serverUtils.HandleHtmlResponse(r, w, templates.SessionMakerPage(*user))
 }
 
