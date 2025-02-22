@@ -22,37 +22,14 @@ jobs:
       with:
         go-version-file: 'go.mod'
 
-    - name: Install go dependencies
-      run: |
-        go mod download
-        go install github.com/a-h/templ/cmd/templ@latest
-    
     - name: Setup Node.js environment
       uses: actions/setup-node@v4.2.0
 
     - name: Install node dependencies
       run: npm install
 
-    - name: Generate templ
-      run: templ generate
-
     - name: Generate css
       run: npx tailwindcss -i ./static/css/input.css -o ./static/css/output.css
-
-    - name: Build app
-      run: go build -v -o ./bin/app ./cmd/server
-
-    - name: Archive App Binary
-      uses: actions/upload-artifact@v4
-      with:
-        name: app-binary
-        path: bin/app
-
-    - name: Archive Static Files
-      uses: actions/upload-artifact@v4
-      with:
-        name: static-files
-        path: static
       
     - name: Set up Docker
       uses: docker/setup-docker-action@v4.1.0
