@@ -21,15 +21,26 @@ jobs:
       uses: actions/setup-go@v4
       with:
         go-version-file: 'go.mod'
+
+    - name: Install go dependencies
+      run: |
+        go mod download
+        go install github.com/a-h/templ/cmd/templ@latest
     
     - name: Setup Node.js environment
       uses: actions/setup-node@v4.2.0
-          
-    - name: Install templ
-      run: go install github.com/a-h/templ/cmd/templ@latest
 
-    - name: Build App Binary
-      run: make build
+    - name: Install node dependencies
+      run: npm install
+
+    - name: Generate templ
+      run: templ generate
+
+    - name: Generate css
+      run: npx tailwindcss -i ./static/css/input.css -o ./static/css/output.css
+
+    - name: Build app
+      run: go build -v -o ./bin/app ./cmd/server
 
     - name: Archive App Binary
       uses: actions/upload-artifact@v4
@@ -43,24 +54,20 @@ jobs:
         name: static-files
         path: static
       
-  # build-image:
-  #   needs: build-go
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #   - name: Set up Docker
-  #     uses: docker/setup-docker-action@v4.1.0
+    - name: Set up Docker
+      uses: docker/setup-docker-action@v4.1.0
     
-  #   - name: Build and push Docker images
-  #     # You may pin to the exact commit or the version.
-  #     # uses: docker/build-push-action@0adf9959216b96bec444f325f1e493d4aa344497
-  #     uses: docker/build-push-action@v6.14.0
-  #     with:
-  #       # Push is a shorthand for --output=type=registry
-  #       push: true # optional, default is false
-  #       # List of tags
-  #       tags: ghcr.io/cariboublue/top-spot
-  #       # GitHub Token used to authenticate against a repository for Git context
-  #       github-token: ${{ secrets.GITHUB_TOKEN }}
+    - name: Build and push Docker images
+      # You may pin to the exact commit or the version.
+      # uses: docker/build-push-action@0adf9959216b96bec444f325f1e493d4aa344497
+      uses: docker/build-push-action@v6.14.0
+      with:
+        # Push is a shorthand for --output=type=registry
+        push: true # optional, default is false
+        # List of tags
+        tags: ghcr.io/cariboublue/top-spot
+        # GitHub Token used to authenticate against a repository for Git context
+        github-token: ${{ secrets.GITHUB_TOKEN }}
               
                   
     
