@@ -21,14 +21,15 @@ jobs:
       uses: actions/setup-go@v4
       with:
         go-version-file: 'go.mod'
-
+    
+    - name: Setup Node.js environment
+      uses: actions/setup-node@v4.2.0
+          
     - name: Install templ
       run: go install github.com/a-h/templ/cmd/templ@latest
 
     - name: Build App Binary
-      run: |
-        templ generate
-        go build -v -o ./bin/app ./cmd/server
+      run: make build
 
     - name: Archive App Binary
       uses: actions/upload-artifact@v4
