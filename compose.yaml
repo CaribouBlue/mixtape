@@ -24,12 +24,12 @@ services:
     environment:
       ENV_FILES: /run/secrets/app_secrets
       DB_PATH: /var/lib/sqlite/db.sqlite
-      SPOTIFY_REDIRECT_URI: http://app.localhost/auth/spotify/redirect
+      SPOTIFY_REDIRECT_URI: http://shmoopysworld.com/auth/spotify/redirect
     secrets:
       - app_secrets
     labels:
       - traefik.enable=true
-      - traefik.http.routers.app.rule=Host(`app.localhost`)
+      - traefik.http.routers.app.rule=Host(`shmoopysworld.com`)
       - traefik.http.routers.app.entrypoints=web
   sqlite:
     image: keinos/sqlite3
