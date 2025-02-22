@@ -21,20 +21,21 @@ jobs:
       uses: actions/setup-go@v4
       with:
         go-version-file: 'go.mod'
+
+    - name: Install go dependencies
+      run: go mod download
     
     - name: Setup Node.js environment
       uses: actions/setup-node@v4.2.0
-          
-    - name: Install templ
-      run: go install github.com/a-h/templ/cmd/templ@latest
+
+    - name: Install node dependencies
+      run: npm install
 
     - name: Generate templ
       run: templ generate
 
     - name: Generate css
-      run: |
-        npm install
-        npx tailwindcss -i ./static/css/input.css -o ./static/css/output.css
+      run: npx tailwindcss -i ./static/css/input.css -o ./static/css/output.css
 
     - name: Build app
       run: go build -v -o ./bin/app ./cmd/server
