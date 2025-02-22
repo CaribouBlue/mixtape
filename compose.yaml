@@ -17,7 +17,7 @@ services:
       # So that Traefik can listen to the Docker events
       - /var/run/docker.sock:/var/run/docker.sock
   app:
-    image: ghcr.io/cariboublue/top-spot:latest
+    image: ghcr.io/cariboublue/top-spot:main
     container_name: app
     volumes:
       - /var/lib/sqlite:/var/lib/sqlite
