@@ -25,6 +25,7 @@ services:
       - app_secrets
     labels:
       - traefik.http.routers.app.rule=Host(`app.localhost`)
+      - traefik.http.services.app.loadbalancer.server.port=80
   sqlite:
     image: keinos/sqlite3
     container_name: sqlite
