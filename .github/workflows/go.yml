@@ -1,0 +1,65 @@
+# This workflow will build a golang project
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-go
+
+name: Go
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+
+  build-go:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version-file: 'go.mod'
+
+    - name: Generate templ files
+      run: |
+        templ generate
+
+    - name: Build App Binary
+      run: go build -v -o ./bin/app ./cmd/server
+
+    - name: Archive App Binary
+      uses: actions/upload-artifact@v4
+      with:
+        name: app-binary
+        path: bin/app
+
+    - name: Archive Static Files
+      uses: actions/upload-artifact@v4
+      with:
+        name: static-files
+        path: static
+      
+  # build-image:
+  #   needs: build-go
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #   - name: Set up Docker
+  #     uses: docker/setup-docker-action@v4.1.0
+    
+  #   - name: Build and push Docker images
+  #     # You may pin to the exact commit or the version.
+  #     # uses: docker/build-push-action@0adf9959216b96bec444f325f1e493d4aa344497
+  #     uses: docker/build-push-action@v6.14.0
+  #     with:
+  #       # Push is a shorthand for --output=type=registry
+  #       push: true # optional, default is false
+  #       # List of tags
+  #       tags: ghcr.io/cariboublue/top-spot
+  #       # GitHub Token used to authenticate against a repository for Git context
+  #       github-token: ${{ secrets.GITHUB_TOKEN }}
+              
+                  
+    
+        
