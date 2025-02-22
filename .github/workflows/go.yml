@@ -23,7 +23,9 @@ jobs:
         go-version-file: 'go.mod'
 
     - name: Install go dependencies
-      run: go mod download
+      run: |
+        go mod download
+        go install github.com/a-h/templ/cmd/templ@latest
     
     - name: Setup Node.js environment
       uses: actions/setup-node@v4.2.0
