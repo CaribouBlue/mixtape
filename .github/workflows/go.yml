@@ -32,7 +32,9 @@ jobs:
       run: templ generate
 
     - name: Generate css
-      run: npx tailwindcss -i ./static/css/input.css -o ./static/css/output.css
+      run: |
+        npm install
+        npx tailwindcss -i ./static/css/input.css -o ./static/css/output.css
 
     - name: Build app
       run: go build -v -o ./bin/app ./cmd/server
