@@ -2,6 +2,7 @@ package mux
 
 import (
 	"net/http"
+	"os"
 
 	"github.com/CaribouBlue/top-spot/internal/server/middleware"
 )
@@ -23,7 +24,12 @@ func NewStaticMux(opts StaticMuxOpts, middleware []middleware.Middleware) *Stati
 		Middleware: middleware,
 	}
 
-	mux.Handle("/", http.FileServer(http.Dir("./static")))
+	appDataPath := os.Getenv("APP_DATA_PATH")
+	if appDataPath == "" {
+		appDataPath = "."
+	}
+
+	mux.Handle("/", http.FileServer(http.Dir(appDataPath+"/static")))
 
 	return mux
 }

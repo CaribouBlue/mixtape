@@ -1,5 +1,7 @@
 .PHONY: build
 build:
+	templ generate
+	npx tailwindcss -i ./static/css/input.css -o ./static/css/output.css
 	go build -v -o ./bin/app ./cmd/server
 
 .PHONY: start

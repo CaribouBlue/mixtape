@@ -1,4 +1,4 @@
-FROM golang:1.24
+FROM golang:1.24 AS build
 
 WORKDIR /usr/src/app
 
@@ -6,14 +6,25 @@ WORKDIR /usr/src/app
 COPY go.mod go.sum ./
 RUN go mod download
 
-
 COPY . .
-RUN go build -v -o /usr/local/bin/app ./cmd/server
+RUN go build -v -o ./bin/app ./cmd/server
 
-ENV DB_PATH /data/db.sqlite3
-ENV SERVER_ADDRESS :80
-EXPOSE 80
+FROM golang:1.24
 
-RUN go run ./cmd/tools/sqlite/setup
+LABEL org.opencontainers.image.source=https://github.com/CaribouBlue/top-spot
+LABEL org.opencontainers.image.description=""
+LABEL org.opencontainers.image.licenses=MIT
+
+ARG PORT=80
+ARG APP_DATA_PATH=/var/lib/app
+
+ENV PORT ${PORT}
+ENV SERVER_ADDRESS :${PORT}
+ENV APP_DATA_PATH ${APP_DATA_PATH}
+
+COPY --from=build /usr/src/app/bin /usr/local/bin
+COPY --from=build /usr/src/app/static ${APP_DATA_PATH}/static
+
+EXPOSE ${PORT}
 
 CMD ["app"]

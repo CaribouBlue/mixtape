@@ -20,7 +20,7 @@ func StartServer() {
 	dbPath := os.Getenv("DB_PATH")
 	db, err := storage.NewSqliteDb(dbPath)
 	if err != nil {
-		log.Fatal("Error creating SQLite JSON DB:", err)
+		log.Fatal("Error creating SQLite DB:", err)
 	}
 
 	// Initialize Mailer

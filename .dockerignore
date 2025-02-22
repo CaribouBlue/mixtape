@@ -1,0 +1,6 @@
+# env file
+.env*
+.secrets
+
+# sqlite
+*.sqlite

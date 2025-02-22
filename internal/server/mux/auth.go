@@ -93,6 +93,7 @@ func (mux *AuthMux) handleUserSignUp(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusUnprocessableEntity)
 			return
 		} else {
+			log.Default().Println("Failed to sign up user:", err)
 			http.Error(w, "Failed to sign up user", http.StatusInternalServerError)
 			return
 		}

@@ -3,7 +3,6 @@ package main
 import (
 	"log"
 	"os"
-	"strings"
 
 	"github.com/CaribouBlue/top-spot/internal/storage"
 	"github.com/joho/godotenv"
@@ -18,17 +17,6 @@ func main() {
 	log.Println("Setting up the database...")
 
 	dbPath := os.Getenv("DB_PATH")
-
-	if i := strings.LastIndex(dbPath, "/"); i != -1 {
-		dbDir := dbPath[0:i]
-		if _, err := os.Stat(dbDir); os.IsNotExist(err) {
-			err := os.MkdirAll(dbDir, os.ModePerm)
-			if err != nil {
-				log.Fatal("Error creating directories for DB path:", err)
-			}
-		}
-	}
-
 	db, err := storage.NewSqliteDb(dbPath)
 	if err != nil {
 		log.Fatalln("Failed to connect to the database:", err)
