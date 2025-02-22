@@ -9,10 +9,21 @@ on:
   pull_request:
     branches: [ "main" ]
 
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
 jobs:
 
   build-go:
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+      
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -33,18 +44,27 @@ jobs:
       
     - name: Set up Docker
       uses: docker/setup-docker-action@v4.1.0
+
+    - name: Docker Login
+      uses: docker/login-action@v3.3.0
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Extract metadata (tags, labels) for Docker
+      id: meta
+      uses: docker/metadata-action@v5.6.1
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
     
     - name: Build and push Docker images
-      # You may pin to the exact commit or the version.
-      # uses: docker/build-push-action@0adf9959216b96bec444f325f1e493d4aa344497
       uses: docker/build-push-action@v6.14.0
       with:
-        # Push is a shorthand for --output=type=registry
-        push: true # optional, default is false
-        # List of tags
-        tags: ghcr.io/cariboublue/top-spot
-        # GitHub Token used to authenticate against a repository for Git context
-        github-token: ${{ secrets.GITHUB_TOKEN }}
+        context: .
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
               
                   
     
