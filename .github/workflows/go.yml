@@ -24,6 +24,7 @@ jobs:
 
     - name: Generate templ files
       run: |
+        go install github.com/a-h/templ/cmd/templ@latest
         templ generate
 
     - name: Build App Binary
