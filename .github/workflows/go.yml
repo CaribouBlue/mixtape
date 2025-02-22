@@ -22,13 +22,13 @@ jobs:
       with:
         go-version-file: 'go.mod'
 
-    - name: Generate templ files
-      run: |
-        go install github.com/a-h/templ/cmd/templ@latest
-        templ generate
+    - name: Install templ
+      run: go install github.com/a-h/templ/cmd/templ@latest
 
     - name: Build App Binary
-      run: go build -v -o ./bin/app ./cmd/server
+      run: |
+        templ generate
+        go build -v -o ./bin/app ./cmd/server
 
     - name: Archive App Binary
       uses: actions/upload-artifact@v4
