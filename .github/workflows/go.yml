@@ -33,6 +33,9 @@ jobs:
       
     - name: Set up Docker
       uses: docker/setup-docker-action@v4.1.0
+
+    - name: Login to registry
+      run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
     
     - name: Build and push Docker images
       # You may pin to the exact commit or the version.
@@ -44,7 +47,7 @@ jobs:
         # List of tags
         tags: ghcr.io/cariboublue/top-spot
         # GitHub Token used to authenticate against a repository for Git context
-        github-token: ${{ secrets.GITHUB_TOKEN }}
+        # github-token: ${{ secrets.GITHUB_TOKEN }}
               
                   
     
