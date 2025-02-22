@@ -32,7 +32,7 @@ jobs:
       run: |
         templ generate
         npx tailwindcss -i ./static/css/input.css -o ./static/css/output.css
-	      go build -v -o ./bin/app ./cmd/server
+	go build -v -o ./bin/app ./cmd/server
 
     - name: Archive App Binary
       uses: actions/upload-artifact@v4
