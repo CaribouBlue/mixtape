@@ -1,9 +1,11 @@
 module github.com/CaribouBlue/top-spot
 
-go 1.22.2
+go 1.23
+
+toolchain go1.23.0
 
 require (
-	github.com/a-h/templ v0.2.778
+	github.com/a-h/templ v0.3.833
 	github.com/joho/godotenv v1.5.1
 )
 
