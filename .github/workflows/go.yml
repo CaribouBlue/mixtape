@@ -15,7 +15,7 @@ env:
 
 jobs:
 
-  build-go:
+  build-app:
     runs-on: ubuntu-latest
 
     permissions:
