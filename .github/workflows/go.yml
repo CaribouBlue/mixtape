@@ -54,24 +54,20 @@ jobs:
         name: static-files
         path: static
       
-  # build-image:
-  #   needs: build-go
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #   - name: Set up Docker
-  #     uses: docker/setup-docker-action@v4.1.0
+    - name: Set up Docker
+      uses: docker/setup-docker-action@v4.1.0
     
-  #   - name: Build and push Docker images
-  #     # You may pin to the exact commit or the version.
-  #     # uses: docker/build-push-action@0adf9959216b96bec444f325f1e493d4aa344497
-  #     uses: docker/build-push-action@v6.14.0
-  #     with:
-  #       # Push is a shorthand for --output=type=registry
-  #       push: true # optional, default is false
-  #       # List of tags
-  #       tags: ghcr.io/cariboublue/top-spot
-  #       # GitHub Token used to authenticate against a repository for Git context
-  #       github-token: ${{ secrets.GITHUB_TOKEN }}
+    - name: Build and push Docker images
+      # You may pin to the exact commit or the version.
+      # uses: docker/build-push-action@0adf9959216b96bec444f325f1e493d4aa344497
+      uses: docker/build-push-action@v6.14.0
+      with:
+        # Push is a shorthand for --output=type=registry
+        push: true # optional, default is false
+        # List of tags
+        tags: ghcr.io/cariboublue/top-spot
+        # GitHub Token used to authenticate against a repository for Git context
+        github-token: ${{ secrets.GITHUB_TOKEN }}
               
                   
     
