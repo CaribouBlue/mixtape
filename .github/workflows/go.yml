@@ -24,10 +24,11 @@ jobs:
 
     steps:
     - name: Validate environment variables
-      if: ${{ env.DEPLOY_HOST == '' || env.DEPLOY_PRIVATE_KEY == '' }}
       run: 
-        echo "Failed environment variable validation"
-        exit 1
+        if [ -z "${{ env.DEPLOY_HOST }}" ] || [ -z "${{ env.DEPLOY_PRIVATE_KEY }}" ]; then
+          echo "Failed environment variable validation"
+          exit 1
+        fi
 
   build-app:
     runs-on: ubuntu-latest
@@ -101,6 +102,6 @@ jobs:
         name: ${{ env.STACK_NAME }}
         file: ./compose.yaml
         host: ${{ env.DEPLOY_HOST }}
-        user: ${{ secrets.DEPLOY_USER }}
+        user: ${{ env.DEPLOY_USER }}
         ssh-key: ${{ env.DEPLOY_PRIVATE_KEY }}
         registry_auth: true
