@@ -93,17 +93,6 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Setup SSH
-      run: |
-        mkdir -p ~/.ssh
-
-    - name: Debug
-      run: |
-        whoami
-        ls -al /home
-        ls -al ~
-        ls -al ~/.ssh
-
     - name: Deploy app stack
       uses: cssnr/stack-deploy-action@v1
       with:
@@ -112,4 +101,4 @@ jobs:
         host: ${{ env.DEPLOY_HOST }}
         user: ${{ env.DEPLOY_USER }}
         ssh-key: ${{ env.DEPLOY_PRIVATE_KEY }}
-        # registry_auth: true
+        registry_auth: true
