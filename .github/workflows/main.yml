@@ -95,7 +95,7 @@ jobs:
 
     - name: Setup SSH
       run: |
-        mkdir -p ~/.ssh/tempfile
+        mkdir -p ~/.ssh
 
     - name: Debug
       run: |
@@ -112,4 +112,4 @@ jobs:
         host: ${{ env.DEPLOY_HOST }}
         user: ${{ env.DEPLOY_USER }}
         ssh-key: ${{ env.DEPLOY_PRIVATE_KEY }}
-        registry_auth: true
+        # registry_auth: true
