@@ -93,6 +93,11 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
+    - name: Debug
+      run: |
+        whoami
+        ls -al ~
+
     - name: Deploy app stack
       uses: cssnr/stack-deploy-action@v1
       with:
