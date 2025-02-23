@@ -14,7 +14,7 @@ permissions:
 env:
   CONTAINER_REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  STACK_NAME: ${{ github.repository }}
+  STACK_NAME: top-spot
   DEPLOY_USER: deploy
   DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
   DEPLOY_PRIVATE_KEY: ${{ secrets.DEPLOY_PRIVATE_KEY }}
