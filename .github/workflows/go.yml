@@ -13,13 +13,27 @@ env:
   CONTAINER_REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
   STACK_NAME: ${{ github.repository }}
-  DOCKER_DEPLOY_HOST: ssh://deploy@${{ secrets.DEPLOY_HOST }}
-  DOCKER_DEPLOY_PRIVATE_KEY: ${{ secrets.DEPLOY_SSH_SECRET_KEY }}
+  DEPLOY_USER: deploy
+  DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+  DEPLOY_PRIVATE_KEY: ${{ secrets.DEPLOY_PRIVATE_KEY }}
 
 jobs:
 
+  validate-env:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Validate environment variables
+      if: ${{ env.DEPLOY_HOST == '' || env.DEPLOY_PRIVATE_KEY == '' }}
+      run: 
+        echo "Failed environment variable validation"
+        exit 1
+
   build-app:
     runs-on: ubuntu-latest
+
+    needs:
+      - validate-env
 
     permissions:
       contents: read
@@ -74,6 +88,7 @@ jobs:
     runs-on: ubuntu-latest
 
     needs:
+      - validate-env
       - build-app
 
     steps:
@@ -85,6 +100,7 @@ jobs:
       with:
         name: ${{ env.STACK_NAME }}
         file: ./compose.yaml
-        host: ${{ env.DOCKER_DEPLOY_HOST }}
-        ssh-key: ${{ env.DOCKER_DEPLOY_PRIVATE_KEY }}
+        host: ${{ env.DEPLOY_HOST }}
+        user: ${{ secrets.DEPLOY_USER }}
+        ssh-key: ${{ env.DEPLOY_PRIVATE_KEY }}
         registry_auth: true
