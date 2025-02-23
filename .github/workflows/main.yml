@@ -73,6 +73,8 @@ jobs:
           type=ref,event=pr
           type=semver,pattern={{version}}
           type=semver,pattern={{major}}.{{minor}}
+          type=sha,format=long
+          type=raw,value=latest,enable={{is_default_branch}}
     
     - name: Build and push app image
       uses: docker/build-push-action@v6.14.0
@@ -93,6 +95,10 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
+    - name: Create stack env file
+      run: |
+        echo "APP_IMAGE_TAG=${{ github.sha }}" >> ./envfile
+
     - name: Deploy app stack
       uses: cssnr/stack-deploy-action@v1
       with:
@@ -102,3 +108,4 @@ jobs:
         user: ${{ env.DEPLOY_USER }}
         ssh_key: ${{ env.DEPLOY_PRIVATE_KEY }}
         registry_auth: true
+        env_file: ./envfile
