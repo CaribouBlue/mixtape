@@ -29,6 +29,7 @@ jobs:
           echo "Failed environment variable validation"
           exit 1
         fi
+        exit 0
 
   build-app:
     runs-on: ubuntu-latest
