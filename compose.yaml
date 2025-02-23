@@ -18,25 +18,22 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
   app:
     image: ghcr.io/cariboublue/top-spot:main
-    container_name: app
     volumes:
       - /var/lib/sqlite:/var/lib/sqlite
     environment:
       ENV_FILES: /run/secrets/app_secrets
-      DB_PATH: /var/lib/sqlite/db.sqlite
       SPOTIFY_REDIRECT_URI: http://shmoopysworld.com/auth/spotify/redirect
     secrets:
       - app_secrets
     labels:
       - traefik.enable=true
-      - traefik.http.routers.app.rule=Host(`shmoopysworld.com`)
+      - traefik.http.routers.app.rule=HostRegexp(`.*shmoopysworld.com`)
       - traefik.http.routers.app.entrypoints=web
   sqlite:
     image: keinos/sqlite3
-    container_name: sqlite
     volumes:
       - /var/lib/sqlite:/var/lib/sqlite
     command: sleep infinity
 secrets:
   app_secrets:
-    file: .secrets
+    external: true

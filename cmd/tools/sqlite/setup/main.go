@@ -5,18 +5,13 @@ import (
 	"os"
 
 	"github.com/CaribouBlue/top-spot/internal/storage"
-	"github.com/joho/godotenv"
 )
 
 func main() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
-
-	log.Println("Setting up the database...")
-
 	dbPath := os.Getenv("DB_PATH")
+
+	log.Println("Setting up the database @", dbPath)
+
 	db, err := storage.NewSqliteDb(dbPath)
 	if err != nil {
 		log.Fatalln("Failed to connect to the database:", err)

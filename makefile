@@ -44,3 +44,7 @@ sqlite-init-local-dev:
 	make sqlite-teardown 
 	make sqlite-setup 
 	make sqlite-load-test-data
+
+.PHONY: docker-deploy
+docker-deploy:
+	docker stack deploy -c ./compose.yaml top-spot --with-registry-auth 
