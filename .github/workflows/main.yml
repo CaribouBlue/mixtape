@@ -95,12 +95,14 @@ jobs:
 
     - name: Setup SSH
       run: |
-        mkdir ~/.ssh
+        mkdir -p ~/.ssh/tempfile
 
     - name: Debug
       run: |
         whoami
+        ls -al /home
         ls -al ~
+        ls -al ~/.ssh
 
     - name: Deploy app stack
       uses: cssnr/stack-deploy-action@v1
