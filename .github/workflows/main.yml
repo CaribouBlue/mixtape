@@ -87,7 +87,7 @@ jobs:
 
     needs:
       - validate-env
-      # - build-app
+      - build-app
 
     steps:
     - name: Checkout repository
