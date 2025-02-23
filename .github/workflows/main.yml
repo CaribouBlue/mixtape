@@ -97,7 +97,7 @@ jobs:
 
     - name: Create stack env file
       run: |
-        echo "APP_IMAGE_TAG=${{ github.sha }}" >> ./envfile
+        echo "APP_IMAGE_TAG=sha-${{ github.sha }}" >> ./envfile
 
     - name: Deploy app stack
       uses: cssnr/stack-deploy-action@v1
