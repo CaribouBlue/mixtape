@@ -2,9 +2,14 @@ name: Main Workflow
 
 on:
   push:
-    branches: [ "main" ]
+    branches: 
+      - main
   pull_request:
-    branches: [ "main" ]
+    branches: 
+      - main
+  
+permissions:
+  packages: write
 
 env:
   CONTAINER_REGISTRY: ghcr.io
@@ -33,12 +38,6 @@ jobs:
 
     needs:
       - validate-env
-
-    permissions:
-      contents: read
-      packages: write
-      attestations: write
-      id-token: write
       
     steps:
     - name: Checkout repository
