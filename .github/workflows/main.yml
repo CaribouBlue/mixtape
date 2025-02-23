@@ -100,5 +100,5 @@ jobs:
         file: ./compose.yaml
         host: ${{ env.DEPLOY_HOST }}
         user: ${{ env.DEPLOY_USER }}
-        ssh-key: ${{ env.DEPLOY_PRIVATE_KEY }}
+        ssh_key: ${{ env.DEPLOY_PRIVATE_KEY }}
         registry_auth: true
