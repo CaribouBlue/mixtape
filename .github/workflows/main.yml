@@ -91,13 +91,6 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Login to docker
-      uses: docker/login-action@v3.3.0
-      with:
-        registry: ${{ env.CONTAINER_REGISTRY }}
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
     - name: Create stack env file
       run: |
         echo "APP_IMAGE_TAG=sha-${{ github.sha }}" >> ./envfile
@@ -107,8 +100,11 @@ jobs:
       with:
         name: ${{ env.STACK_NAME }}
         file: ./compose.yaml
+        env_file: ./envfile
         host: ${{ env.DEPLOY_HOST }}
         user: ${{ env.DEPLOY_USER }}
         ssh_key: ${{ env.DEPLOY_PRIVATE_KEY }}
         registry_auth: true
-        env_file: ./envfile
+        registry_host: ${{ env.CONTAINER_REGISTRY }}
+        registry_user: ${{ github.actor }}
+        registry_pass: ${{ secrets.GITHUB_TOKEN }}
