@@ -28,7 +28,7 @@ services:
       - app_secrets
     labels:
       - traefik.enable=true
-      - traefik.http.routers.app.rule=HostRegexp(`.*shmoopysworld.com`)
+      - traefik.http.routers.app.rule=HostRegexp(`^(www\.)?shmoopysworld\.com$`)
       - traefik.http.routers.app.entrypoints=web
     deploy:
       replicas: 2
