@@ -24,7 +24,7 @@ jobs:
 
     steps:
     - name: Validate environment variables
-      run: 
+      run: |
         if [ -z "${{ env.DEPLOY_HOST }}" ] || [ -z "${{ env.DEPLOY_PRIVATE_KEY }}" ]; then
           echo "Failed environment variable validation"
           exit 1
