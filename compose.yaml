@@ -30,8 +30,6 @@ services:
       - traefik.enable=true
       - traefik.http.routers.app.rule=HostRegexp(`(www\.)?shmoopysworld\.com`)
       - traefik.http.routers.app.entrypoints=web
-    deploy:
-      replicas: 2
   sqlite:
     image: keinos/sqlite3
     volumes:
