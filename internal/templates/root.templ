@@ -9,6 +9,7 @@ templ Root(props RootProps) {
 	<html>
 		<head>
 			<title>Mixtape | { props.Title }</title>
+			<link rel="icon" sizes="any" type="image/svg+xml" href="/static/svg/mixtape-icon.svg"/>
 			<script src="/static/scripts/htmx-2.0.3.min.js"></script>
 			<script src="/static/scripts/htmx-ext-response-targets-2.0.0.min.js"></script>
 			<script src="https://unpkg.com/idiomorph@0.3.0/dist/idiomorph-ext.min.js"></script>
@@ -37,13 +38,16 @@ templ Header(isAuthenticated bool) {
 	<header class="w-full flex justify-center items-center py-4">
 		@AppContainer() {
 			<div class="flex justify-between items-center">
-				<h1
-					hx-get="/app"
-					hx-trigger="click"
-					hx-target="body"
-					hx-push-url="true"
-					class="text-2xl font-bold cursor-pointer"
-				>Mixtape</h1>
+				<div class="flex gap-2 items-center">
+					@MixtapeIcon(NewIconProps(withClass("h-full w-6")))
+					<h1
+						hx-get="/app"
+						hx-trigger="click"
+						hx-target="body"
+						hx-push-url="true"
+						class="text-2xl font-bold cursor-pointer"
+					>Mixtape</h1>
+				</div>
 				<nav>
 					if isAuthenticated {
 						@HeaderNavLink("Home", "/app/home")
