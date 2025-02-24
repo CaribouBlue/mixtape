@@ -4,6 +4,7 @@ services:
     image: traefik:v3.3
     # Enables the web UI and tells Traefik to listen to docker
     command:
+      - "--log.level=DEBUG"
       - --api.insecure=true
       - --providers.docker
       - --providers.docker.exposedbydefault=false
@@ -12,9 +13,9 @@ services:
       - --certificatesresolvers.myresolver.acme.email=${ACME_EMAIL}
       - --certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json
       - --entrypoints.web.address=:80
-      - --entrypoints.web.http.redirections.entrypoint.to=websecure
-      - --entrypoints.web.http.redirections.entrypoint.scheme=https
     ports:
+      # The HTTPS port
+      - 443:443
       # The HTTP port
       - 80:80
       # The Web UI (enabled by --api.insecure=true)
@@ -36,19 +37,14 @@ services:
       - app_secrets
     labels:
       - traefik.enable=true
-      - traefik.http.middlewares.app-ratelimit.ratelimit.average=20
-      - traefik.http.routers.app.rule=HostRegexp(`(www\.)?shmoopysworld\.com`) && !Method(`POST`)
       - traefik.http.services.app.loadbalancer.server.port=80
+      - traefik.http.routers.app.rule=HostRegexp(`(www\.)?shmoopysworld\.com`)
       - traefik.http.routers.app.entrypoints=websecure
+      - traefik.http.routers.app.tls=true
       - traefik.http.routers.app.tls.certresolver=myresolver
-      - traefik.http.routers.app.middlewares=app-ratelimit
-      # Define separate router for POST methods
-      - traefik.http.middlewares.app-ratelimit-post.ratelimit.average=1
-      - traefik.http.middlewares.app-ratelimit-post.ratelimit.period=1m
-      - traefik.http.routers.app-post.rule=HostRegexp(`(www\.)?shmoopysworld\.com`) && Method(`POST`)
-      - traefik.http.routers.app-post.middlewares=app-ratelimit-post
-      - traefik.http.routers.app-post.entrypoints=websecure
-      - traefik.http.routers.app-post.tls.certresolver=myresolver
+      - traefik.http.routers.app.tls.domains[0].main=shmoopysworld.com
+      # - traefik.http.routers.app.middlewares=app-ratelimit
+      # - traefik.http.middlewares.app-ratelimit.ratelimit.average=20
     deploy:
       replicas: 2
   sqlite:
