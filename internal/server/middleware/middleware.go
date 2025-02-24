@@ -6,9 +6,9 @@ import (
 	"net/http"
 	"slices"
 
-	"github.com/CaribouBlue/top-spot/internal/core"
-	"github.com/CaribouBlue/top-spot/internal/server/utils"
-	"github.com/CaribouBlue/top-spot/internal/spotify"
+	"github.com/CaribouBlue/mixtape/internal/core"
+	"github.com/CaribouBlue/mixtape/internal/server/utils"
+	"github.com/CaribouBlue/mixtape/internal/spotify"
 )
 
 type Middleware func(http.Handler) http.Handler

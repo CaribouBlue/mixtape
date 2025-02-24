@@ -5,7 +5,7 @@ import (
 	"log"
 	"time"
 
-	"github.com/CaribouBlue/top-spot/internal/core"
+	"github.com/CaribouBlue/mixtape/internal/core"
 	_ "github.com/mattn/go-sqlite3"
 )
 

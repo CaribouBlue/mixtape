@@ -4,7 +4,7 @@ import (
 	"log"
 	"os"
 
-	"github.com/CaribouBlue/top-spot/internal/storage"
+	"github.com/CaribouBlue/mixtape/internal/storage"
 )
 
 func main() {

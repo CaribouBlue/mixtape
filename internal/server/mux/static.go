@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/CaribouBlue/top-spot/internal/server/middleware"
+	"github.com/CaribouBlue/mixtape/internal/server/middleware"
 )
 
 type StaticMux struct {

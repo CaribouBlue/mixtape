@@ -3,10 +3,10 @@ package mux
 import (
 	"net/http"
 
-	"github.com/CaribouBlue/top-spot/internal/core"
-	"github.com/CaribouBlue/top-spot/internal/server/middleware"
-	"github.com/CaribouBlue/top-spot/internal/server/utils"
-	"github.com/CaribouBlue/top-spot/internal/templates"
+	"github.com/CaribouBlue/mixtape/internal/core"
+	"github.com/CaribouBlue/mixtape/internal/server/middleware"
+	"github.com/CaribouBlue/mixtape/internal/server/utils"
+	"github.com/CaribouBlue/mixtape/internal/templates"
 )
 
 type AppMux struct {

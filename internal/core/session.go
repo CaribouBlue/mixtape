@@ -7,7 +7,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/CaribouBlue/top-spot/internal/utils"
+	"github.com/CaribouBlue/mixtape/internal/utils"
 )
 
 type SessionPhase string
@@ -302,7 +302,7 @@ func (s *SessionService) GetSessionView(sessionId, userId int64) (*SessionDto, e
 				trackIds[i] = candidate.TrackId
 			}
 
-			playlistName := fmt.Sprintf("Top Spot: %s %s", session.Name, session.CreatedAt.Format("02-01-06"))
+			playlistName := fmt.Sprintf("Mixtape: %s %s", session.Name, session.CreatedAt.Format("02-01-06"))
 			playlistDetails, err := s.musicService.musicRepository.CreatePlaylist(playlistName, trackIds)
 			if err != nil {
 				return nil, err

@@ -1,4 +1,4 @@
-module github.com/CaribouBlue/top-spot
+module github.com/CaribouBlue/mixtape
 
 go 1.23
 

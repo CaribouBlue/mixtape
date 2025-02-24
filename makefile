@@ -15,17 +15,17 @@ start-dev:
 
 .PHONY: container-build
 container-build:
-	docker build -t top-spot .
+	docker build -t mixtape .
 
 .PHONY: container-start
 container-start:
 	make container-build
-	docker run --rm --name top-spot -p 8080:80 top-spot
+	docker run --rm --name mixtape -p 8080:80 mixtape
 
 .PHONY: container-teardown
 container-teardown:
-	docker stop top-spot
-	docker rm top-spot
+	docker stop mixtape
+	docker rm mixtape
 
 .PHONY: sqlite-setup
 sqlite-setup:
@@ -47,8 +47,8 @@ sqlite-init-local-dev:
 
 .PHONY: docker-stack-deploy
 docker-stack-deploy:
-	docker stack deploy -c ./compose.yaml top-spot --with-registry-auth 
+	docker stack deploy -c ./compose.yaml mixtape --with-registry-auth 
 
 .PHONY: docker-stack-rm
 docker-stack-rm:
-	docker stack rm top-spot
+	docker stack rm mixtape

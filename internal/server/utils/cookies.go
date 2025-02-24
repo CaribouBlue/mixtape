@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/CaribouBlue/top-spot/internal/core"
+	"github.com/CaribouBlue/mixtape/internal/core"
 	jwt "github.com/golang-jwt/jwt/v5"
 )
 

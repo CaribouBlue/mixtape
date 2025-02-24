@@ -4,8 +4,8 @@ import (
 	"net/http"
 	"os"
 
-	"github.com/CaribouBlue/top-spot/internal/core"
-	"github.com/CaribouBlue/top-spot/internal/utils"
+	"github.com/CaribouBlue/mixtape/internal/core"
+	"github.com/CaribouBlue/mixtape/internal/utils"
 	"github.com/google/uuid"
 )
 

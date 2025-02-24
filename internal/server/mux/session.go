@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/CaribouBlue/top-spot/internal/core"
-	"github.com/CaribouBlue/top-spot/internal/server/middleware"
-	serverUtils "github.com/CaribouBlue/top-spot/internal/server/utils"
-	"github.com/CaribouBlue/top-spot/internal/templates"
+	"github.com/CaribouBlue/mixtape/internal/core"
+	"github.com/CaribouBlue/mixtape/internal/server/middleware"
+	serverUtils "github.com/CaribouBlue/mixtape/internal/server/utils"
+	"github.com/CaribouBlue/mixtape/internal/templates"
 )
 
 type SessionMux struct {

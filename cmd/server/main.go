@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/CaribouBlue/top-spot/internal/server"
+	"github.com/CaribouBlue/mixtape/internal/server"
 	"github.com/joho/godotenv"
 )
 

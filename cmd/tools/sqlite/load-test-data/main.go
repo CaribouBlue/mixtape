@@ -5,8 +5,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/CaribouBlue/top-spot/internal/core"
-	"github.com/CaribouBlue/top-spot/internal/storage"
+	"github.com/CaribouBlue/mixtape/internal/core"
+	"github.com/CaribouBlue/mixtape/internal/storage"
 	"github.com/joho/godotenv"
 )
 
