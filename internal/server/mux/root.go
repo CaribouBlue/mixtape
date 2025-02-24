@@ -5,6 +5,7 @@ import (
 
 	"github.com/CaribouBlue/mixtape/internal/core"
 	"github.com/CaribouBlue/mixtape/internal/server/middleware"
+	"github.com/CaribouBlue/mixtape/internal/server/utils"
 )
 
 type RootMux struct {
@@ -31,6 +32,10 @@ func NewRootMux(services RootMuxServices, middleware []middleware.Middleware, ch
 		middleware,
 		children,
 	}
+
+	mux.Handle("/{$}", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		utils.HandleRedirect(w, r, "/app")
+	}))
 
 	authPathPrefix := mux.Children.AuthMux.Opts.PathPrefix
 	mux.Handle(authPathPrefix+"/", http.StripPrefix(authPathPrefix, mux.Children.AuthMux))
