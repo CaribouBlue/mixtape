@@ -26,12 +26,12 @@ services:
       DB_PATH: /var/lib/sqlite/db.sqlite
     secrets:
       - app_secrets
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.app.rule=HostRegexp(`(www\.)?shmoopysworld\.com`)
+      - traefik.http.routers.app.entrypoints=web
     deploy:
       replicas: 2
-      labels:
-        - traefik.enable=true
-        - traefik.http.routers.app.rule=HostRegexp(`^(www\.)?shmoopysworld\.com$$`)
-        - traefik.http.routers.app.entrypoints=web
   sqlite:
     image: keinos/sqlite3
     volumes:
