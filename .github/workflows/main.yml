@@ -94,8 +94,9 @@ jobs:
 
       - name: Create stack env file
         run: |
-          echo "APP_IMAGE_TAG=sha-${{ github.sha }}" >> ./envfile
-          echo "ACME_EMAIL=${{ env.ACME_EMAIL }}" >> ./envfile
+          echo 'APP_IMAGE_TAG=sha-${{ github.sha }}' >> ./envfile
+          echo 'ACME_EMAIL=${{ env.ACME_EMAIL }}' >> ./envfile
+          echo 'TRAEFIK_AUTH_USERS=${{ env.TRAEFIK_AUTH_USERS }}' >> ./envfile
 
       - name: Deploy app stack
         uses: cssnr/stack-deploy-action@v1
