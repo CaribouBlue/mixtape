@@ -15,7 +15,6 @@ RUN go build -v -o ./bin/sqlite-setup ./cmd/tools/sqlite/setup
 FROM golang:1.24
 
 LABEL org.opencontainers.image.source=https://github.com/CaribouBlue/mixtape
-LABEL org.opencontainers.image.description="Mixtape application image"
 LABEL org.opencontainers.image.licenses=MIT
 
 ARG PORT=80
