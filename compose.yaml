@@ -26,9 +26,10 @@ services:
       - traefik.http.routers.dashboard.service=api@internal
       - traefik.http.routers.dashboard.middlewares=traefik-auth
 
-      # Note: all dollar signs in the hash need to be doubled for escaping.
       # To create a user:password pair, the following command can be used:
-      #   echo $(htpasswd -nB <USERNAME> ) | sed -e s/\\$/\\$\\$/g
+      #   echo $(htpasswd -nB <USERNAME> )
+      # Note: all dollar signs in the hash need to be doubled for escaping in the docker-compose file
+      # Note: all dollar signs must be escaped with \ when setting env variables
       - traefik.http.middlewares.traefik-auth.basicauth.users=${TRAEFIK_AUTH_USERS}
 
     ports:
