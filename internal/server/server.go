@@ -15,7 +15,7 @@ import (
 	"github.com/CaribouBlue/mixtape/internal/storage"
 )
 
-func StartServer() {
+func NewServer() *http.Server {
 	// Initialize DB
 	dbPath := os.Getenv("DB_PATH")
 	db, err := storage.NewSqliteDb(dbPath)
@@ -34,8 +34,10 @@ func StartServer() {
 	_ = mail.NewMailService(mailer)
 
 	// Initialize server
-	serverAddress := os.Getenv("SERVER_ADDRESS")
-	if serverAddress == "" {
+	host := os.Getenv("HOST")
+	port := os.Getenv("PORT")
+	serverAddress := fmt.Sprintf("%s:%s", host, port)
+	if serverAddress == ":" {
 		serverAddress = "localhost:8080"
 	}
 
@@ -124,10 +126,7 @@ func StartServer() {
 		Handler: rootMuxHandler,
 	}
 
-	fmt.Println("Starting server at", serverAddress)
-	if err := server.ListenAndServe(); err != nil {
-		fmt.Println("Error starting server:", err)
-	}
+	return server
 }
 
 var musicRepoFactory utils.RequestBasedFactory[core.MusicRepository] = func(r *http.Request) core.MusicRepository {

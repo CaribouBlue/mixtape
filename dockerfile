@@ -17,11 +17,12 @@ FROM golang:1.24
 LABEL org.opencontainers.image.source=https://github.com/CaribouBlue/mixtape
 LABEL org.opencontainers.image.licenses=MIT
 
+ARG HOST
 ARG PORT=80
 ARG APP_DATA_PATH=/var/lib/app
 
+ENV HOST=${HOST}
 ENV PORT=${PORT}
-ENV SERVER_ADDRESS=:${PORT}
 ENV APP_DATA_PATH=${APP_DATA_PATH}
 
 COPY --from=build /usr/src/app/bin /usr/local/bin
