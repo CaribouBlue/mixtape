@@ -6,6 +6,9 @@ services:
     command:
       - --log.filePath=/traefik/logs/traefik.log
       - --log.format=json
+      - --accesslog=true
+      - --metrics.otlp=true
+      - --tracing=true
 
       - --api=true
       - --providers.docker
