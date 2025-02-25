@@ -4,15 +4,16 @@ services:
     image: traefik:v3.3
     # Enables the web UI and tells Traefik to listen to docker
     command:
-      - "--log.level=DEBUG"
+      - --log.filePath=/traefik/logs/traefik.log
+      - --log.format=json
       - --api.insecure=true
       - --providers.docker
       - --providers.docker.exposedbydefault=false
+      - --entryPoints.web.address=:80
       - --entryPoints.websecure.address=:443
       - --certificatesresolvers.myresolver.acme.tlschallenge=true
       - --certificatesresolvers.myresolver.acme.email=${ACME_EMAIL}
       - --certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json
-      - --entrypoints.web.address=:80
     ports:
       # The HTTPS port
       - 443:443
@@ -24,7 +25,9 @@ services:
       # So that Traefik can listen to the Docker events
       - /var/run/docker.sock:/var/run/docker.sock
       # So that Traefik can store the ACME certs
-      - /etc/letsencrypt:/letsencrypt
+      - letsencrypt:/letsencrypt
+      # Logs
+      - /var/log/traefik:/traefik/logs
   app:
     image: ghcr.io/cariboublue/mixtape:${APP_IMAGE_TAG:-latest}
     volumes:
@@ -38,13 +41,16 @@ services:
     labels:
       - traefik.enable=true
       - traefik.http.services.app.loadbalancer.server.port=80
-      - traefik.http.routers.app.rule=HostRegexp(`(www\.)?shmoopysworld\.com`)
+
+      - traefik.http.routers.app.rule=Host(`shmoopysworld.com`)
       - traefik.http.routers.app.entrypoints=websecure
-      - traefik.http.routers.app.tls=true
       - traefik.http.routers.app.tls.certresolver=myresolver
-      - traefik.http.routers.app.tls.domains[0].main=shmoopysworld.com
-      # - traefik.http.routers.app.middlewares=app-ratelimit
-      # - traefik.http.middlewares.app-ratelimit.ratelimit.average=20
+
+      - traefik.http.routers.app-insecure.rule=Host(`shmoopysworld.com`)
+      - traefik.http.routers.app-insecure.entrypoints=web
+      - traefik.http.middlewares.app-https-redirect.redirectscheme.scheme=https
+      - traefik.http.middlewares.app-https-redirect.redirectscheme.port=443
+      - traefik.http.routers.app-insecure.middlewares=app-https-redirect@docker
     deploy:
       replicas: 2
   sqlite:
@@ -52,6 +58,8 @@ services:
     volumes:
       - /var/lib/sqlite:/var/lib/sqlite
     command: sleep infinity
+volumes:
+  letsencrypt:
 secrets:
   app_secrets:
     external: true
