@@ -16,6 +16,7 @@ env:
   DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
   DEPLOY_PRIVATE_KEY: ${{ secrets.DEPLOY_PRIVATE_KEY }}
   ACME_EMAIL: ${{ secrets.ACME_EMAIL }}
+  TRAEFIK_AUTH_USERS: ${{ vars.TRAEFIK_AUTH_USERS }}
 
 jobs:
   validate-env:

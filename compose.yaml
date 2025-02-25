@@ -6,14 +6,31 @@ services:
     command:
       - --log.filePath=/traefik/logs/traefik.log
       - --log.format=json
-      - --api.insecure=true
+
+      - --api=true
       - --providers.docker
       - --providers.docker.exposedbydefault=false
+
       - --entryPoints.web.address=:80
       - --entryPoints.websecure.address=:443
+      - --entryPoints.traefik.address=:8080
+
       - --certificatesresolvers.myresolver.acme.tlschallenge=true
       - --certificatesresolvers.myresolver.acme.email=${ACME_EMAIL}
       - --certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.dashboard.rule=Host(`traefik.shmoopysworld.com`)
+      - traefik.http.routers.dashboard.entrypoints=websecure
+      - traefik.http.routers.dashboard.tls.certresolver=myresolver
+      - traefik.http.routers.dashboard.service=api@internal
+      - traefik.http.routers.dashboard.middlewares=traefik-auth
+
+      # Note: all dollar signs in the hash need to be doubled for escaping.
+      # To create a user:password pair, the following command can be used:
+      #   echo $(htpasswd -nB <USERNAME> ) | sed -e s/\\$/\\$\\$/g
+      - traefik.http.middlewares.traefik-auth.basicauth.users=${TRAEFIK_AUTH_USERS}
+
     ports:
       # The HTTPS port
       - 443:443
@@ -48,9 +65,10 @@ services:
 
       - traefik.http.routers.app-insecure.rule=Host(`shmoopysworld.com`)
       - traefik.http.routers.app-insecure.entrypoints=web
-      - traefik.http.middlewares.app-https-redirect.redirectscheme.scheme=https
-      - traefik.http.middlewares.app-https-redirect.redirectscheme.port=443
-      - traefik.http.routers.app-insecure.middlewares=app-https-redirect@docker
+      - traefik.http.routers.app-insecure.middlewares=https-redirect@docker
+
+      - traefik.http.middlewares.https-redirect.redirectscheme.scheme=https
+      - traefik.http.middlewares.https-redirect.redirectscheme.port=443
     deploy:
       replicas: 2
   sqlite:
