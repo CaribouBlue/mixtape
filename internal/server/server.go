@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"os"
 
+	"github.com/CaribouBlue/mixtape/internal/config"
 	"github.com/CaribouBlue/mixtape/internal/core"
 	"github.com/CaribouBlue/mixtape/internal/mail"
 	"github.com/CaribouBlue/mixtape/internal/server/middleware"
@@ -17,14 +17,17 @@ import (
 
 func NewServer() *http.Server {
 	// Initialize DB
-	dbPath := os.Getenv("DB_PATH")
+	dbPath := config.GetConfigValue(config.ConfDbPath)
 	db, err := storage.NewSqliteDb(dbPath)
 	if err != nil {
 		log.Fatal("Error creating SQLite DB:", err)
 	}
 
 	// Initialize Mailer
-	mailer, err := mail.NewGmailMailer(os.Getenv("GMAIL_USERNAME"), os.Getenv("GMAIL_PASSWORD"))
+	mailer, err := mail.NewGmailMailer(
+		config.GetConfigValue(config.ConfGmailUsername),
+		config.GetConfigValue(config.ConfGmailPassword),
+	)
 	if err != nil {
 		log.Fatal("Error creating Gmail mailer:", err)
 	}
@@ -34,8 +37,8 @@ func NewServer() *http.Server {
 	_ = mail.NewMailService(mailer)
 
 	// Initialize server
-	host := os.Getenv("HOST")
-	port := os.Getenv("PORT")
+	host := config.GetConfigValue(config.ConfHost)
+	port := config.GetConfigValue(config.ConfPort)
 	serverAddress := fmt.Sprintf("%s:%s", host, port)
 	if serverAddress == ":" {
 		serverAddress = "localhost:8080"

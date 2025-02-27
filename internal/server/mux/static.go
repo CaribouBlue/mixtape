@@ -2,8 +2,8 @@ package mux
 
 import (
 	"net/http"
-	"os"
 
+	"github.com/CaribouBlue/mixtape/internal/config"
 	"github.com/CaribouBlue/mixtape/internal/server/middleware"
 )
 
@@ -24,7 +24,7 @@ func NewStaticMux(opts StaticMuxOpts, middleware []middleware.Middleware) *Stati
 		Middleware: middleware,
 	}
 
-	appDataPath := os.Getenv("APP_DATA_PATH")
+	appDataPath := config.GetConfigValue(config.ConfAppDataPath)
 	if appDataPath == "" {
 		appDataPath = "."
 	}

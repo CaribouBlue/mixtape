@@ -2,11 +2,11 @@ package core
 
 import (
 	"errors"
-	"os"
 	"regexp"
 	"strconv"
 	"strings"
 
+	"github.com/CaribouBlue/mixtape/internal/config"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -56,7 +56,7 @@ func (s *UserService) NormalizeUsername(username string) string {
 }
 
 func (s *UserService) SignUpNewUser(username, password, confirmPassword, accessCode string) (*UserEntity, error) {
-	if accessCode != os.Getenv("ACCESS_CODE") {
+	if accessCode != config.GetConfigValue(config.ConfAccessCode) {
 		return nil, ErrIncorrectAccessCode
 	}
 

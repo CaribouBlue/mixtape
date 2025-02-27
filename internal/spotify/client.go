@@ -2,8 +2,8 @@ package spotify
 
 import (
 	"net/http"
-	"os"
 
+	"github.com/CaribouBlue/mixtape/internal/config"
 	"github.com/CaribouBlue/mixtape/internal/core"
 	"github.com/CaribouBlue/mixtape/internal/utils"
 	"github.com/google/uuid"
@@ -28,10 +28,10 @@ func NewClient(clientId string, clientSecret string, redirectUri string, scope s
 }
 
 func NewDefaultClient() *Client {
-	clientId := os.Getenv("SPOTIFY_CLIENT_ID")
-	clientSecret := os.Getenv("SPOTIFY_CLIENT_SECRET")
-	redirectUri := os.Getenv("SPOTIFY_REDIRECT_URI")
-	scope := os.Getenv("SPOTIFY_SCOPE")
+	clientId := config.GetConfigValue(config.ConfSpotifyClientId)
+	clientSecret := config.GetConfigValue(config.ConfSpotifyClientSecret)
+	redirectUri := config.GetConfigValue(config.ConfSpotifyRedirectUri)
+	scope := config.GetConfigValue(config.ConfSpotifyScope)
 
 	spotifyClient := NewClient(clientId, clientSecret, redirectUri, scope)
 
