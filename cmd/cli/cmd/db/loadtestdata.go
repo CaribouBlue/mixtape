@@ -1,46 +1,44 @@
-package main
+package db
 
 import (
 	"log"
-	"os"
 	"time"
 
 	"github.com/CaribouBlue/mixtape/internal/core"
 	"github.com/CaribouBlue/mixtape/internal/storage"
-	"github.com/joho/godotenv"
+	"github.com/spf13/cobra"
 )
 
-func main() {
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
+var loadTestDataCmd = &cobra.Command{
+	Use:   "loadtestdata DB_PATH",
+	Short: "Load test data into a SQLite database",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		dbPath := args[0]
 
-	log.Println("Setting up the database...")
+		db, err := storage.NewSqliteDb(dbPath)
+		if err != nil {
+			log.Fatalln("Failed to connect to the database:", err)
+			return
+		}
+		defer db.Close()
 
-	dbPath := os.Getenv("DB_PATH")
-	db, err := storage.NewSqliteDb(dbPath)
-	if err != nil {
-		log.Fatalln("Failed to connect to the database:", err)
-		return
-	}
-	defer db.Close()
+		log.Println("Adding test data...")
 
-	log.Println("Adding test data...")
+		log.Default().Println("Creating users...")
+		CreateUsers(db)
 
-	log.Default().Println("Creating users...")
-	CreateUsers(db)
+		log.Default().Println("Creating submission phase session...")
+		CreateSubmissionPhaseSession(db)
 
-	log.Default().Println("Creating submission phase session...")
-	CreateSubmissionPhaseSession(db)
+		log.Default().Println("Creating vote phase session...")
+		CreateVotePhaseSession(db)
 
-	log.Default().Println("Creating vote phase session...")
-	CreateVotePhaseSession(db)
+		log.Default().Println("Creating result phase session...")
+		CreateResultPhaseSession(db)
 
-	log.Default().Println("Creating result phase session...")
-	CreateResultPhaseSession(db)
-
-	log.Println("Test data added successfully.")
+		log.Println("Test data added successfully")
+	},
 }
 
 func CreateUsers(db *storage.SqliteStore) {

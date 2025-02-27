@@ -1,31 +1,39 @@
-package main
+package db
 
 import (
 	"log"
-	"os"
 
 	"github.com/CaribouBlue/mixtape/internal/storage"
+	"github.com/spf13/cobra"
 )
 
-func main() {
-	dbPath := os.Getenv("DB_PATH")
+var setupCmd = &cobra.Command{
+	Use:   "setup DB_PATH",
+	Short: "Setup a SQLite database",
+	Args:  cobra.ExactArgs(1),
+	Run: func(cmd *cobra.Command, args []string) {
+		dbPath := args[0]
 
-	log.Println("Setting up the database @", dbPath)
+		log.Println("Setting up the database")
 
-	db, err := storage.NewSqliteDb(dbPath)
-	if err != nil {
-		log.Fatalln("Failed to connect to the database:", err)
-		return
-	}
-	defer db.Close()
+		db, err := storage.NewSqliteDb(dbPath)
+		if err != nil {
+			log.Fatalln("Failed to connect to the database:", err)
+			return
+		}
+		defer db.Close()
 
-	CreateTables(db)
-	CreateViews(db)
+		createTables(db)
+		createViews(db)
 
-	log.Println("Database setup completed successfully.")
+		log.Println("Database setup completed successfully.")
+	},
 }
 
-func CreateTables(db *storage.SqliteStore) {
+func init() {
+}
+
+func createTables(db *storage.SqliteStore) {
 	tables := []string{
 		`CREATE TABLE IF NOT EXISTS ` + storage.TableNameUsers + ` (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -79,7 +87,7 @@ func CreateTables(db *storage.SqliteStore) {
 	}
 }
 
-func CreateViews(db *storage.SqliteStore) {
+func createViews(db *storage.SqliteStore) {
 	views := []string{}
 
 	for _, query := range views {
