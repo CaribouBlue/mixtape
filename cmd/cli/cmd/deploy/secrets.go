@@ -3,11 +3,9 @@ package deploy
 import (
 	"fmt"
 	"log"
-	"os"
 	"os/exec"
 	"strings"
 
-	"github.com/CaribouBlue/mixtape/cmd/cli/config"
 	"github.com/spf13/cobra"
 )
 
@@ -16,74 +14,85 @@ var secretCmd = &cobra.Command{
 	Short: "Deploy an app secret",
 	Args:  cobra.ExactArgs(2),
 	Run: func(cmd *cobra.Command, args []string) {
-		secretName := args[0]
+		secretTarget := args[0]
 		secretFile := args[1]
 
-		osCmd := exec.Command("docker", "context", "show")
+		initialDockerContext, err := GetCurrentDockerContext()
+		if err != nil {
+			log.Fatalln("Failed to get current docker context:", err)
+		}
+		defer func() {
+			err := SetDockerContext(initialDockerContext)
+			if err != nil {
+				log.Fatalln("Failed to set docker context to", initialDockerContext, ":", err)
+			}
+		}()
+
+		err = SetDockerContext(flagDockerContext)
+		if err != nil {
+			log.Fatalln("Failed to set docker context to", flagDockerContext, ":", err)
+		}
+		log.Println("Using Docker context", flagDockerContext)
+
+		osCmd := exec.Command("docker", "secret", "ls", "--format", "{{.Name}}", "--filter", fmt.Sprintf("Name=%s", secretTarget))
 		output, err := osCmd.CombinedOutput()
 		if err != nil {
 			log.Fatalln("Failed to run", "`"+strings.Join(osCmd.Args, " ")+"`", "with", err)
 		}
-		initialDockerContext := strings.Trim(string(output), "\n")
+		staleSecretName := strings.Trim(string(output), "\n")
 
-		osCmd = exec.Command("docker", "context", "use", flagDockerContext)
-		err = osCmd.Run()
-		if err != nil {
-			log.Fatalln("Failed to run", "`"+strings.Join(osCmd.Args, " ")+"`", "with", err)
-		}
-		log.Println("Using Docker context", flagDockerContext)
-
-		osCmd = exec.Command("docker", "secret", "ls", "--format", "{{.Name}}", "--filter", fmt.Sprintf("Name=%s", secretName))
-		output, err = osCmd.CombinedOutput()
-		if err != nil {
-			log.Fatalln("Failed to run", "`"+strings.Join(osCmd.Args, " ")+"`", "with", err)
-		}
-		currentSecretName := strings.Trim(string(output), "\n")
-
-		if currentSecretName == "" {
-			log.Fatalln("No secret found with name", secretName)
+		useTempSecret := false
+		if staleSecretName == "" {
+			log.Println("No secret found with name", secretTarget, "creating new secret")
 		} else {
-			log.Println("Found secret", currentSecretName)
+			log.Println("Found secret", staleSecretName)
+			useTempSecret = true
 		}
 
-		secretNameEnding := currentSecretName[len(currentSecretName)-2:]
-		if secretNameEnding == "-x" {
-			secretNameEnding = "y"
-		} else {
-			secretNameEnding = "x"
+		newSecretName := secretTarget
+		if useTempSecret {
+			newSecretName = secretTarget + "-temp"
 		}
-		newSecretName := fmt.Sprintf("%s-%s", secretName, secretNameEnding)
 
-		osCmd = exec.Command("docker", "secret", "create", newSecretName, secretFile)
-		err = osCmd.Run()
+		err = CreateDockerSecret(newSecretName, secretFile)
 		if err != nil {
-			log.Fatalln("Failed to run", "`"+strings.Join(osCmd.Args, " ")+"`", "with", err)
+			log.Fatalln("Failed to create secret", newSecretName, "with", err)
 		}
 		log.Println("Created new secret", newSecretName)
 
-		osCmd = exec.Command("docker", "service", "update", flagServiceName, "--secret-rm", currentSecretName, "--secret-add", "source="+newSecretName+",target="+secretName)
-		osCmd.Stdout = os.Stdout
-		err = osCmd.Run()
+		err = UpdateDockerServiceSecret(flagServiceName, staleSecretName, newSecretName, secretTarget)
 		if err != nil {
-			log.Fatalln("Failed to run", "`"+strings.Join(osCmd.Args, " ")+"`", "with", err)
+			log.Fatalln("Failed to update service with", err)
 		}
-		log.Printf("Updated service %s to use new secret %s as %s", flagServiceName, newSecretName, secretName)
+		log.Println("Updated service with new secret", newSecretName)
 
-		osCmd = exec.Command("docker", "secret", "rm", currentSecretName)
-		err = osCmd.Run()
+		err = RemoveDockerSecret(staleSecretName)
 		if err != nil {
-			log.Fatalln("Failed to run", "`"+strings.Join(osCmd.Args, " ")+"`", "with", err)
+			log.Fatalln("Failed to remove stale secret", staleSecretName, "with", err)
 		}
-		log.Println("Removed old secret", currentSecretName)
+		log.Println("Removed stale secret", staleSecretName)
 
-		if flagDockerContext != initialDockerContext {
-			osCmd = exec.Command("docker", "context", "use", initialDockerContext)
-			output, err = osCmd.CombinedOutput()
+		if useTempSecret {
+			tempSecretName := newSecretName
+			secretName := secretTarget
+
+			err = CreateDockerSecret(secretName, secretFile)
 			if err != nil {
-				log.Println(string(output))
-				log.Fatal(err)
+				log.Fatalln("Failed to create secret", secretName, "with", err)
 			}
-			log.Default().Println("Returned docker context to initial value", initialDockerContext)
+			log.Println("Created new secret", secretName)
+
+			err = UpdateDockerServiceSecret(flagServiceName, tempSecretName, secretName, secretTarget)
+			if err != nil {
+				log.Fatalln("Failed to update service with", err)
+			}
+			log.Println("Updated service with new secret", newSecretName)
+
+			err = RemoveDockerSecret(tempSecretName)
+			if err != nil {
+				log.Fatalln("Failed to remove stale secret", tempSecretName, "with", err)
+			}
+			log.Println("Removed temp secret", tempSecretName)
 		}
 	},
 }
@@ -94,6 +103,5 @@ var (
 )
 
 func init() {
-	secretCmd.Flags().StringVarP(&flagDockerContext, "docker-context", "c", config.GetConfigValue(config.ConfDockerContext), "The docker context to use")
 	secretCmd.Flags().StringVarP(&flagServiceName, "service-name", "n", "mixtape_app", "The name of the service to update")
 }

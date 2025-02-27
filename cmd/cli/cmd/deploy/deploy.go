@@ -1,6 +1,7 @@
 package deploy
 
 import (
+	"github.com/CaribouBlue/mixtape/cmd/cli/config"
 	"github.com/spf13/cobra"
 )
 
@@ -12,5 +13,8 @@ var DeployCmd = &cobra.Command{
 }
 
 func init() {
+	DeployCmd.PersistentFlags().StringVarP(&flagDockerContext, "docker-context", "c", config.GetConfigValue(config.ConfDockerContext), "The docker context to use")
+
 	DeployCmd.AddCommand(secretCmd)
+	DeployCmd.AddCommand(appCmd)
 }
