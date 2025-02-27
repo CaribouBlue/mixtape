@@ -16,7 +16,6 @@ services:
 
       - --entryPoints.web.address=:80
       - --entryPoints.websecure.address=:443
-      - --entryPoints.traefik.address=:8080
 
       - --certificatesresolvers.myresolver.acme.tlschallenge=true
       - --certificatesresolvers.myresolver.acme.email=${ACME_EMAIL}
@@ -40,12 +39,10 @@ services:
       - 443:443
       # The HTTP port
       - 80:80
-      # The Web UI (enabled by --api.insecure=true)
-      - 8080:8080
     volumes:
       # So that Traefik can listen to the Docker events
       - /var/run/docker.sock:/var/run/docker.sock
-      # So that Traefik can store the ACME certs
+      # So that Traefik can store ACME certs
       - letsencrypt:/letsencrypt
       # Logs
       - /var/log/traefik:/traefik/logs
@@ -66,13 +63,16 @@ services:
       - traefik.http.routers.app.rule=Host(`shmoopysworld.com`)
       - traefik.http.routers.app.entrypoints=websecure
       - traefik.http.routers.app.tls.certresolver=myresolver
+      - traefik.http.routers.app.middlewares=app-ratelimiter
 
       - traefik.http.routers.app-insecure.rule=Host(`shmoopysworld.com`)
       - traefik.http.routers.app-insecure.entrypoints=web
-      - traefik.http.routers.app-insecure.middlewares=https-redirect@docker
+      - traefik.http.routers.app-insecure.middlewares=https-redirect,app-ratelimiter
 
       - traefik.http.middlewares.https-redirect.redirectscheme.scheme=https
       - traefik.http.middlewares.https-redirect.redirectscheme.port=443
+
+      - traefik.http.middlewares.app-ratelimiter.ratelimit.average=20
     deploy:
       replicas: 2
   sqlite:
