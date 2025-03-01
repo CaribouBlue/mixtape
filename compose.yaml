@@ -52,7 +52,7 @@ services:
       - /var/lib/sqlite:/var/lib/sqlite
     environment:
       ENV_FILES: /run/secrets/app_secrets
-      SPOTIFY_REDIRECT_URI: http://shmoopysworld.com/auth/spotify/redirect
+      SPOTIFY_REDIRECT_URI: https://shmoopysworld.com/auth/spotify/redirect
       DB_PATH: /var/lib/sqlite/db.sqlite
     secrets:
       - app_secrets
