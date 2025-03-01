@@ -63,16 +63,15 @@ services:
       - traefik.http.routers.app.rule=Host(`shmoopysworld.com`)
       - traefik.http.routers.app.entrypoints=websecure
       - traefik.http.routers.app.tls.certresolver=myresolver
-      - traefik.http.routers.app.middlewares=app-ratelimiter
+      # - traefik.http.routers.app.middlewares=app-ratelimiter
 
       - traefik.http.routers.app-insecure.rule=Host(`shmoopysworld.com`)
       - traefik.http.routers.app-insecure.entrypoints=web
-      - traefik.http.routers.app-insecure.middlewares=https-redirect,app-ratelimiter
+      - traefik.http.routers.app-insecure.middlewares=https-redirect
 
       - traefik.http.middlewares.https-redirect.redirectscheme.scheme=https
       - traefik.http.middlewares.https-redirect.redirectscheme.port=443
-
-      - traefik.http.middlewares.app-ratelimiter.ratelimit.average=20
+      # - traefik.http.middlewares.app-ratelimiter.ratelimit.average=20
     deploy:
       replicas: 2
   sqlite:
