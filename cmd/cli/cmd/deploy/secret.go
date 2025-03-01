@@ -86,7 +86,7 @@ var secretCmd = &cobra.Command{
 			if err != nil {
 				log.Fatalln("Failed to update service with", err)
 			}
-			log.Println("Updated service with new secret", newSecretName)
+			log.Println("Updated service with new secret", secretName)
 
 			err = RemoveDockerSecret(tempSecretName)
 			if err != nil {
