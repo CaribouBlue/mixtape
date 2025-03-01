@@ -10,11 +10,11 @@ import (
 )
 
 var loadTestDataCmd = &cobra.Command{
-	Use:   "loadtd DB_PATH",
+	Use:   "loadtd",
 	Short: "Load test data into a SQLite database",
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		dbPath := args[0]
+		dbPath := flagDbPath
 
 		db, err := storage.NewSqliteDb(dbPath)
 		if err != nil {
@@ -23,7 +23,7 @@ var loadTestDataCmd = &cobra.Command{
 		}
 		defer db.Close()
 
-		log.Println("Adding test data...")
+		log.Println("Adding test data to the database @", dbPath)
 
 		log.Default().Println("Creating users...")
 		CreateUsers(db)

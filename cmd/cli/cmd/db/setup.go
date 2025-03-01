@@ -8,13 +8,12 @@ import (
 )
 
 var setupCmd = &cobra.Command{
-	Use:   "setup DB_PATH",
+	Use:   "setup",
 	Short: "Setup a SQLite database",
-	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
-		dbPath := args[0]
+		dbPath := flagDbPath
 
-		log.Println("Setting up the database")
+		log.Println("Setting up the database @", dbPath)
 
 		db, err := storage.NewSqliteDb(dbPath)
 		if err != nil {

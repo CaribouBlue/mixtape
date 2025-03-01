@@ -13,11 +13,13 @@ type ConfigProperty struct {
 
 var (
 	ConfDockerContext ConfigProperty = ConfigProperty{"DOCKER_CONTEXT", "default"}
+	ConfDbPath        ConfigProperty = ConfigProperty{"DB_PATH", ""}
 )
 
 var isLoaded bool = false
 
 func Load() error {
+	isLoaded = true
 	return godotenv.Load(".env.cli")
 }
 
