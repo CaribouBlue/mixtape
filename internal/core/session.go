@@ -127,10 +127,9 @@ type VoteEntity struct {
 }
 
 type PlayerEntity struct {
-	SessionId   int64
-	PlayerId    int64
-	PlaylistId  string
-	DisplayName string
+	SessionId  int64
+	PlayerId   int64
+	PlaylistId string
 }
 
 type SessionDto struct {
@@ -178,6 +177,7 @@ func (a ByVoteCountDesc) Less(i, j int) bool { return a[i].Votes > a[j].Votes }
 type PlayerDto struct {
 	PlayerEntity
 	PlaylistUrl string
+	DisplayName string
 }
 
 func (p *PlayerDto) IsJoinedSession() bool {

@@ -9,7 +9,8 @@ RUN go install github.com/a-h/templ/cmd/templ@latest
 
 COPY . .
 RUN templ generate
-RUN go build -v -o ./bin/app ./cmd/server
+RUN go build -v -o ./bin/mixtape-app ./cmd/server
+RUN go build -v -o ./bin/mixtape-cli ./cmd/cli
 RUN go build -v -o ./bin/sqlite-setup ./cmd/tools/sqlite/setup
 
 FROM golang:1.24
@@ -30,4 +31,4 @@ COPY --from=build /usr/src/app/static ${APP_DATA_PATH}/static
 
 EXPOSE ${PORT}
 
-CMD ["app"]
+CMD ["mixtape-app"]

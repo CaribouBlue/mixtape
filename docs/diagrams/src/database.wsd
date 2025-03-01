@@ -42,7 +42,7 @@ package "Session Repo" as session_repo {
         session_id: int <<FK>>
         player_id: int <<FK>>
         --
-        playlist_id: string
+        playlist_id: string <<FK>>
     }
 
     
@@ -106,6 +106,7 @@ package "Music Repo" as music_repo {
 ' --------------------
 players }|--|| sessions
 players }o--|| users
+players ||--o| playlists
 
 candidates }o--|| players
 candidates }o--|| sessions
