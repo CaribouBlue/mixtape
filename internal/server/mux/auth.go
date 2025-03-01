@@ -111,6 +111,7 @@ func (mux *AuthMux) handleUserLoginSubmit(w http.ResponseWriter, r *http.Request
 		http.Error(w, "Invalid login", http.StatusUnprocessableEntity)
 		return
 	} else if err != nil {
+		log.Default().Println("Failed to log in user:", err)
 		http.Error(w, "Failed to log in user", http.StatusInternalServerError)
 		return
 	}

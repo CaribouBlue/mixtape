@@ -10,20 +10,23 @@ import (
 )
 
 const (
-	TableNameUsers      = "users"
+	// User Repo
+	TableNameUsers = "users"
+
+	// Session Repo
 	TableNameSessions   = "sessions"
+	TableNamePlayers    = "players"
 	TableNameCandidates = "candidates"
 	TableNameVotes      = "votes"
-	TableNamePlaylists  = "playlists"
 )
 
 func makeSelectCandidatesQuery(conditional string) string {
 	selectCandidatesQuery := `
 		SELECT id,
 			c.session_id AS session_id,
-			c.user_id AS user_id,
+			c.nominator_id AS nominator_id,
 			track_id,
-			COUNT(DISTINCT v.user_id) AS votes
+			COUNT(DISTINCT v.voter_id) AS votes
 		FROM ` + TableNameCandidates + ` c
 		FULL JOIN
 			` + TableNameVotes + ` v ON v.candidate_id = c.id
@@ -238,8 +241,8 @@ func (store *SqliteStore) GetAllSessions() (*[]core.SessionEntity, error) {
 }
 
 func (store *SqliteStore) AddCandidate(sessionId int64, candidate *core.CandidateEntity) (*core.CandidateEntity, error) {
-	query := "INSERT INTO " + TableNameCandidates + " (session_id, user_id, track_id) VALUES (?, ?, ?)"
-	result, err := store.Exec(query, sessionId, candidate.UserId, candidate.TrackId)
+	query := "INSERT INTO " + TableNameCandidates + " (session_id, nominator_id, track_id) VALUES (?, ?, ?)"
+	result, err := store.Exec(query, sessionId, candidate.NominatorId, candidate.TrackId)
 	if err != nil {
 		return nil, err
 	}
@@ -263,7 +266,7 @@ func (store *SqliteStore) GetAllCandidates(sessionId int64) (*[]core.CandidateEn
 	candidates := make([]core.CandidateEntity, 0)
 	for rows.Next() {
 		candidate := core.CandidateEntity{}
-		err := rows.Scan(&candidate.Id, &candidate.SessionId, &candidate.UserId, &candidate.TrackId, &candidate.Votes)
+		err := rows.Scan(&candidate.Id, &candidate.SessionId, &candidate.NominatorId, &candidate.TrackId, &candidate.Votes)
 		if err != nil {
 			return nil, err
 		}
@@ -280,7 +283,7 @@ func (store *SqliteStore) GetAllCandidates(sessionId int64) (*[]core.CandidateEn
 func (store *SqliteStore) GetCandidateById(sessionId int64, candidateId int64) (*core.CandidateEntity, error) {
 	row := store.db.QueryRow(makeSelectCandidatesQuery("WHERE c.session_id = ? AND c.id = ?"), sessionId, candidateId)
 	candidate := &core.CandidateEntity{}
-	err := row.Scan(&candidate.Id, &candidate.SessionId, &candidate.UserId, &candidate.TrackId, &candidate.Votes)
+	err := row.Scan(&candidate.Id, &candidate.SessionId, &candidate.NominatorId, &candidate.TrackId, &candidate.Votes)
 	if err == sql.ErrNoRows {
 		return nil, nil // candidate not found
 	} else if err != nil {
@@ -290,7 +293,7 @@ func (store *SqliteStore) GetCandidateById(sessionId int64, candidateId int64) (
 }
 
 func (store *SqliteStore) GetCandidatesByUserId(sessionId int64, userId int64) (*[]core.CandidateEntity, error) {
-	rows, err := store.db.Query(makeSelectCandidatesQuery("WHERE c.session_id = ? AND c.user_id = ?"), sessionId, userId)
+	rows, err := store.db.Query(makeSelectCandidatesQuery("WHERE c.session_id = ? AND c.nominator_id = ?"), sessionId, userId)
 	if err != nil {
 		log.Default().Println("Error querying candidates: ", err)
 		return nil, err
@@ -300,7 +303,7 @@ func (store *SqliteStore) GetCandidatesByUserId(sessionId int64, userId int64) (
 	candidates := make([]core.CandidateEntity, 0)
 	for rows.Next() {
 		candidate := core.CandidateEntity{}
-		err := rows.Scan(&candidate.Id, &candidate.SessionId, &candidate.UserId, &candidate.TrackId, &candidate.Votes)
+		err := rows.Scan(&candidate.Id, &candidate.SessionId, &candidate.NominatorId, &candidate.TrackId, &candidate.Votes)
 		if err != nil {
 			return nil, err
 		}
@@ -315,7 +318,7 @@ func (store *SqliteStore) GetCandidatesByUserId(sessionId int64, userId int64) (
 }
 
 func (store *SqliteStore) GetCandidateByNotUserId(sessionId int64, userId int64) (*[]core.CandidateEntity, error) {
-	rows, err := store.db.Query(makeSelectCandidatesQuery("WHERE c.session_id = ? AND c.user_id != ?"), sessionId, userId)
+	rows, err := store.db.Query(makeSelectCandidatesQuery("WHERE c.session_id = ? AND c.nominator_id != ?"), sessionId, userId)
 	if err != nil {
 		return nil, err
 	}
@@ -324,7 +327,7 @@ func (store *SqliteStore) GetCandidateByNotUserId(sessionId int64, userId int64)
 	candidates := make([]core.CandidateEntity, 0)
 	for rows.Next() {
 		candidate := core.CandidateEntity{}
-		err := rows.Scan(&candidate.Id, &candidate.SessionId, &candidate.UserId, &candidate.TrackId, &candidate.Votes)
+		err := rows.Scan(&candidate.Id, &candidate.SessionId, &candidate.NominatorId, &candidate.TrackId, &candidate.Votes)
 		if err != nil {
 			return nil, err
 		}
@@ -348,8 +351,8 @@ func (store *SqliteStore) DeleteCandidate(sessionId int64, candidateId int64) er
 }
 
 func (store *SqliteStore) AddVote(sessionId int64, vote *core.VoteEntity) (*core.VoteEntity, error) {
-	query := "INSERT INTO " + TableNameVotes + " (session_id, user_id, candidate_id) VALUES (?, ?, ?)"
-	_, err := store.Exec(query, sessionId, vote.UserId, vote.CandidateId)
+	query := "INSERT INTO " + TableNameVotes + " (session_id, voter_id, candidate_id) VALUES (?, ?, ?)"
+	_, err := store.Exec(query, sessionId, vote.VoterId, vote.CandidateId)
 	if err != nil {
 		return nil, err
 	}
@@ -358,7 +361,7 @@ func (store *SqliteStore) AddVote(sessionId int64, vote *core.VoteEntity) (*core
 }
 
 func (store *SqliteStore) GetVotesByUserId(sessionId int64, userId int64) (*[]core.VoteEntity, error) {
-	query := "SELECT session_id, user_id, candidate_id FROM " + TableNameVotes + " WHERE session_id = ? AND user_id = ?"
+	query := "SELECT session_id, voter_id, candidate_id FROM " + TableNameVotes + " WHERE session_id = ? AND voter_id = ?"
 	rows, err := store.db.Query(query, sessionId, userId)
 	if err != nil {
 		return nil, err
@@ -368,7 +371,7 @@ func (store *SqliteStore) GetVotesByUserId(sessionId int64, userId int64) (*[]co
 	votes := make([]core.VoteEntity, 0)
 	for rows.Next() {
 		vote := core.VoteEntity{}
-		err := rows.Scan(&vote.SessionId, &vote.UserId, &vote.CandidateId)
+		err := rows.Scan(&vote.SessionId, &vote.VoterId, &vote.CandidateId)
 		if err != nil {
 			return nil, err
 		}
@@ -383,10 +386,10 @@ func (store *SqliteStore) GetVotesByUserId(sessionId int64, userId int64) (*[]co
 }
 
 func (store *SqliteStore) GetVote(sessionId int64, userId int64, candidateId int64) (*core.VoteEntity, error) {
-	query := "SELECT session_id, user_id, candidate_id FROM " + TableNameVotes + " WHERE session_id = ? AND user_id = ? AND candidate_id = ?"
+	query := "SELECT session_id, voter_id, candidate_id FROM " + TableNameVotes + " WHERE session_id = ? AND voter_id = ? AND candidate_id = ?"
 	row := store.db.QueryRow(query, sessionId, userId, candidateId)
 	vote := &core.VoteEntity{}
-	err := row.Scan(&vote.SessionId, &vote.UserId, &vote.CandidateId)
+	err := row.Scan(&vote.SessionId, &vote.VoterId, &vote.CandidateId)
 	if err == sql.ErrNoRows {
 		return nil, nil // Vote not found
 	} else if err != nil {
@@ -396,7 +399,7 @@ func (store *SqliteStore) GetVote(sessionId int64, userId int64, candidateId int
 }
 
 func (store *SqliteStore) DeleteVote(sessionId int64, userId int64, candidateId int64) error {
-	query := "DELETE FROM " + TableNameVotes + " WHERE session_id = ? AND user_id = ? AND candidate_id = ?"
+	query := "DELETE FROM " + TableNameVotes + " WHERE session_id = ? AND voter_id = ? AND candidate_id = ?"
 	_, err := store.Exec(query, sessionId, userId, candidateId)
 	if err != nil {
 		return err
@@ -404,26 +407,36 @@ func (store *SqliteStore) DeleteVote(sessionId int64, userId int64, candidateId 
 	return nil
 }
 
-func (store *SqliteStore) AddPlaylist(sessionId int64, playlist *core.SessionPlaylistEntity) (*core.SessionPlaylistEntity, error) {
-	query := "INSERT INTO " + TableNamePlaylists + " (session_id, user_id, playlist_id) VALUES (?, ?, ?)"
-	_, err := store.Exec(query, sessionId, playlist.UserId, playlist.PlaylistId)
+func (store *SqliteStore) AddPlayer(sessionId int64, player *core.PlayerEntity) (*core.PlayerEntity, error) {
+	query := "INSERT INTO " + TableNamePlayers + " (session_id, player_id, playlist_id) VALUES (?, ?, ?)"
+	_, err := store.Exec(query, sessionId, player.PlayerId, player.PlaylistId)
 	if err != nil {
 		return nil, err
 	}
 
-	return playlist, nil
+	return player, nil
 }
 
-func (store *SqliteStore) FindPlaylist(sessionId int64, userId int64) (*core.SessionPlaylistEntity, error) {
-	query := "SELECT session_id, user_id, playlist_id FROM " + TableNamePlaylists + " WHERE session_id = ? AND user_id = ?"
-	row := store.db.QueryRow(query, sessionId, userId)
-	playlist := &core.SessionPlaylistEntity{}
-	err := row.Scan(&playlist.SessionId, &playlist.UserId, &playlist.PlaylistId)
+func (store *SqliteStore) UpdatePlayerPlaylist(sessionId int64, playerId int64, playlistId string) error {
+	query := "UPDATE " + TableNamePlayers + " SET playlist_id = ? WHERE session_id = ? AND player_id = ?"
+	_, err := store.Exec(query, playlistId, sessionId, playerId)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (store *SqliteStore) GetPlayer(sessionId int64, playerId int64) (*core.PlayerEntity, error) {
+	query := "SELECT session_id, player_id, playlist_id FROM " + TableNamePlayers + " WHERE session_id = ? AND player_id = ?"
+	row := store.db.QueryRow(query, sessionId, playerId)
+	player := &core.PlayerEntity{}
+	err := row.Scan(&player.SessionId, &player.PlayerId, &player.PlaylistId)
 	if err == sql.ErrNoRows {
-		return nil, nil // Playlist not found
+		return nil, nil // Player not found
 	} else if err != nil {
 		return nil, err
 	}
 
-	return playlist, nil
+	return player, nil
 }

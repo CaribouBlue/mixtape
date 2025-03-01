@@ -1,42 +1,123 @@
 
 @startuml
 
-' skinparam linetype ortho
-skinparam nodesep 100
-skinparam ranksep 100
+' --------------------
+' | configuration
+' --------------------
+hide circle
+skinparam linetype ortho
+left to right direction
+' skinparam nodesep 100
+' skinparam ranksep 100
 
-entity Users {
-    id: int <<PK>>
+' --------------------
+' | entities
+' --------------------
+package "User Repo" as user_repo {
+    entity users {
+        id: int <<PK>>
+        --
+        username: string
+        display_name: string
+        spotify_token: string
+        hashed_password: string
+        is_admin: bool
+    }
 }
 
-entity Sessions {
-    id: int <<PK>>
+package "Session Repo" as session_repo {
+    entity sessions {
+        id: int <<PK>>
+        --
+        name: string
+        created_by: int
+        created_at: int
+        max_submissions: int
+        start_at: int
+        submission_phase_duration: int
+        vote_phase_duration: int
+    }
+
+    entity players {
+        session_id: int <<FK>>
+        player_id: int <<FK>>
+        --
+        playlist_id: string
+    }
+
+    
+
+    entity candidates {
+        id: int <<PK>>
+        --
+        nominator_id: int <<FK>>
+        session_id: int <<FK>>
+        track_id: string
+    }
+
+    
+
+    entity votes {
+        session_id: int <<FK>>
+        voter_id: int <<FK>>
+        candidate_id: int <<FK>>
+        --
+    }
+
+    
 }
 
-entity Candidates {
-    id: int <<PK>>
-    userId: int <<FK>>
-    sessionId: int <<FK>>
+package "Music Repo" as music_repo {
+    entity artists {
+        id: string <<PK>>
+        --
+        name: string
+        url: string
+    }
+
+    entity albums {
+        id: string <<PK>>
+        --
+        name: string
+        url: string
+    }
+
+    entity playlists {
+        id: string <<PK>>
+        --
+        name: string
+        url: string
+    }
+
+    entity tracks {
+        id: string <<PK>>
+        --
+        name: string
+        artists: string
+        album: string
+        explicit: bool
+        url: string
+    }
+
 }
 
-Candidates }o--|| Users
-Candidates }o--|| Sessions
+' --------------------
+' | relationships
+' --------------------
+players }|--|| sessions
+players }o--|| users
 
-entity Votes {
-    sessionId: int <<FK>>
-    userId: int <<FK>>
-    CandidateId: int <<FK>>
-}
+candidates }o--|| players
+candidates }o--|| sessions
+candidates }o--|| tracks
 
-Votes }o--|| Users
-Votes }o--|| Candidates
+votes }o--|| players
+votes }o--|| candidates
+votes }o--|| sessions
 
-entity Playlists {
-    sessionId: int <<FK>>
-    userId: int <<FK>>
-}
+tracks }|--|{ artists
+tracks }|--|| albums
+tracks }o--o{ playlists
 
-Playlists }o--|| Users
-Playlists }o--|| Sessions
 
 @enduml

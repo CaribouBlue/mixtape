@@ -54,29 +54,30 @@ func createTables(db *storage.SqliteStore) {
 			vote_phase_duration INTEGER,
 			FOREIGN KEY (created_by) REFERENCES ` + storage.TableNameUsers + ` (id)
 		);`,
+		`CREATE TABLE IF NOT EXISTS ` + storage.TableNamePlayers + ` (
+			session_id INTEGER,
+			player_id INTEGER,
+			playlist_id TEXT,
+			FOREIGN KEY (session_id) REFERENCES ` + storage.TableNameSessions + ` (id),
+			FOREIGN KEY (player_id) REFERENCES ` + storage.TableNameUsers + ` (id),
+			PRIMARY KEY (session_id, player_id)
+		);`,
 		`CREATE TABLE IF NOT EXISTS ` + storage.TableNameCandidates + ` (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			user_id INTEGER,
+			nominator_id INTEGER,
 			session_id INTEGER,
 			track_id TEXT,
-			FOREIGN KEY (user_id) REFERENCES ` + storage.TableNameUsers + ` (id),
+			FOREIGN KEY (nominator_id) REFERENCES ` + storage.TableNameUsers + ` (id),
 			FOREIGN KEY (session_id) REFERENCES ` + storage.TableNameSessions + ` (id)
 		);`,
 		`CREATE TABLE IF NOT EXISTS ` + storage.TableNameVotes + ` (
 			session_id INTEGER,
-			user_id INTEGER,
+			voter_id INTEGER,
 			candidate_id INTEGER,
 			FOREIGN KEY (session_id) REFERENCES ` + storage.TableNameSessions + ` (id),
-			FOREIGN KEY (user_id) REFERENCES ` + storage.TableNameUsers + ` (id),
-			FOREIGN KEY (candidate_id) REFERENCES ` + storage.TableNameCandidates + ` (id)
-		);`,
-		`CREATE TABLE IF NOT EXISTS ` + storage.TableNamePlaylists + ` (
-			session_id INTEGER,
-			user_id INTEGER,
-			playlist_id TEXT,
-			FOREIGN KEY (session_id) REFERENCES ` + storage.TableNameSessions + ` (id),
-			FOREIGN KEY (user_id) REFERENCES ` + storage.TableNameUsers + ` (id),
-			PRIMARY KEY (session_id, user_id)
+			FOREIGN KEY (voter_id) REFERENCES ` + storage.TableNameUsers + ` (id),
+			FOREIGN KEY (candidate_id) REFERENCES ` + storage.TableNameCandidates + ` (id),
+			PRIMARY KEY (session_id, voter_id, candidate_id)
 		);`,
 	}
 

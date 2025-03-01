@@ -2,6 +2,7 @@ package core
 
 import (
 	"errors"
+	"log"
 	"regexp"
 	"strconv"
 	"strings"
@@ -94,7 +95,7 @@ func (s *UserService) LoginUser(username string, password string) (*UserEntity, 
 	} else if user == nil {
 		return nil, ErrUserNotFound
 	}
-
+	log.Println("user hashed pwd", user.HashedPassword)
 	if err := bcrypt.CompareHashAndPassword(user.HashedPassword, []byte(password)); err != nil {
 		if err == bcrypt.ErrMismatchedHashAndPassword {
 			return nil, ErrIncorrectPassword

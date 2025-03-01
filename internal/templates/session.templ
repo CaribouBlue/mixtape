@@ -14,22 +14,28 @@ const (
 )
 
 // Session Page Templates
-templ SessionPage(s core.SessionDto, u core.UserEntity) {
+templ SessionPage(s core.SessionDto) {
 	@Root(RootProps{Title: "Session " + s.Name, IsAuthenticated: true}) {
 		<div
 			id={ IdAttrSessionPage }
 			class="grid grid-cols-1 gap-4"
 		>
-			<h1 class="text-2xl">{ s.Name }</h1>
-			@SessionTimeline(s)
-			switch s.Phase() {
-				case core.SubmissionPhase:
-					@SubmissionPhaseView(s, u)
-				case core.VotePhase:
-					@VotePhaseView(s, u)
-				case core.ResultPhase:
-					@ResultsPhaseView(s)
-			}
+			<div class="col-span-full">
+				<h1 class="text-2xl">{ s.Name }</h1>
+			</div>
+			<div class="col-span-full">
+				@SessionTimeline(s)
+			</div>
+			<div class="col-span-full">
+				switch s.Phase() {
+					case core.SubmissionPhase:
+						@SubmissionPhaseView(s)
+					case core.VotePhase:
+						@VotePhaseView(s)
+					case core.ResultPhase:
+						@ResultsPhaseView(s)
+				}
+			</div>
 		</div>
 	}
 }
@@ -139,40 +145,52 @@ templ SessionTimeline(s core.SessionDto) {
 }
 
 // Submission Phase View Templates
-templ SubmissionPhaseView(s core.SessionDto, u core.UserEntity) {
-	<div>
-		<h2
-			class="text-lg"
-		>Your Submissions </h2>
-		<p
-			hx-get={ fmt.Sprintf("/app/session/%d/submission-counter", s.Id) }
-			hx-trigger={ fmt.Sprintf("%s from:body, %s from:body", serverUtils.EventNewSubmission, serverUtils.EventDeleteSubmission) }
-			class="text-sm"
+templ SubmissionPhaseView(s core.SessionDto) {
+	if !s.CurrentPlayer.IsJoinedSession() {
+		<button
+			hx-post={ fmt.Sprintf("/app/session/%d/player/me", s.Id) }
+			hx-swap="outerHTML"
+			class="btn btn-wide w-full"
 		>
-			@SubmissionCounter(s)
-		</p>
-	</div>
-	<div class="overflow-x-auto">
-		<table id={ IdAttrCandidateSubmission } class="table">
-			<tbody>
-				for _, candidate := range *s.SubmittedCandidates {
-					@SubmissionItem(candidate)
-				}
-			</tbody>
-		</table>
-	</div>
-	<input
-		hx-get={ fmt.Sprintf("/app/session/%d/submission-search", s.Id) }
-		hx-trigger="input changed delay:500ms, search"
-		hx-target={ fmt.Sprintf("#%s", IdAttrCandidateSubmissionSearchResults) }
-		class="input input-bordered w-full"
-		type="search"
-		name="query"
-		placeholder="Begin Typing To Search Tracks..."
-	/>
-	<div class="overflow-x-auto">
-		<table id={ IdAttrCandidateSubmissionSearchResults } class="table"></table>
-	</div>
+			Join Session
+		</button>
+	} else {
+		<div class="col-span-full grid grid-cols-subgrid gap-4">
+			<div>
+				<h2
+					class="text-lg"
+				>Your Submissions </h2>
+				<p
+					hx-get={ fmt.Sprintf("/app/session/%d/submission-counter", s.Id) }
+					hx-trigger={ fmt.Sprintf("%s from:body, %s from:body", serverUtils.EventNewSubmission, serverUtils.EventDeleteSubmission) }
+					class="text-sm"
+				>
+					@SubmissionCounter(s)
+				</p>
+			</div>
+			<div class="overflow-x-auto">
+				<table id={ IdAttrCandidateSubmission } class="table">
+					<tbody>
+						for _, candidate := range *s.SubmittedCandidates {
+							@SubmissionItem(candidate)
+						}
+					</tbody>
+				</table>
+			</div>
+			<input
+				hx-get={ fmt.Sprintf("/app/session/%d/submission-search", s.Id) }
+				hx-trigger="input changed delay:500ms, search"
+				hx-target={ fmt.Sprintf("#%s", IdAttrCandidateSubmissionSearchResults) }
+				class="input input-bordered w-full"
+				type="search"
+				name="query"
+				placeholder="Begin Typing To Search Tracks..."
+			/>
+			<div class="overflow-x-auto">
+				<table id={ IdAttrCandidateSubmissionSearchResults } class="table"></table>
+			</div>
+		</div>
+	}
 }
 
 templ SubmissionCounter(s core.SessionDto) {
@@ -314,55 +332,61 @@ templ AddSubmission(candidate core.CandidateDto) {
 }
 
 // Vote Phase View Templates
-templ VotePhaseView(s core.SessionDto, u core.UserEntity) {
-	@PlaylistButton(*s.Playlist)
-	<div
-		x-data="{ open: false }"
-		class="collapse collapse-arrow bg-base-200"
-	>
-		<input
-			x-bind:checked="open"
-			@click="open = !open"
-			type="radio"
-			name="session-accordion"
-			class="cursor-pointer"
-		/>
-		<div
-			class="collapse-title text-lg"
-		>Your Submissions</div>
-		<div class="collapse-content">
+templ VotePhaseView(s core.SessionDto) {
+	if !s.CurrentPlayer.IsJoinedSession() {
+		@SessionClosedCard()
+	} else {
+		<div class="col-span-full grid grid-cols-subgrid gap-4">
+			@PlaylistButton(s.CurrentPlayer.PlaylistUrl)
+			<div
+				x-data="{ open: false }"
+				class="collapse collapse-arrow bg-base-200"
+			>
+				<input
+					x-bind:checked="open"
+					@click="open = !open"
+					type="radio"
+					name="session-accordion"
+					class="cursor-pointer"
+				/>
+				<div
+					class="collapse-title text-lg"
+				>Your Submissions</div>
+				<div class="collapse-content">
+					<div class="overflow-x-auto">
+						<table class="table">
+							<tbody>
+								for _, candidate := range *s.SubmittedCandidates {
+									@CandidateBallot(candidate, false)
+								}
+							</tbody>
+						</table>
+					</div>
+				</div>
+			</div>
+			<div>
+				<h1 class="text-xl">Your Ballot</h1>
+				<p
+					hx-get={ fmt.Sprintf("/app/session/%d/vote-counter", s.Id) }
+					hx-trigger={ fmt.Sprintf("%s from:body, %s from:body", serverUtils.EventNewVote, serverUtils.EventDeleteVote) }
+					class="text-sm"
+				>
+					@VoteCounter(s)
+				</p>
+			</div>
 			<div class="overflow-x-auto">
-				<table class="table">
-					<tbody>
-						for _, candidate := range *s.SubmittedCandidates {
-							@CandidateBallot(candidate, false)
+				<table
+					class="table"
+				>
+					<tbody hx-ext="response-targets">
+						for _, candidate := range *s.BallotCandidates {
+							@CandidateBallot(candidate, true)
 						}
 					</tbody>
 				</table>
 			</div>
 		</div>
-	</div>
-	<div>
-		<h1 class="text-xl">Your Ballot</h1>
-		<p
-			hx-get={ fmt.Sprintf("/app/session/%d/vote-counter", s.Id) }
-			hx-trigger={ fmt.Sprintf("%s from:body, %s from:body", serverUtils.EventNewVote, serverUtils.EventDeleteVote) }
-			class="text-sm"
-		>
-			@VoteCounter(s)
-		</p>
-	</div>
-	<div class="overflow-x-auto">
-		<table
-			class="table"
-		>
-			<tbody hx-ext="response-targets">
-				for _, candidate := range *s.BallotCandidates {
-					@CandidateBallot(candidate, true)
-				}
-			</tbody>
-		</table>
-	</div>
+	}
 }
 
 templ CandidateBallot(candidate core.CandidateDto, canVote bool) {
@@ -467,17 +491,23 @@ templ VoteCounter(s core.SessionDto) {
 
 // Results Phase View Templates
 templ ResultsPhaseView(s core.SessionDto) {
-	@PlaylistButton(*s.Playlist)
-	<h1 class="text-xl">Final Results</h1>
-	<div class="overflow-x-auto">
-		<table class="table">
-			<tbody>
-				for _, result := range *s.Results {
-					@Result(result)
-				}
-			</tbody>
-		</table>
-	</div>
+	if !s.CurrentPlayer.IsJoinedSession() {
+		@SessionClosedCard()
+	} else {
+		<div class="col-span-full grid grid-cols-subgrid gap-4">
+			@PlaylistButton(s.CurrentPlayer.PlaylistUrl)
+			<h1 class="text-xl">Final Results</h1>
+			<div class="overflow-x-auto">
+				<table class="table">
+					<tbody>
+						for _, result := range *s.Results {
+							@Result(result)
+						}
+					</tbody>
+				</table>
+			</div>
+		</div>
+	}
 }
 
 func PlaceDisplayText(place int) string {
@@ -513,7 +543,7 @@ templ Result(result core.CandidateDto) {
 		>
 			{ PlaceDisplayText(result.Place) }
 		</td>
-		<td>{ fmt.Sprint(result.Owner.DisplayName) }</td>
+		<td>{ fmt.Sprint(result.Nominator.DisplayName) }</td>
 		<td>
 			<div class="flex items-center gap-2">
 				<a
@@ -573,12 +603,36 @@ templ SessionPhaseDuration(s core.SessionEntity) {
 	}
 }
 
-templ PlaylistButton(playlist core.PlaylistDto) {
+templ PlaylistButton(playlistUrl string) {
 	<a
-		href={ templ.SafeURL(playlist.Url) }
+		href={ templ.SafeURL(playlistUrl) }
 		target="_blank"
 		class="btn btn-wide w-full"
 	>
 		Open Playlist
 	</a>
+}
+
+templ SessionClosedCard() {
+	<div class="card w-full border">
+		<div class="card-body items-center text-center gap-4">
+			<h2 class="card-title">Session closed!</h2>
+			<p>This session is currently closed to new players. You can only join a session during the "Submission Phase".</p>
+			<div class="card-actions justify-end">
+				<button
+					onclick="history.back()"
+					class="btn btn-primary btn-wide"
+				>
+					Got it
+				</button>
+				<button
+					x-data="{ btnTxt: `That's lame` }"
+					@click="btnTxt = `Tough titties`; $el.disabled = true"
+					class="btn btn-wide"
+				>
+					<span x-html="btnTxt"></span>
+				</button>
+			</div>
+		</div>
+	</div>
 }

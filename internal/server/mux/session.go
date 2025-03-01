@@ -56,6 +56,7 @@ func NewSessionMux(opts SessionMuxOpts, repos SessionMuxRepos, middleware []midd
 	mux.Handle("GET /{sessionId}/submission-search", http.HandlerFunc(mux.handleSearchSubmissions))
 	mux.Handle("GET /{sessionId}/submission-counter", http.HandlerFunc(mux.handleGetSubmissionCounter))
 	mux.Handle("GET /{sessionId}/vote-counter", http.HandlerFunc(mux.handleGetVoteCounter))
+	mux.Handle("POST /{sessionId}/player/me", http.HandlerFunc(mux.handleJoinSession))
 
 	mux.Handle("POST /{sessionId}/candidate", http.HandlerFunc(mux.handleSubmitCandidate))
 	mux.Handle("DELETE /{sessionId}/candidate/{candidateId}", http.HandlerFunc(mux.handleRemoveCandidate))
@@ -86,13 +87,13 @@ func (mux *SessionMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 func (mux *SessionMux) handlePageSessions(w http.ResponseWriter, r *http.Request) {
 	user := r.Context().Value(serverUtils.UserCtxKey).(*core.UserEntity)
 
-	sessions, err := mux.services.SessionService.GetSessionsList()
+	sessions, err := mux.services.SessionService.GetSessionsListForUser(user.Id)
 	if err != nil {
 		http.Error(w, "Failed to get sessions", http.StatusInternalServerError)
 		return
 	}
 
-	component := templates.UserSessions(*user, *sessions)
+	component := templates.UserSessions(*sessions)
 	serverUtils.HandleHtmlResponse(r, w, component)
 }
 
@@ -143,7 +144,7 @@ func (mux *SessionMux) handlePageSession(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	component := templates.SessionPage(*sessionView, *user)
+	component := templates.SessionPage(*sessionView)
 	serverUtils.HandleHtmlResponse(r, w, component)
 }
 
@@ -228,6 +229,30 @@ func (mux *SessionMux) handleGetVoteCounter(w http.ResponseWriter, r *http.Reque
 	}
 
 	serverUtils.HandleHtmlResponse(r, w, templates.VoteCounter(*sessionView))
+}
+
+func (mux *SessionMux) handleJoinSession(w http.ResponseWriter, r *http.Request) {
+	user := r.Context().Value(serverUtils.UserCtxKey).(*core.UserEntity)
+
+	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid session ID", http.StatusBadRequest)
+		return
+	}
+
+	_, err = mux.services.SessionService.JoinSession(sessionId, user.Id)
+	if err != nil {
+		http.Error(w, "Failed to join session", http.StatusInternalServerError)
+		return
+	}
+
+	sessionView, err := mux.services.SessionService.GetSessionView(sessionId, user.Id)
+	if err != nil {
+		http.Error(w, "Failed to get session view", http.StatusInternalServerError)
+		return
+	}
+
+	serverUtils.HandleHtmlResponse(r, w, templates.SubmissionPhaseView(*sessionView))
 }
 
 func (mux *SessionMux) handleGetPhaseDuration(w http.ResponseWriter, r *http.Request) {
