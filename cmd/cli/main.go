@@ -10,7 +10,7 @@ import (
 func init() {
 	err := config.Load()
 	if err != nil {
-		log.Default().Fatalln("Unable to load default .env file: ", err)
+		log.Default().Println("No config loaded from env")
 	}
 }
 
