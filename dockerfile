@@ -3,6 +3,7 @@ FROM node:18 AS bundle-static
 WORKDIR /usr/src/app
 
 COPY static ./static
+COPY internal ./internal
 COPY package.json .
 COPY package-lock.json .
 COPY tailwind.config.js .
