@@ -440,3 +440,26 @@ func (store *SqliteStore) GetPlayer(sessionId int64, playerId int64) (*core.Play
 
 	return player, nil
 }
+
+func (store *SqliteStore) GetPlayers(sessionId int64) (*[]core.PlayerEntity, error) {
+	query := "SELECT session_id, player_id, playlist_id FROM " + TableNamePlayers + " WHERE session_id = ?"
+	rows, err := store.db.Query(query, sessionId)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	players := make([]core.PlayerEntity, 0)
+	for rows.Next() {
+		player := core.PlayerEntity{}
+		err := rows.Scan(&player.SessionId, &player.PlayerId, &player.PlaylistId)
+		if err != nil {
+			return nil, err
+		}
+
+		players = append(players, player)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return &players, nil
+}

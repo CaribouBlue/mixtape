@@ -12,7 +12,6 @@ import (
 var loadTestDataCmd = &cobra.Command{
 	Use:   "loadtd",
 	Short: "Load test data into a SQLite database",
-	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		dbPath := flagDbPath
 

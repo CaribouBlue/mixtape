@@ -3,7 +3,6 @@ package core
 import (
 	"errors"
 	"fmt"
-	"log"
 	"math"
 	"sort"
 	"time"
@@ -20,10 +19,10 @@ const (
 )
 
 var (
-	ErrNoSubmissionsLeft   = errors.New("no submissions left")
-	ErrDuplicateSubmission = errors.New("duplicate submission")
-	ErrNoVotesLeft         = errors.New("no votes left")
-	ErrPlaylistNotFound    = errors.New("playlist not found")
+	ErrNoSubmissionsLeft     = errors.New("no submissions left")
+	ErrDuplicateSubmission   = errors.New("duplicate submission")
+	ErrNoVotesLeft           = errors.New("no votes left")
+	ErrPlaylistAlreadyExists = errors.New("playlist already exists")
 )
 
 type SessionEntity struct {
@@ -138,6 +137,7 @@ type SessionDto struct {
 	BallotCandidates    *[]CandidateDto
 	Results             *[]CandidateDto
 	CurrentPlayer       *PlayerDto
+	Players             *[]PlayerDto
 }
 
 func (s *SessionDto) VoteCount() int {
@@ -203,6 +203,7 @@ type SessionRepository interface {
 
 	AddPlayer(sessionId int64, player *PlayerEntity) (*PlayerEntity, error)
 	GetPlayer(sessionId int64, playerId int64) (*PlayerEntity, error)
+	GetPlayers(sessionId int64) (*[]PlayerEntity, error)
 	UpdatePlayerPlaylist(sessionId int64, playerId int64, playlistId string) error
 }
 
@@ -304,7 +305,27 @@ func (s *SessionService) GetSessionView(sessionId, userId int64) (*SessionDto, e
 	submittedCandidates := []CandidateDto{}
 	ballotCandidates := []CandidateDto{}
 	results := []CandidateDto{}
+	players := []PlayerDto{}
 	currentPlayer := PlayerDto{}
+
+	playerEntities, err := s.sessionRepository.GetPlayers(sessionId)
+	if err != nil {
+		return nil, err
+	}
+
+	for _, playerEntity := range *playerEntities {
+		player := PlayerDto{
+			PlayerEntity: playerEntity,
+		}
+
+		user, err := s.userService.GetUserById(playerEntity.PlayerId)
+		if err != nil {
+			return nil, err
+		}
+		player.DisplayName = user.DisplayName
+
+		players = append(players, player)
+	}
 
 	currentPlayerEntity, err := s.sessionRepository.GetPlayer(sessionId, userId)
 	if err != nil {
@@ -333,33 +354,7 @@ func (s *SessionService) GetSessionView(sessionId, userId int64) (*SessionDto, e
 
 	if session.Phase() != SubmissionPhase {
 		if currentPlayer.IsJoinedSession() {
-			log.Default().Println("Current player playlist ID: ", currentPlayer.PlaylistId)
-			if currentPlayer.PlaylistId == "" {
-				candidates, err := s.sessionRepository.GetAllCandidates(sessionId)
-				if err != nil {
-					return nil, err
-				}
-
-				trackIds := make([]string, len(*candidates))
-				for i, candidate := range *candidates {
-					trackIds[i] = candidate.TrackId
-				}
-
-				playlistName := fmt.Sprintf("Mixtape: %s %s", session.Name, session.CreatedAt.Format("02-01-06"))
-				playlistDetails, err := s.musicService.musicRepository.CreatePlaylist(playlistName, trackIds)
-				if err != nil {
-					return nil, err
-				}
-
-				log.Default().Println("Playlist details: ", playlistDetails.Id, playlistDetails)
-
-				err = s.sessionRepository.UpdatePlayerPlaylist(sessionId, userId, playlistDetails.Id)
-				if err != nil {
-					return nil, err
-				}
-				currentPlayer.PlaylistId = playlistDetails.Id
-				currentPlayer.PlaylistUrl = playlistDetails.Url
-			} else {
+			if currentPlayer.PlaylistId != "" {
 				playlistDetails, err := s.musicService.GetPlaylistById(currentPlayer.PlaylistId)
 				if err != nil {
 					return nil, err
@@ -380,9 +375,6 @@ func (s *SessionService) GetSessionView(sessionId, userId int64) (*SessionDto, e
 			if err != nil {
 				return nil, err
 			}
-
-			// log.Default().Println("CandidateDto: ", candidateDto)
-			// log.Default().Println("Vote: ", candidateDto.Vote)
 
 			ballotCandidates = append(submittedCandidates, *candidateDto)
 		}
@@ -443,6 +435,7 @@ func (s *SessionService) GetSessionView(sessionId, userId int64) (*SessionDto, e
 		BallotCandidates:    &ballotCandidates,
 		Results:             &results,
 		CurrentPlayer:       &currentPlayer,
+		Players:             &players,
 	}
 
 	return sessionView, nil
@@ -525,6 +518,50 @@ func (s *SessionService) RemoveCandidate(sessionId, userId, candidateId int64) e
 	}
 
 	return nil
+}
+
+func (s *SessionService) CreatePlayerPlaylist(sessionId, playerId int64) (*PlayerDto, error) {
+	player := &PlayerDto{}
+
+	session, err := s.sessionRepository.GetSessionById(sessionId)
+	if err != nil {
+		return nil, err
+	}
+
+	playerEntity, err := s.sessionRepository.GetPlayer(sessionId, playerId)
+	if err != nil {
+		return nil, err
+	}
+	player.PlayerEntity = *playerEntity
+
+	if playerEntity.PlaylistId != "" {
+		return nil, ErrPlaylistAlreadyExists
+	}
+
+	candidates, err := s.sessionRepository.GetAllCandidates(sessionId)
+	if err != nil {
+		return nil, err
+	}
+
+	trackIds := make([]string, len(*candidates))
+	for i, candidate := range *candidates {
+		trackIds[i] = candidate.TrackId
+	}
+
+	playlistName := fmt.Sprintf("Mixtape: %s %s", session.Name, session.CreatedAt.Format("02-01-06"))
+	playlistDetails, err := s.musicService.musicRepository.CreatePlaylist(playlistName, trackIds)
+	if err != nil {
+		return nil, err
+	}
+
+	err = s.sessionRepository.UpdatePlayerPlaylist(sessionId, player.PlayerId, playlistDetails.Id)
+	if err != nil {
+		return nil, err
+	}
+	player.PlaylistId = playlistDetails.Id
+	player.PlaylistUrl = playlistDetails.Url
+
+	return player, nil
 }
 
 func (s *SessionService) VoteForCandidate(sessionId, userId, candidateId int64) (*CandidateDto, error) {

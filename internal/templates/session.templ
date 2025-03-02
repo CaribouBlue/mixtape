@@ -26,6 +26,32 @@ templ SessionPage(s core.SessionDto) {
 			<div class="col-span-full">
 				@SessionTimeline(s)
 			</div>
+			<div class="col-span-full grid grid-cols-subgrid gap-4">
+				@CollapsibleCard("Players", false) {
+					<div class="overflow-x-auto">
+						<table class="table">
+							<thead>
+								<tr></tr>
+							</thead>
+							<tbody>
+								for _, player := range *s.Players {
+									<tr>
+										<td class="flex items-center gap-2">
+											if player.PlayerId == s.CurrentPlayer.PlayerId {
+												@PersonIcon(NewIconProps())
+											}
+											if player.PlayerId == s.CreatedBy {
+												@HouseIcon(NewIconProps())
+											}
+											{ player.DisplayName }
+										</td>
+									</tr>
+								}
+							</tbody>
+						</table>
+					</div>
+				}
+			</div>
 			<div class="col-span-full">
 				switch s.Phase() {
 					case core.SubmissionPhase:
@@ -155,19 +181,17 @@ templ SubmissionPhaseView(s core.SessionDto) {
 			Join Session
 		</button>
 	} else {
-		<div class="col-span-full grid grid-cols-subgrid gap-4">
-			<div>
-				<h2
-					class="text-lg"
-				>Your Submissions </h2>
-				<p
-					hx-get={ fmt.Sprintf("/app/session/%d/submission-counter", s.Id) }
-					hx-trigger={ fmt.Sprintf("%s from:body, %s from:body", serverUtils.EventNewSubmission, serverUtils.EventDeleteSubmission) }
-					class="text-sm"
-				>
-					@SubmissionCounter(s)
-				</p>
-			</div>
+		<div class="col-span-full grid grid-cols-subgrid gap-4 p-4 border rounded-2xl">
+			<h2
+				class="text-lg"
+			>Your Submissions </h2>
+			<p
+				hx-get={ fmt.Sprintf("/app/session/%d/submission-counter", s.Id) }
+				hx-trigger={ fmt.Sprintf("%s from:body, %s from:body", serverUtils.EventNewSubmission, serverUtils.EventDeleteSubmission) }
+				class="text-sm"
+			>
+				@SubmissionCounter(s)
+			</p>
 			<div class="overflow-x-auto">
 				<table id={ IdAttrCandidateSubmission } class="table">
 					<tbody>
@@ -337,53 +361,44 @@ templ VotePhaseView(s core.SessionDto) {
 		@SessionClosedCard()
 	} else {
 		<div class="col-span-full grid grid-cols-subgrid gap-4">
-			@PlaylistButton(s.CurrentPlayer.PlaylistUrl)
-			<div
-				x-data="{ open: false }"
-				class="collapse collapse-arrow bg-base-200"
-			>
-				<input
-					x-bind:checked="open"
-					@click="open = !open"
-					type="radio"
-					name="session-accordion"
-					class="cursor-pointer"
-				/>
-				<div
-					class="collapse-title text-lg"
-				>Your Submissions</div>
-				<div class="collapse-content">
-					<div class="overflow-x-auto">
-						<table class="table">
-							<tbody>
-								for _, candidate := range *s.SubmittedCandidates {
-									@CandidateBallot(candidate, false)
-								}
-							</tbody>
-						</table>
-					</div>
+			@PlaylistButton(s.Id, s.CurrentPlayer.PlaylistUrl)
+			@CollapsibleCard("Your Submissions", false) {
+				<div class="overflow-x-auto">
+					<table class="table">
+						<tbody>
+							for _, candidate := range *s.SubmittedCandidates {
+								@CandidateBallot(candidate, false)
+							}
+						</tbody>
+					</table>
 				</div>
-			</div>
-			<div>
-				<h1 class="text-xl">Your Ballot</h1>
-				<p
-					hx-get={ fmt.Sprintf("/app/session/%d/vote-counter", s.Id) }
-					hx-trigger={ fmt.Sprintf("%s from:body, %s from:body", serverUtils.EventNewVote, serverUtils.EventDeleteVote) }
-					class="text-sm"
+			}
+			<div class="col-span-full grid grid-cols-subgrid gap-4 p-4 border rounded-2xl">
+				<div
+					x-data={ fmt.Sprintf("{ voteCount: %d, maxVotes: %d }", s.VoteCount(), s.MaxVotes()) }
+					{ templ.Attributes{
+						fmt.Sprintf("@%s.document", serverUtils.EventNewVote): "voteCount++",
+						fmt.Sprintf("@%s.document", serverUtils.EventDeleteVote): "voteCount--",
+					}... }
 				>
-					@VoteCounter(s)
-				</p>
-			</div>
-			<div class="overflow-x-auto">
-				<table
-					class="table"
-				>
-					<tbody hx-ext="response-targets">
-						for _, candidate := range *s.BallotCandidates {
-							@CandidateBallot(candidate, true)
-						}
-					</tbody>
-				</table>
+					<h1 class="text-xl">Your Ballot</h1>
+					<p
+						class="text-sm"
+					>
+						<span x-html="`${voteCount}/${maxVotes}`"></span>
+					</p>
+				</div>
+				<div class="overflow-x-auto">
+					<table
+						class="table"
+					>
+						<tbody hx-ext="response-targets">
+							for _, candidate := range *s.BallotCandidates {
+								@CandidateBallot(candidate, true)
+							}
+						</tbody>
+					</table>
+				</div>
 			</div>
 		</div>
 	}
@@ -495,16 +510,18 @@ templ ResultsPhaseView(s core.SessionDto) {
 		@SessionClosedCard()
 	} else {
 		<div class="col-span-full grid grid-cols-subgrid gap-4">
-			@PlaylistButton(s.CurrentPlayer.PlaylistUrl)
-			<h1 class="text-xl">Final Results</h1>
-			<div class="overflow-x-auto">
-				<table class="table">
-					<tbody>
-						for _, result := range *s.Results {
-							@Result(result)
-						}
-					</tbody>
-				</table>
+			@PlaylistButton(s.Id, s.CurrentPlayer.PlaylistUrl)
+			<div class="col-span-full grid grid-cols-subgrid gap-4 p-4 border rounded-2xl">
+				<h1 class="text-xl">Final Results</h1>
+				<div class="overflow-x-auto">
+					<table class="table">
+						<tbody>
+							for _, result := range *s.Results {
+								@Result(result)
+							}
+						</tbody>
+					</table>
+				</div>
 			</div>
 		</div>
 	}
@@ -603,14 +620,27 @@ templ SessionPhaseDuration(s core.SessionEntity) {
 	}
 }
 
-templ PlaylistButton(playlistUrl string) {
-	<a
-		href={ templ.SafeURL(playlistUrl) }
-		target="_blank"
-		class="btn btn-wide w-full"
-	>
-		Open Playlist
-	</a>
+templ PlaylistButton(sessionId int64, playlistUrl string) {
+	if playlistUrl == "" {
+		<button
+			hx-post={ fmt.Sprintf("/app/session/%d/player/me/playlist", sessionId) }
+			hx-swap="outerHTML"
+			hx-disabled-elt="this"
+			class="btn btn-wide w-full"
+		>
+			@requestSpinner(SpinnerOpts{Size: SpinnerSizeS}) {
+				Create Playlist
+			}
+		</button>
+	} else {
+		<a
+			href={ templ.SafeURL(playlistUrl) }
+			target="_blank"
+			class="btn btn-wide w-full"
+		>
+			Open Playlist
+		</a>
+	}
 }
 
 templ SessionClosedCard() {

@@ -57,6 +57,7 @@ func NewSessionMux(opts SessionMuxOpts, repos SessionMuxRepos, middleware []midd
 	mux.Handle("GET /{sessionId}/submission-counter", http.HandlerFunc(mux.handleGetSubmissionCounter))
 	mux.Handle("GET /{sessionId}/vote-counter", http.HandlerFunc(mux.handleGetVoteCounter))
 	mux.Handle("POST /{sessionId}/player/me", http.HandlerFunc(mux.handleJoinSession))
+	mux.Handle("POST /{sessionId}/player/me/playlist", http.HandlerFunc(mux.handleCreatePlayerPlaylist))
 
 	mux.Handle("POST /{sessionId}/candidate", http.HandlerFunc(mux.handleSubmitCandidate))
 	mux.Handle("DELETE /{sessionId}/candidate/{candidateId}", http.HandlerFunc(mux.handleRemoveCandidate))
@@ -253,6 +254,24 @@ func (mux *SessionMux) handleJoinSession(w http.ResponseWriter, r *http.Request)
 	}
 
 	serverUtils.HandleHtmlResponse(r, w, templates.SubmissionPhaseView(*sessionView))
+}
+
+func (mux *SessionMux) handleCreatePlayerPlaylist(w http.ResponseWriter, r *http.Request) {
+	user := r.Context().Value(serverUtils.UserCtxKey).(*core.UserEntity)
+
+	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid session ID", http.StatusBadRequest)
+		return
+	}
+
+	player, err := mux.services.SessionService.CreatePlayerPlaylist(sessionId, user.Id)
+	if err != nil {
+		http.Error(w, "Failed to create player playlist", http.StatusInternalServerError)
+		return
+	}
+
+	serverUtils.HandleHtmlResponse(r, w, templates.PlaylistButton(sessionId, player.PlaylistUrl))
 }
 
 func (mux *SessionMux) handleGetPhaseDuration(w http.ResponseWriter, r *http.Request) {

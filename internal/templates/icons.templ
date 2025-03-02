@@ -54,15 +54,14 @@ templ KeyIcon() {
 	</svg>
 }
 
-templ PersonIcon() {
+templ PersonIcon(props IconProps) {
 	<svg
 		xmlns="http://www.w3.org/2000/svg"
-		width="16"
-		height="16"
+		width={ props.width }
+		height={ props.height }
 		fill="currentColor"
-		class="bi bi-person-fill"
+		class={ "bi bi-person-fill " + props.class }
 		viewBox="0 0 16 16"
-		class="h-4 w-4 opacity-70"
 	>
 		<path d="M3 14s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1zm5-6a3 3 0 1 0 0-6 3 3 0 0 0 0 6"></path>
 	</svg>
@@ -99,5 +98,32 @@ templ MixtapeIcon(props IconProps) {
 	>
 		<path d="M1.5 2A1.5 1.5 0 0 0 0 3.5v9A1.5 1.5 0 0 0 1.5 14h.191l1.862-3.724A.5.5 0 0 1 4 10h8a.5.5 0 0 1 .447.276L14.31 14h.191a1.5 1.5 0 0 0 1.5-1.5v-9A1.5 1.5 0 0 0 14.5 2zM4 7a1 1 0 1 1 0-2 1 1 0 0 1 0 2m8 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2M6 6a1 1 0 0 1 1-1h2a1 1 0 0 1 0 2H7a1 1 0 0 1-1-1"></path>
 		<path d="m13.191 14-1.5-3H4.309l-1.5 3z"></path>
+	</svg>
+}
+
+templ HouseIcon(props IconProps) {
+	<svg
+		xmlns="http://www.w3.org/2000/svg"
+		width={ props.width }
+		height={ props.height }
+		fill="currentColor"
+		class={ "bi bi-house-fill " + props.class }
+		viewBox="0 0 16 16"
+	>
+		<path d="M8.707 1.5a1 1 0 0 0-1.414 0L.646 8.146a.5.5 0 0 0 .708.708L8 2.207l6.646 6.647a.5.5 0 0 0 .708-.708L13 5.793V2.5a.5.5 0 0 0-.5-.5h-1a.5.5 0 0 0-.5.5v1.293z"></path>
+		<path d="m8 3.293 6 6V13.5a1.5 1.5 0 0 1-1.5 1.5h-9A1.5 1.5 0 0 1 2 13.5V9.293z"></path>
+	</svg>
+}
+
+templ ChevronUpIcon(props IconProps) {
+	<svg
+		xmlns="http://www.w3.org/2000/svg"
+		width={ props.width }
+		height={ props.height }
+		fill="currentColor"
+		class={ "bi bi-chevron-up " + props.class }
+		viewBox="0 0 16 16"
+	>
+		<path fill-rule="evenodd" d="M7.646 4.646a.5.5 0 0 1 .708 0l6 6a.5.5 0 0 1-.708.708L8 5.707l-5.646 5.647a.5.5 0 0 1-.708-.708z"></path>
 	</svg>
 }

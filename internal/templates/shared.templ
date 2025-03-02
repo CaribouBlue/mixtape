@@ -1,5 +1,7 @@
 package templates
 
+import "fmt"
+
 templ ScreenAlert(text string) {
 	<div role="alert" class="alert alert-error">
 		<svg
@@ -44,5 +46,36 @@ templ Alert() {
 			"
 			class="alert-text"
 		></span>
+	</div>
+}
+
+templ CollapsibleCard(title string, isDefaultOpen bool) {
+	<div
+		x-data={ fmt.Sprintf("{isOpen: %t}", isDefaultOpen) }
+		x-bind:class="isOpen ? 'grid-rows-[max-content_1fr] gap-4' : 'grid-rows-[max-content_0fr] gap-0'"
+		class="transition-all collapsible-card grid border rounded-2xl overflow-hidden"
+	>
+		<div
+			@click="isOpen = !isOpen"
+			class="flex justify-between items-center p-4 cursor-pointer"
+		>
+			<h2
+				class="text-lg"
+			>{ title }</h2>
+			<div
+				x-bind:class="isOpen ? '' : 'rotate-180'"
+				class="transition-transform"
+			>
+				@ChevronUpIcon(NewIconProps())
+			</div>
+		</div>
+		<div
+			x-show="isOpen"
+			x-transition
+			x-bind:class="isOpen ? 'min-h-fit pb-4' : 'min-h-0 pb-0'"
+			class="transition-all px-4"
+		>
+			{ children... }
+		</div>
 	</div>
 }
