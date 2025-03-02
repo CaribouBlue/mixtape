@@ -41,15 +41,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4.2.0
-
-      - name: Install node dependencies
-        run: npm install
-
-      - name: Generate css
-        run: npx tailwindcss -i ./static/css/input.css -o ./static/css/output.css
-
       - name: Set up Docker
         uses: docker/setup-docker-action@v4.1.0
 

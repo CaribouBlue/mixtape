@@ -1,4 +1,13 @@
-FROM golang:1.24 AS build
+FROM node:18 AS bundle-static
+
+WORKDIR /usr/src/app
+
+COPY . .
+RUN npm install
+RUN npx tailwindcss -i ./static/css/input.css -o ./static/css/output.css
+RUN rm ./static/css/input.css
+
+FROM golang:1.24 AS build-app
 
 WORKDIR /usr/src/app
 
@@ -25,8 +34,8 @@ ENV HOST=${HOST}
 ENV PORT=${PORT}
 ENV APP_DATA_PATH=${APP_DATA_PATH}
 
-COPY --from=build /usr/src/app/bin /usr/local/bin
-COPY --from=build /usr/src/app/static ${APP_DATA_PATH}/static
+COPY --from=build-app /usr/src/app/bin /usr/local/bin
+COPY --from=bundle-static /usr/src/app/static ${APP_DATA_PATH}/static
 
 EXPOSE ${PORT}
 
