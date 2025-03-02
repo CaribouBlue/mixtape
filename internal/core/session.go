@@ -19,10 +19,13 @@ const (
 )
 
 var (
-	ErrNoSubmissionsLeft     = errors.New("no submissions left")
-	ErrDuplicateSubmission   = errors.New("duplicate submission")
-	ErrNoVotesLeft           = errors.New("no votes left")
-	ErrPlaylistAlreadyExists = errors.New("playlist already exists")
+	ErrNoSubmissionsLeft             = errors.New("no submissions left")
+	ErrDuplicateSubmission           = errors.New("duplicate submission")
+	ErrNoVotesLeft                   = errors.New("no votes left")
+	ErrPlaylistAlreadyExists         = errors.New("playlist already exists")
+	ErrUserCannotFinalizeSubmissions = errors.New("user cannot finalize submissions")
+	ErrSubmissionsRemaining          = errors.New("not all submissions have been made")
+	ErrSubmissionsFinalized          = errors.New("submissions have already been finalized")
 )
 
 type SessionEntity struct {
@@ -126,9 +129,10 @@ type VoteEntity struct {
 }
 
 type PlayerEntity struct {
-	SessionId  int64
-	PlayerId   int64
-	PlaylistId string
+	SessionId              int64
+	PlayerId               int64
+	PlaylistId             string
+	IsSubmissionsFinalized bool
 }
 
 type SessionDto struct {
@@ -147,6 +151,10 @@ func (s *SessionDto) VoteCount() int {
 		}
 		return count
 	}, 0)
+}
+
+func (s *SessionDto) SubmissionsRemaining() int {
+	return s.MaxSubmissions - len(*s.SubmittedCandidates)
 }
 
 type CandidateDto struct {
@@ -205,6 +213,7 @@ type SessionRepository interface {
 	GetPlayer(sessionId int64, playerId int64) (*PlayerEntity, error)
 	GetPlayers(sessionId int64) (*[]PlayerEntity, error)
 	UpdatePlayerPlaylist(sessionId int64, playerId int64, playlistId string) error
+	FinalizePlayerSubmissions(sessionId, playerId int64) error
 }
 
 type SessionService struct {
@@ -455,6 +464,28 @@ func (s *SessionService) JoinSession(sessionId, userId int64) (*PlayerDto, error
 	}, nil
 }
 
+func (s *SessionService) FinalizePlayerSubmissions(sessionId, userId int64) error {
+	session, err := s.GetSessionView(sessionId, userId)
+	if err != nil {
+		return err
+	}
+
+	if session.CurrentPlayer.PlayerId != userId {
+		return ErrUserCannotFinalizeSubmissions
+	}
+
+	if session.SubmissionsRemaining() > 0 {
+		return ErrSubmissionsRemaining
+	}
+
+	err = s.sessionRepository.FinalizePlayerSubmissions(sessionId, userId)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (s *SessionService) SearchCandidateSubmissions(sessionId int64, query string) (*[]CandidateDto, error) {
 	tracks, err := s.musicService.SearchTracks(query)
 	if err != nil {
@@ -474,6 +505,15 @@ func (s *SessionService) SearchCandidateSubmissions(sessionId int64, query strin
 
 func (s *SessionService) SubmitCandidate(sessionId, userId int64, trackId string) (*CandidateDto, error) {
 	// TODO: improve validation logic
+	player, err := s.sessionRepository.GetPlayer(sessionId, userId)
+	if err != nil {
+		return nil, err
+	}
+
+	if player.IsSubmissionsFinalized {
+		return nil, ErrSubmissionsFinalized
+	}
+
 	session, err := s.sessionRepository.GetSessionById(sessionId)
 	if err != nil {
 		return nil, err
@@ -512,7 +552,16 @@ func (s *SessionService) SubmitCandidate(sessionId, userId int64, trackId string
 }
 
 func (s *SessionService) RemoveCandidate(sessionId, userId, candidateId int64) error {
-	err := s.sessionRepository.DeleteCandidate(sessionId, candidateId)
+	player, err := s.sessionRepository.GetPlayer(sessionId, userId)
+	if err != nil {
+		return err
+	}
+
+	if player.IsSubmissionsFinalized {
+		return ErrSubmissionsFinalized
+	}
+
+	err = s.sessionRepository.DeleteCandidate(sessionId, candidateId)
 	if err != nil {
 		return err
 	}

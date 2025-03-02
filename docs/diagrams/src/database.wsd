@@ -43,9 +43,13 @@ package "Session Repo" as session_repo {
         player_id: int <<FK>>
         --
         playlist_id: string <<FK>>
+        is_submissions_finalized: bool
     }
-
-    
+    note right
+        TODO:
+        Update is_submissions_finalized 
+        to be a unix timestamp submissions_finalized_at
+    end note
 
     entity candidates {
         id: int <<PK>>
@@ -54,8 +58,6 @@ package "Session Repo" as session_repo {
         session_id: int <<FK>>
         track_id: string
     }
-
-    
 
     entity votes {
         session_id: int <<FK>>

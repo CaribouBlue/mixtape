@@ -57,6 +57,7 @@ func createTables(db *storage.SqliteStore) {
 			session_id INTEGER,
 			player_id INTEGER,
 			playlist_id TEXT,
+			is_submissions_finalized INTEGER DEFAULT (0),
 			FOREIGN KEY (session_id) REFERENCES ` + storage.TableNameSessions + ` (id),
 			FOREIGN KEY (player_id) REFERENCES ` + storage.TableNameUsers + ` (id),
 			PRIMARY KEY (session_id, player_id)

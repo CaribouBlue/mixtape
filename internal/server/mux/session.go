@@ -54,9 +54,9 @@ func NewSessionMux(opts SessionMuxOpts, repos SessionMuxRepos, middleware []midd
 
 	mux.Handle("GET /{sessionId}/phase-duration", http.HandlerFunc(mux.handleGetPhaseDuration))
 	mux.Handle("GET /{sessionId}/submission-search", http.HandlerFunc(mux.handleSearchSubmissions))
-	mux.Handle("GET /{sessionId}/submission-counter", http.HandlerFunc(mux.handleGetSubmissionCounter))
-	mux.Handle("GET /{sessionId}/vote-counter", http.HandlerFunc(mux.handleGetVoteCounter))
+
 	mux.Handle("POST /{sessionId}/player/me", http.HandlerFunc(mux.handleJoinSession))
+	mux.Handle("POST /{sessionId}/player/me/finalize-submissions", http.HandlerFunc(mux.handleFinalizeSubmissions))
 	mux.Handle("POST /{sessionId}/player/me/playlist", http.HandlerFunc(mux.handleCreatePlayerPlaylist))
 
 	mux.Handle("POST /{sessionId}/candidate", http.HandlerFunc(mux.handleSubmitCandidate))
@@ -192,44 +192,14 @@ func (mux *SessionMux) handleSubmitCandidate(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	session, err := mux.services.SessionService.GetSessionView(sessionId, user.Id)
+	if err != nil {
+		http.Error(w, "Failed to get session view", http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Add("HX-Trigger", serverUtils.EventNewSubmission)
-	serverUtils.HandleHtmlResponse(r, w, templates.AddSubmission(*submission))
-}
-
-func (mux *SessionMux) handleGetSubmissionCounter(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(serverUtils.UserCtxKey).(*core.UserEntity)
-
-	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
-	if err != nil {
-		http.Error(w, "Invalid session ID", http.StatusBadRequest)
-		return
-	}
-
-	sessionView, err := mux.services.SessionService.GetSessionView(sessionId, user.Id)
-	if err != nil {
-		http.Error(w, "Failed to get session view", http.StatusInternalServerError)
-		return
-	}
-
-	serverUtils.HandleHtmlResponse(r, w, templates.SubmissionCounter(*sessionView))
-}
-
-func (mux *SessionMux) handleGetVoteCounter(w http.ResponseWriter, r *http.Request) {
-	user := r.Context().Value(serverUtils.UserCtxKey).(*core.UserEntity)
-
-	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
-	if err != nil {
-		http.Error(w, "Invalid session ID", http.StatusBadRequest)
-		return
-	}
-
-	sessionView, err := mux.services.SessionService.GetSessionView(sessionId, user.Id)
-	if err != nil {
-		http.Error(w, "Failed to get session view", http.StatusInternalServerError)
-		return
-	}
-
-	serverUtils.HandleHtmlResponse(r, w, templates.VoteCounter(*sessionView))
+	serverUtils.HandleHtmlResponse(r, w, templates.AddSubmission(*session, *submission))
 }
 
 func (mux *SessionMux) handleJoinSession(w http.ResponseWriter, r *http.Request) {
@@ -253,7 +223,31 @@ func (mux *SessionMux) handleJoinSession(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	serverUtils.HandleHtmlResponse(r, w, templates.SubmissionPhaseView(*sessionView))
+	serverUtils.HandleHtmlResponse(r, w, templates.SessionPage(*sessionView))
+}
+
+func (mux *SessionMux) handleFinalizeSubmissions(w http.ResponseWriter, r *http.Request) {
+	user := r.Context().Value(serverUtils.UserCtxKey).(*core.UserEntity)
+
+	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
+	if err != nil {
+		http.Error(w, "Invalid session ID", http.StatusBadRequest)
+		return
+	}
+
+	err = mux.services.SessionService.FinalizePlayerSubmissions(sessionId, user.Id)
+	if err != nil {
+		http.Error(w, "Failed to finalize submissions", http.StatusInternalServerError)
+		return
+	}
+
+	sessionView, err := mux.services.SessionService.GetSessionView(sessionId, user.Id)
+	if err != nil {
+		http.Error(w, "Failed to get session view", http.StatusInternalServerError)
+		return
+	}
+
+	serverUtils.HandleHtmlResponse(r, w, templates.SessionPage(*sessionView))
 }
 
 func (mux *SessionMux) handleCreatePlayerPlaylist(w http.ResponseWriter, r *http.Request) {
@@ -311,8 +305,14 @@ func (mux *SessionMux) handleRemoveCandidate(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
+	session, err := mux.services.SessionService.GetSessionView(sessionId, user.Id)
+	if err != nil {
+		http.Error(w, "Failed to get session view", http.StatusInternalServerError)
+		return
+	}
+
 	w.Header().Add("HX-Trigger", serverUtils.EventDeleteSubmission)
-	w.WriteHeader(http.StatusOK)
+	serverUtils.HandleHtmlResponse(r, w, templates.RemoveSubmission(*session))
 }
 
 func (mux *SessionMux) handleCreateCandidateVote(w http.ResponseWriter, r *http.Request) {

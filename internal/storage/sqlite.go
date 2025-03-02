@@ -427,11 +427,21 @@ func (store *SqliteStore) UpdatePlayerPlaylist(sessionId int64, playerId int64, 
 	return nil
 }
 
+func (store *SqliteStore) FinalizePlayerSubmissions(sessionId, playerId int64) error {
+	query := "UPDATE " + TableNamePlayers + " SET is_submissions_finalized = ? WHERE session_id = ? AND player_id = ?"
+	_, err := store.Exec(query, true, sessionId, playerId)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (store *SqliteStore) GetPlayer(sessionId int64, playerId int64) (*core.PlayerEntity, error) {
-	query := "SELECT session_id, player_id, playlist_id FROM " + TableNamePlayers + " WHERE session_id = ? AND player_id = ?"
+	query := "SELECT session_id, player_id, playlist_id, is_submissions_finalized FROM " + TableNamePlayers + " WHERE session_id = ? AND player_id = ?"
 	row := store.db.QueryRow(query, sessionId, playerId)
 	player := &core.PlayerEntity{}
-	err := row.Scan(&player.SessionId, &player.PlayerId, &player.PlaylistId)
+	err := row.Scan(&player.SessionId, &player.PlayerId, &player.PlaylistId, &player.IsSubmissionsFinalized)
 	if err == sql.ErrNoRows {
 		return nil, nil // Player not found
 	} else if err != nil {
@@ -442,7 +452,7 @@ func (store *SqliteStore) GetPlayer(sessionId int64, playerId int64) (*core.Play
 }
 
 func (store *SqliteStore) GetPlayers(sessionId int64) (*[]core.PlayerEntity, error) {
-	query := "SELECT session_id, player_id, playlist_id FROM " + TableNamePlayers + " WHERE session_id = ?"
+	query := "SELECT session_id, player_id, playlist_id, is_submissions_finalized FROM " + TableNamePlayers + " WHERE session_id = ?"
 	rows, err := store.db.Query(query, sessionId)
 	if err != nil {
 		return nil, err
@@ -451,7 +461,7 @@ func (store *SqliteStore) GetPlayers(sessionId int64) (*[]core.PlayerEntity, err
 	players := make([]core.PlayerEntity, 0)
 	for rows.Next() {
 		player := core.PlayerEntity{}
-		err := rows.Scan(&player.SessionId, &player.PlayerId, &player.PlaylistId)
+		err := rows.Scan(&player.SessionId, &player.PlayerId, &player.PlaylistId, &player.IsSubmissionsFinalized)
 		if err != nil {
 			return nil, err
 		}

@@ -11,6 +11,8 @@ const (
 	IdAttrSessionPage                      string = "session-page"
 	IdAttrCandidateSubmission              string = "candidate-submissions"
 	IdAttrCandidateSubmissionSearchResults string = "candidate-submission-search-results"
+	IdAttrCandidateSubmissionsActions      string = "candidate-submissions-actions"
+	IdAttrFinalizeSubmissionsButton        string = "finalize-submissions-button"
 )
 
 // Session Page Templates
@@ -27,7 +29,7 @@ templ SessionPage(s core.SessionDto) {
 				@SessionTimeline(s)
 			</div>
 			<div class="col-span-full grid grid-cols-subgrid gap-4">
-				@CollapsibleCard("Players", false) {
+				@CollapsibleCard("Players", s.Phase() == core.SubmissionPhase) {
 					<div class="overflow-x-auto">
 						<table class="table">
 							<thead>
@@ -44,6 +46,13 @@ templ SessionPage(s core.SessionDto) {
 												@HouseIcon(NewIconProps())
 											}
 											{ player.DisplayName }
+										</td>
+										<td>
+											if player.IsSubmissionsFinalized {
+												<div class="badge badge-success badge-outline">
+													finalized submissions
+												</div>
+											}
 										</td>
 									</tr>
 								}
@@ -175,50 +184,65 @@ templ SubmissionPhaseView(s core.SessionDto) {
 	if !s.CurrentPlayer.IsJoinedSession() {
 		<button
 			hx-post={ fmt.Sprintf("/app/session/%d/player/me", s.Id) }
+			hx-target="body"
 			hx-swap="outerHTML"
+			hx-disabled-elt="this"
 			class="btn btn-wide w-full"
 		>
 			Join Session
 		</button>
 	} else {
-		<div class="col-span-full grid grid-cols-subgrid gap-4 p-4 border rounded-2xl">
+		<div
+			x-data={ fmt.Sprintf("{ submissionCount: %d, maxSubmissions: %d }", len(*s.SubmittedCandidates), s.MaxSubmissions) }
+			{ templ.Attributes{
+				fmt.Sprintf("@%s.document", serverUtils.EventNewSubmission): "submissionCount++",
+				fmt.Sprintf("@%s.document", serverUtils.EventDeleteSubmission): "submissionCount--",
+			}... }
+			class="col-span-full grid grid-cols-subgrid gap-4 p-4 border rounded-2xl"
+		>
 			<h2
 				class="text-lg"
 			>Your Submissions </h2>
-			<p
-				hx-get={ fmt.Sprintf("/app/session/%d/submission-counter", s.Id) }
-				hx-trigger={ fmt.Sprintf("%s from:body, %s from:body", serverUtils.EventNewSubmission, serverUtils.EventDeleteSubmission) }
-				class="text-sm"
-			>
-				@SubmissionCounter(s)
-			</p>
+			if !s.CurrentPlayer.IsSubmissionsFinalized {
+				<p
+					class="text-sm"
+				>
+					<span x-html="`${submissionCount}/${maxSubmissions}`"></span>
+				</p>
+			}
 			<div class="overflow-x-auto">
 				<table id={ IdAttrCandidateSubmission } class="table">
 					<tbody>
 						for _, candidate := range *s.SubmittedCandidates {
-							@SubmissionItem(candidate)
+							@SubmissionItem(candidate, s.CurrentPlayer.IsSubmissionsFinalized)
 						}
 					</tbody>
 				</table>
 			</div>
-			<input
-				hx-get={ fmt.Sprintf("/app/session/%d/submission-search", s.Id) }
-				hx-trigger="input changed delay:500ms, search"
-				hx-target={ fmt.Sprintf("#%s", IdAttrCandidateSubmissionSearchResults) }
-				class="input input-bordered w-full"
-				type="search"
-				name="query"
-				placeholder="Begin Typing To Search Tracks..."
-			/>
-			<div class="overflow-x-auto">
-				<table id={ IdAttrCandidateSubmissionSearchResults } class="table"></table>
+			<div id={ IdAttrCandidateSubmissionsActions }>
+				if len(*s.SubmittedCandidates) < s.MaxSubmissions {
+					@CandidateSubmissionSearchBar(s.Id)
+				} else {
+					@FinalizeSubmissionsButton(s.Id, s.CurrentPlayer.IsSubmissionsFinalized)
+				}
 			</div>
 		</div>
 	}
 }
 
-templ SubmissionCounter(s core.SessionDto) {
-	{ fmt.Sprintf("%d/%d", len(*s.SubmittedCandidates), s.MaxSubmissions) }
+templ CandidateSubmissionSearchBar(sessionId int64) {
+	<input
+		hx-get={ fmt.Sprintf("/app/session/%d/submission-search", sessionId) }
+		hx-trigger="input changed delay:500ms, search"
+		hx-target={ fmt.Sprintf("#%s", IdAttrCandidateSubmissionSearchResults) }
+		class="input input-bordered w-full mb-4"
+		type="search"
+		name="query"
+		placeholder="Begin Typing To Search Tracks..."
+	/>
+	<div class="overflow-x-auto">
+		<table id={ IdAttrCandidateSubmissionSearchResults } class="table"></table>
+	</div>
 }
 
 templ CandidateSubmissionSearchResults(candidates []core.CandidateDto) {
@@ -254,6 +278,7 @@ templ CandidateSubmissionSearchResults(candidates []core.CandidateDto) {
 					<button
 						hx-post={ fmt.Sprintf("/app/session/%d/candidate", candidate.SessionId) }
 						hx-vals={ fmt.Sprintf(`{"trackId": "%s"}`, candidate.Track.Id) }
+						hx-disabled-elt="this"
 						hx-target="closest tr"
 						hx-target-422="previous span"
 						class="btn"
@@ -299,16 +324,43 @@ templ CandidateSubmissionSearchResults(candidates []core.CandidateDto) {
 	</tbody>
 }
 
-templ SubmissionItem(candidate core.CandidateDto) {
+templ FinalizeSubmissionsButton(sessionId int64, isSubmissionsFinalized bool) {
+	if isSubmissionsFinalized {
+		<button
+			class="btn btn-primary w-full"
+			disabled
+		>
+			Submissions Finalized
+		</button>
+	} else {
+		<button
+			id={ IdAttrFinalizeSubmissionsButton }
+			hx-post={ fmt.Sprintf("/app/session/%d/player/me/finalize-submissions", sessionId) }
+			hx-target="body"
+			hx-swap="outerHTML"
+			hx-disabled-elt="this"
+			class="btn btn-primary w-full"
+		>
+			@requestSpinner(SpinnerOpts{Size: SpinnerSizeS}) {
+				Finalize Submissions
+			}
+		</button>
+	}
+}
+
+templ SubmissionItem(candidate core.CandidateDto, isFinalized bool) {
 	<tr>
-		<td class="w-0">
-			<button
-				hx-delete={ fmt.Sprintf("/app/session/%d/candidate/%d", candidate.SessionId, candidate.Id) }
-				hx-target="closest tr"
-				hx-swap="delete"
-				class="btn"
-			>Remove</button>
-		</td>
+		if !isFinalized {
+			<td class="w-0">
+				<button
+					hx-delete={ fmt.Sprintf("/app/session/%d/candidate/%d", candidate.SessionId, candidate.Id) }
+					hx-target="closest tr"
+					hx-swap="delete"
+					hx-disabled-elt="this"
+					class="btn"
+				>Remove</button>
+			</td>
+		}
 		<td>
 			<div class="flex items-center gap-2">
 				<a
@@ -347,12 +399,31 @@ templ SubmissionItem(candidate core.CandidateDto) {
 	</tr>
 }
 
-templ AddSubmission(candidate core.CandidateDto) {
+templ AddSubmission(session core.SessionDto, candidate core.CandidateDto) {
 	<tbody
 		hx-swap-oob={ fmt.Sprintf("beforeend:#%s tbody", IdAttrCandidateSubmission) }
 	>
-		@SubmissionItem(candidate)
+		@SubmissionItem(candidate, session.CurrentPlayer.IsSubmissionsFinalized)
 	</tbody>
+	if session.SubmissionsRemaining() == 0 {
+		<div
+			id={ IdAttrCandidateSubmissionsActions }
+			hx-swap-oob="true"
+		>
+			@FinalizeSubmissionsButton(session.Id, session.CurrentPlayer.IsSubmissionsFinalized)
+		</div>
+	}
+}
+
+templ RemoveSubmission(session core.SessionDto) {
+	if session.SubmissionsRemaining() == 1 {
+		<div
+			id={ IdAttrCandidateSubmissionsActions }
+			hx-swap-oob="true"
+		>
+			@CandidateSubmissionSearchBar(session.Id)
+		</div>
+	}
 }
 
 // Vote Phase View Templates
