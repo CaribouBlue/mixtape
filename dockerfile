@@ -3,7 +3,7 @@ FROM node:18 AS bundle-static
 WORKDIR /usr/src/app
 
 COPY . .
-RUN npm install
+RUN npm ci
 RUN npx tailwindcss -i ./static/css/input.css -o ./static/css/output.css
 RUN rm ./static/css/input.css
 
