@@ -118,27 +118,12 @@ func (mux *AuthMux) handleUserLoginSubmit(w http.ResponseWriter, r *http.Request
 
 	err = utils.SetAuthCookie(w, u)
 	if err != nil {
-		log.Default().Print(err)
+		log.Default().Println("Failed to set auth cookie:", err)
 		http.Error(w, "Failed to set auth cookie", http.StatusInternalServerError)
 		return
 	}
 
-	spotify, ok := r.Context().Value(utils.SpotifyClientCtxKey).(*spotify.Client)
-	if !ok || spotify == nil {
-		http.Error(w, "Failed to get Spotify client", http.StatusInternalServerError)
-		return
-	}
-
-	_, err = spotify.Reauthenticate(u.SpotifyToken)
-	if err != nil {
-		w.Header().Add("HX-Redirect", mux.Opts.PathPrefix+"/spotify")
-		w.WriteHeader(http.StatusOK)
-		return
-	} else {
-		w.Header().Add("HX-Redirect", mux.Opts.LoginSuccessPath)
-		w.WriteHeader(http.StatusOK)
-		return
-	}
+	utils.HandleRedirect(w, r, mux.Opts.PathPrefix+"/login")
 }
 
 func (mux *AuthMux) handleLogin(w http.ResponseWriter, r *http.Request) {
@@ -155,15 +140,18 @@ func (mux *AuthMux) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Default().Println("Reauthenticating Spotify client for user:", u.Username, u.SpotifyToken)
+	if u.IsAuthenticatedWithSpotify() {
+		_, err := spotify.Reauthenticate(u.SpotifyToken)
+		if err != nil {
+			log.Default().Println("Failed to reauthenticate with spotify", err)
+			http.Error(w, "Failed to authenticate", http.StatusInternalServerError)
+			return
+		}
 
-	_, err := spotify.Reauthenticate(u.SpotifyToken)
-	if err != nil {
-		log.Default().Println("Failed to reauthenticate Spotify client:", err)
-		utils.HandleRedirect(w, r, mux.Opts.PathPrefix+"/spotify")
+		utils.HandleRedirect(w, r, mux.Opts.LoginSuccessPath)
 		return
 	} else {
-		utils.HandleRedirect(w, r, mux.Opts.LoginSuccessPath)
+		utils.HandleRedirect(w, r, mux.Opts.PathPrefix+"/spotify")
 		return
 	}
 }

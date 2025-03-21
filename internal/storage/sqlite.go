@@ -108,19 +108,18 @@ func (store *SqliteStore) GetUserById(userId int64) (*core.UserEntity, error) {
 	}
 
 	user.IsAdmin = isAdmin.Bool
-	if spotifyToken.Valid {
-		user.SpotifyToken = spotifyToken.String
-	}
+	user.SpotifyToken = spotifyToken.String
 
 	return user, nil
 }
 
 func (store *SqliteStore) GetUserByUsername(username string) (*core.UserEntity, error) {
 	user := &core.UserEntity{}
-	query := "SELECT id, username, display_name, hashed_password, is_admin FROM " + TableNameUsers + " WHERE username = ?"
+	query := "SELECT id, username, display_name, hashed_password, spotify_token, is_admin FROM " + TableNameUsers + " WHERE username = ?"
 	row := store.db.QueryRow(query, username)
+	var spotifyToken sql.NullString
 	var isAdmin sql.NullBool
-	err := row.Scan(&user.Id, &user.Username, &user.DisplayName, &user.HashedPassword, &isAdmin)
+	err := row.Scan(&user.Id, &user.Username, &user.DisplayName, &user.HashedPassword, &spotifyToken, &isAdmin)
 	if err == sql.ErrNoRows {
 		return nil, nil // User not found
 	} else if err != nil {
@@ -128,6 +127,7 @@ func (store *SqliteStore) GetUserByUsername(username string) (*core.UserEntity, 
 	}
 
 	user.IsAdmin = isAdmin.Bool
+	user.SpotifyToken = spotifyToken.String
 
 	return user, nil
 }

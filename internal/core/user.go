@@ -2,7 +2,6 @@ package core
 
 import (
 	"errors"
-	"log"
 	"regexp"
 	"strconv"
 	"strings"
@@ -30,6 +29,10 @@ type UserEntity struct {
 
 func (u *UserEntity) IdString() string {
 	return strconv.FormatInt(u.Id, 10)
+}
+
+func (u *UserEntity) IsAuthenticatedWithSpotify() bool {
+	return u.SpotifyToken != ""
 }
 
 type UserRepository interface {
@@ -95,7 +98,7 @@ func (s *UserService) LoginUser(username string, password string) (*UserEntity, 
 	} else if user == nil {
 		return nil, ErrUserNotFound
 	}
-	log.Println("user hashed pwd", user.HashedPassword)
+
 	if err := bcrypt.CompareHashAndPassword(user.HashedPassword, []byte(password)); err != nil {
 		if err == bcrypt.ErrMismatchedHashAndPassword {
 			return nil, ErrIncorrectPassword

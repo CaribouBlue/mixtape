@@ -288,8 +288,6 @@ func (s *SessionService) GetSessionsListForUser(userId int64) (*[]SessionDto, er
 			session.CurrentPlayer.PlayerEntity = *player
 		}
 
-		fmt.Println("Session player ID: ", session.CurrentPlayer.PlayerId)
-
 		sessions[i] = session
 	}
 
