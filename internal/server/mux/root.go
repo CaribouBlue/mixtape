@@ -9,46 +9,35 @@ import (
 )
 
 type RootMux struct {
-	*http.ServeMux
-	Services   RootMuxServices
-	Middleware []middleware.Middleware
-	Children   RootMuxChildren
+	Mux[RootMuxOpts, RootMuxServices]
+}
+
+func (mux *RootMux) Opts() MuxOpts {
+	return mux.opts.MuxOpts
+}
+
+type RootMuxOpts struct {
+	MuxOpts
 }
 
 type RootMuxServices struct {
+	MuxServices
 	UserService *core.UserService
 }
 
-type RootMuxChildren struct {
-	AuthMux   *AuthMux
-	AppMux    *AppMux
-	StaticMux *StaticMux
-}
-
-func NewRootMux(services RootMuxServices, middleware []middleware.Middleware, children RootMuxChildren) *RootMux {
+func NewRootMux(opts RootMuxOpts, services RootMuxServices, middleware []middleware.Middleware, children []ChildMux) *RootMux {
 	mux := &RootMux{
-		http.NewServeMux(),
-		services,
-		middleware,
-		children,
+		*NewMux(
+			opts,
+			services,
+			children,
+			middleware,
+		),
 	}
 
 	mux.Handle("/{$}", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		utils.HandleRedirect(w, r, "/app")
 	}))
 
-	authPathPrefix := mux.Children.AuthMux.Opts.PathPrefix
-	mux.Handle(authPathPrefix+"/", http.StripPrefix(authPathPrefix, mux.Children.AuthMux))
-
-	appPathPrefix := mux.Children.AppMux.Opts.PathPrefix
-	mux.Handle(appPathPrefix+"/", http.StripPrefix(appPathPrefix, mux.Children.AppMux))
-
-	staticPathPrefix := mux.Children.StaticMux.Opts.PathPrefix
-	mux.Handle(staticPathPrefix+"/", http.StripPrefix(staticPathPrefix, mux.Children.StaticMux))
-
 	return mux
-}
-
-func (mux *RootMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	middleware.Apply(mux.ServeMux, mux.Middleware...).ServeHTTP(w, r)
 }

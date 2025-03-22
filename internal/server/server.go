@@ -45,6 +45,7 @@ func NewServer() *http.Server {
 	}
 
 	rootMuxHandler := mux.NewRootMux(
+		mux.RootMuxOpts{},
 		mux.RootMuxServices{
 			UserService: userService,
 		},
@@ -55,18 +56,24 @@ func NewServer() *http.Server {
 				http.Error(w, "Not found", http.StatusNotFound)
 			})),
 		},
-		mux.RootMuxChildren{
-			StaticMux: mux.NewStaticMux(
+		[]mux.ChildMux{
+			mux.NewStaticMux(
 				mux.StaticMuxOpts{
-					PathPrefix: "/static",
+					MuxOpts: mux.MuxOpts{
+						PathPrefix: "/static",
+					},
 				},
+				mux.StaticMuxServices{},
 				[]middleware.Middleware{
 					middleware.WithRequestMetadata(),
 				},
+				[]mux.ChildMux{},
 			),
-			AuthMux: mux.NewAuthMux(
+			mux.NewAuthMux(
 				mux.AuthMuxOpts{
-					PathPrefix:       "/auth",
+					MuxOpts: mux.MuxOpts{
+						PathPrefix: "/auth",
+					},
 					LoginSuccessPath: "/app/home",
 				},
 				mux.AuthMuxServices{
@@ -82,11 +89,15 @@ func NewServer() *http.Server {
 						utils.HandleRedirect(w, r, "/auth/login")
 					})),
 				},
+				[]mux.ChildMux{},
 			),
-			AppMux: mux.NewAppMux(
+			mux.NewAppMux(
 				mux.AppMuxOpts{
-					PathPrefix: "/app",
+					MuxOpts: mux.MuxOpts{
+						PathPrefix: "/app",
+					},
 				},
+				mux.AppMuxServices{},
 				[]middleware.Middleware{
 					middleware.WithUser(middleware.WithUserOpts{
 						DefaultUserId: 6666,
@@ -101,23 +112,47 @@ func NewServer() *http.Server {
 						utils.HandleRedirect(w, r, "/app/home")
 					})),
 				},
-				mux.AppMuxChildren{
-					SessionMux: mux.NewSessionMux(
+				[]mux.ChildMux{
+					mux.NewSessionMux(
 						mux.SessionMuxOpts{
-							PathPrefix: "/session",
+							MuxOpts: mux.MuxOpts{
+								PathPrefix: "/session",
+							},
 						},
-						mux.SessionMuxRepos{
-							SessionRepo:      db,
-							MusicRepoFactory: musicRepoFactory,
-							UserRepo:         db,
+						mux.SessionMuxServices{
+							SessionServiceInitializer: func(mux *mux.SessionMux, r *http.Request) (*core.SessionService, error) {
+								musicService, err := mux.Services.MusicService()
+								if err != nil {
+									return nil, err
+								}
+
+								return core.NewSessionService(db, mux.Services.UserService, musicService), nil
+							},
+							MusicServiceInitializer: func(mux *mux.SessionMux, r *http.Request) (*core.MusicService, error) {
+								user := r.Context().Value(utils.UserCtxKey).(*core.UserEntity)
+								spotifyClient := spotify.NewDefaultClient()
+
+								// TODO: handle invalid token
+								if user.SpotifyToken != "" {
+									spotifyClient.Reauthenticate(user.SpotifyToken)
+								}
+
+								return core.NewMusicService(spotifyClient), nil
+							},
+							UserService: userService,
 						},
 						[]middleware.Middleware{},
+						[]mux.ChildMux{},
 					),
-					ProfileMux: mux.NewProfileMux(
+					mux.NewProfileMux(
 						mux.ProfileMuxOpts{
-							PathPrefix: "/profile",
+							MuxOpts: mux.MuxOpts{
+								PathPrefix: "/profile",
+							},
 						},
+						mux.ProfileMuxServices{},
 						[]middleware.Middleware{},
+						[]mux.ChildMux{},
 					),
 				},
 			),
@@ -130,16 +165,4 @@ func NewServer() *http.Server {
 	}
 
 	return server
-}
-
-var musicRepoFactory utils.RequestBasedFactory[core.MusicRepository] = func(r *http.Request) core.MusicRepository {
-	user := r.Context().Value(utils.UserCtxKey).(*core.UserEntity)
-	spotifyClient := spotify.NewDefaultClient()
-
-	// TODO: handle invalid token
-	if user.SpotifyToken != "" {
-		spotifyClient.Reauthenticate(user.SpotifyToken)
-	}
-
-	return spotifyClient
 }

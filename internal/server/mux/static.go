@@ -8,20 +8,29 @@ import (
 )
 
 type StaticMux struct {
-	*http.ServeMux
-	Opts       StaticMuxOpts
-	Middleware []middleware.Middleware
+	Mux[StaticMuxOpts, StaticMuxServices]
+}
+
+func (mux *StaticMux) Opts() MuxOpts {
+	return mux.opts.MuxOpts
 }
 
 type StaticMuxOpts struct {
-	PathPrefix string
+	MuxOpts
 }
 
-func NewStaticMux(opts StaticMuxOpts, middleware []middleware.Middleware) *StaticMux {
+type StaticMuxServices struct {
+	MuxServices
+}
+
+func NewStaticMux(opts StaticMuxOpts, services StaticMuxServices, middleware []middleware.Middleware, children []ChildMux) *StaticMux {
 	mux := &StaticMux{
-		ServeMux:   http.NewServeMux(),
-		Opts:       opts,
-		Middleware: middleware,
+		*NewMux(
+			opts,
+			services,
+			children,
+			middleware,
+		),
 	}
 
 	appDataPath := config.GetConfigValue(config.ConfAppDataPath)
@@ -32,8 +41,4 @@ func NewStaticMux(opts StaticMuxOpts, middleware []middleware.Middleware) *Stati
 	mux.Handle("/", http.FileServer(http.Dir(appDataPath+"/static")))
 
 	return mux
-}
-
-func (mux *StaticMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	middleware.Apply(mux.ServeMux, mux.Middleware...).ServeHTTP(w, r)
 }

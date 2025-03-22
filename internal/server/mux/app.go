@@ -10,28 +10,31 @@ import (
 )
 
 type AppMux struct {
-	*http.ServeMux
-	Opts       AppMuxOpts
-	Children   AppMuxChildren
-	Middleware []middleware.Middleware
+	Mux[AppMuxOpts, AppMuxServices]
+}
+
+func (mux *AppMux) Opts() MuxOpts {
+	return mux.opts.MuxOpts
 }
 
 type AppMuxOpts struct {
-	PathPrefix string
+	MuxOpts
 }
 
-type AppMuxChildren struct {
-	SessionMux *SessionMux
-	ProfileMux *ProfileMux
+type AppMuxServices struct {
+	MuxServices
 }
 
-func NewAppMux(opts AppMuxOpts, mw []middleware.Middleware, children AppMuxChildren) *AppMux {
+func NewAppMux(opts AppMuxOpts, services AppMuxServices, middleware []middleware.Middleware, children []ChildMux) *AppMux {
 	mux := &AppMux{
-		http.NewServeMux(),
-		opts,
-		children,
-		mw,
+		*NewMux(
+			opts,
+			services,
+			children,
+			middleware,
+		),
 	}
+	mux.Middleware = middleware
 
 	mux.Handle("/home", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user := r.Context().Value(utils.UserCtxKey).(*core.UserEntity)
@@ -39,15 +42,5 @@ func NewAppMux(opts AppMuxOpts, mw []middleware.Middleware, children AppMuxChild
 		utils.HandleHtmlResponse(r, w, templates.Home(*user))
 	}))
 
-	sessionPathPrefix := mux.Children.SessionMux.Opts.PathPrefix
-	mux.Handle(sessionPathPrefix+"/", http.StripPrefix(sessionPathPrefix, mux.Children.SessionMux))
-
-	profilePathPrefix := mux.Children.ProfileMux.Opts.PathPrefix
-	mux.Handle(profilePathPrefix+"/", http.StripPrefix(profilePathPrefix, mux.Children.ProfileMux))
-
 	return mux
-}
-
-func (mux *AppMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	middleware.Apply(mux.ServeMux, mux.Middleware...).ServeHTTP(w, r)
 }

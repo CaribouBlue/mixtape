@@ -12,27 +12,31 @@ import (
 )
 
 type AuthMux struct {
-	*http.ServeMux
-	Opts       AuthMuxOpts
-	Services   AuthMuxServices
-	Middleware []middleware.Middleware
+	Mux[AuthMuxOpts, AuthMuxServices]
+}
+
+func (mux *AuthMux) Opts() MuxOpts {
+	return mux.opts.MuxOpts
 }
 
 type AuthMuxOpts struct {
-	PathPrefix       string
+	MuxOpts
 	LoginSuccessPath string
 }
 
 type AuthMuxServices struct {
+	MuxServices
 	UserService *core.UserService
 }
 
-func NewAuthMux(opts AuthMuxOpts, services AuthMuxServices, middleware []middleware.Middleware) *AuthMux {
+func NewAuthMux(opts AuthMuxOpts, services AuthMuxServices, middleware []middleware.Middleware, children []ChildMux) *AuthMux {
 	mux := &AuthMux{
-		http.NewServeMux(),
-		opts,
-		services,
-		middleware,
+		*NewMux(
+			opts,
+			services,
+			children,
+			middleware,
+		),
 	}
 
 	mux.Handle("GET /user/login", http.HandlerFunc(mux.handleUserLoginPage))
@@ -48,10 +52,6 @@ func NewAuthMux(opts AuthMuxOpts, services AuthMuxServices, middleware []middlew
 	mux.Handle("/spotify/redirect", http.HandlerFunc(mux.handleSpotifyAuthRedirect))
 
 	return mux
-}
-
-func (mux *AuthMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	middleware.Apply(mux.ServeMux, mux.Middleware...).ServeHTTP(w, r)
 }
 
 func (mux *AuthMux) handleUserLoginPage(w http.ResponseWriter, r *http.Request) {
@@ -99,7 +99,7 @@ func (mux *AuthMux) handleUserSignUp(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	w.Header().Add("HX-Redirect", mux.Opts.PathPrefix+"/user/login")
+	w.Header().Add("HX-Redirect", mux.opts.PathPrefix+"/user/login")
 	w.WriteHeader(http.StatusCreated)
 }
 
@@ -123,14 +123,14 @@ func (mux *AuthMux) handleUserLoginSubmit(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	utils.HandleRedirect(w, r, mux.Opts.PathPrefix+"/login")
+	utils.HandleRedirect(w, r, mux.opts.PathPrefix+"/login")
 }
 
 func (mux *AuthMux) handleLogin(w http.ResponseWriter, r *http.Request) {
 	u := r.Context().Value(utils.UserCtxKey).(*core.UserEntity)
 
 	if u.Id == 0 {
-		utils.HandleRedirect(w, r, mux.Opts.PathPrefix+"/user/login")
+		utils.HandleRedirect(w, r, mux.opts.PathPrefix+"/user/login")
 		return
 	}
 
@@ -148,17 +148,17 @@ func (mux *AuthMux) handleLogin(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		utils.HandleRedirect(w, r, mux.Opts.LoginSuccessPath)
+		utils.HandleRedirect(w, r, mux.opts.LoginSuccessPath)
 		return
 	} else {
-		utils.HandleRedirect(w, r, mux.Opts.PathPrefix+"/spotify")
+		utils.HandleRedirect(w, r, mux.opts.PathPrefix+"/spotify")
 		return
 	}
 }
 
 func (mux *AuthMux) handleLogout(w http.ResponseWriter, r *http.Request) {
 	utils.ClearAuthCookie(w)
-	utils.HandleRedirect(w, r, mux.Opts.PathPrefix+"/user/login")
+	utils.HandleRedirect(w, r, mux.opts.PathPrefix+"/user/login")
 }
 
 func (mux *AuthMux) handleSpotifyAuth(w http.ResponseWriter, r *http.Request) {
@@ -220,5 +220,5 @@ func (mux *AuthMux) handleSpotifyAuthRedirect(w http.ResponseWriter, r *http.Req
 
 	log.Default().Println("Authenticated Spotify user:", u.Username, u.SpotifyToken)
 
-	utils.HandleRedirect(w, r, mux.Opts.PathPrefix+"/login")
+	utils.HandleRedirect(w, r, mux.opts.PathPrefix+"/login")
 }
