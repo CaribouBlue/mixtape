@@ -25,10 +25,12 @@ func withDefaultValue(defaultValue string) ConfigPropertyOpt {
 	}
 }
 
-func isRequired(prop *ConfigProperty) *ConfigProperty {
-	prop.isRequired = true
-	requiredConfigProperties = append(requiredConfigProperties, prop)
-	return prop
+func withIsRequired(isRequired bool) ConfigPropertyOpt {
+	return func(prop *ConfigProperty) *ConfigProperty {
+		prop.isRequired = isRequired
+		requiredConfigProperties = append(requiredConfigProperties, prop)
+		return prop
+	}
 }
 
 func newConfigProperty(key string, isSecret bool, opts ...ConfigPropertyOpt) ConfigProperty {
@@ -41,16 +43,16 @@ func newConfigProperty(key string, isSecret bool, opts ...ConfigPropertyOpt) Con
 
 var (
 	ConfAccessCode          ConfigProperty = newConfigProperty("ACCESS_CODE", true)
-	ConfDbPath              ConfigProperty = newConfigProperty("DB_PATH", false, isRequired)
+	ConfDbPath              ConfigProperty = newConfigProperty("DB_PATH", false, withIsRequired(true))
 	ConfGmailUsername       ConfigProperty = newConfigProperty("GMAIL_USERNAME", true)
 	ConfGmailPassword       ConfigProperty = newConfigProperty("GMAIL_PASSWORD", true)
 	ConfHost                ConfigProperty = newConfigProperty("HOST", false)
 	ConfPort                ConfigProperty = newConfigProperty("PORT", false)
 	ConfAppDataPath         ConfigProperty = newConfigProperty("APP_DATA_PATH", false, withDefaultValue("."))
-	ConfSpotifyClientId     ConfigProperty = newConfigProperty("SPOTIFY_CLIENT_ID", true, isRequired)
-	ConfSpotifyClientSecret ConfigProperty = newConfigProperty("SPOTIFY_CLIENT_SECRET", true, isRequired)
-	ConfSpotifyRedirectUri  ConfigProperty = newConfigProperty("SPOTIFY_REDIRECT_URI", false, isRequired)
-	ConfSpotifyScope        ConfigProperty = newConfigProperty("SPOTIFY_SCOPE", false, isRequired)
+	ConfSpotifyClientId     ConfigProperty = newConfigProperty("SPOTIFY_CLIENT_ID", true, withIsRequired(true))
+	ConfSpotifyClientSecret ConfigProperty = newConfigProperty("SPOTIFY_CLIENT_SECRET", true, withIsRequired(true))
+	ConfSpotifyRedirectUri  ConfigProperty = newConfigProperty("SPOTIFY_REDIRECT_URI", false, withIsRequired(true))
+	ConfSpotifyScope        ConfigProperty = newConfigProperty("SPOTIFY_SCOPE", false, withIsRequired(true))
 	ConfEnvFiles            ConfigProperty = newConfigProperty("ENV_FILES", false)
 )
 
