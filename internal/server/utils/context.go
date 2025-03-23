@@ -38,13 +38,26 @@ func SetContextValue[T interface{}](ctx context.Context, key ContextKey[T], valu
 }
 
 type RequestMetadata struct {
-	RequestId     string
-	IsHtmxRequest bool
+	RequestCorrelationId string
+	SessionCorrelationId string
+	IsHtmxRequest        bool
 }
 
 func NewRequestMetadata(r *http.Request) *RequestMetadata {
+	requestId := r.Header.Get("Request-Id")
+	if requestId == "" {
+		requestId = uuid.New().String()
+	}
+
+	var sessionId string
+	cookie, err := r.Cookie(CookieSessionCorrelationId)
+	if err == nil {
+		sessionId = cookie.Value
+	}
+
 	return &RequestMetadata{
-		RequestId:     uuid.New().String(),
-		IsHtmxRequest: r.Header.Get("HX-Request") != "",
+		RequestCorrelationId: requestId,
+		SessionCorrelationId: sessionId,
+		IsHtmxRequest:        r.Header.Get("HX-Request") != "",
 	}
 }

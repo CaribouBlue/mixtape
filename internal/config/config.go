@@ -82,9 +82,9 @@ var unvalidatedConfigProperties = []*ConfigProperty{}
 func Load() error {
 	err := godotenv.Load()
 	if err != nil {
-		log.Logger.Warn().Msg("Unable to load default .env file")
+		log.Logger().Warn().Msg("Unable to load default .env file")
 	} else {
-		log.Logger.Debug().Msg("Loaded default .env")
+		log.Logger().Debug().Msg("Loaded default .env")
 	}
 
 	envFilesConfig := GetConfigValue(ConfEnvFiles)
@@ -92,22 +92,22 @@ func Load() error {
 		envFiles := strings.Split(envFilesConfig, ",")
 		err := godotenv.Load(envFiles...)
 		if err != nil {
-			log.Logger.Fatal().Err(err).Msg("Error loading additional .env files")
+			log.Logger().Fatal().Err(err).Msg("Error loading additional .env files")
 		} else {
-			log.Logger.Debug().Str("files", envFilesConfig).Msg("Loaded additional .env files")
+			log.Logger().Debug().Str("files", envFilesConfig).Msg("Loaded additional .env files")
 		}
 	}
 
 	for _, prop := range requiredConfigProperties {
 		if GetConfigValue(*prop) == "" {
-			log.Logger.Fatal().Str("property", prop.key).Msg("Missing required config property")
+			log.Logger().Fatal().Str("property", prop.key).Msg("Missing required config property")
 		}
 	}
 
 	for _, prop := range unvalidatedConfigProperties {
 		isValid := prop.validate(GetConfigValue(*prop))
 		if !isValid {
-			log.Logger.Fatal().Str("property", prop.key).Msg("Invalid config property value")
+			log.Logger().Fatal().Str("property", prop.key).Msg("Invalid config property value")
 		}
 	}
 

@@ -3,11 +3,14 @@ package middleware
 import (
 	"net/http"
 	"slices"
+	"time"
 
 	"github.com/CaribouBlue/mixtape/internal/core"
 	"github.com/CaribouBlue/mixtape/internal/log"
+	"github.com/CaribouBlue/mixtape/internal/log/rlog"
 	"github.com/CaribouBlue/mixtape/internal/server/utils"
 	"github.com/CaribouBlue/mixtape/internal/spotify"
+	"github.com/google/uuid"
 	"github.com/rs/zerolog"
 )
 
@@ -42,20 +45,16 @@ func WithRequestLogging() Middleware {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			wrappedWriter := &wrappedLoggerWriter{w, http.StatusOK}
 
-			path := r.URL.Path
-			method := r.Method
-
 			next.ServeHTTP(wrappedWriter, r)
 
 			var logger *zerolog.Event
 			if wrappedWriter.statusCode >= 500 {
-				logger = log.Logger.Error()
+				logger = rlog.Logger(r).Error()
 			} else {
-				logger = log.Logger.Info()
+				logger = rlog.Logger(r).Info()
 			}
+
 			logger.
-				Str("path", path).
-				Str("method", method).
 				Int("status", wrappedWriter.statusCode).
 				Msg("Request completed")
 		})
@@ -103,6 +102,25 @@ func WithRequestMetadata() Middleware {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 
+			sessionIdCookie, err := r.Cookie(utils.CookieSessionCorrelationId)
+			if err != nil || sessionIdCookie == nil || sessionIdCookie.Value == "" {
+				sessionId := uuid.New().String()
+				http.SetCookie(w, &http.Cookie{
+					Name:     utils.CookieSessionCorrelationId,
+					Value:    sessionId,
+					Path:     "/",
+					MaxAge:   int((time.Hour * 24).Seconds()),
+					HttpOnly: true,
+					Secure:   true,
+					SameSite: http.SameSiteDefaultMode,
+				})
+			} else {
+				err := utils.RefreshCookie(w, r, utils.CookieSessionCorrelationId)
+				if err != nil {
+					log.Logger().Error().Err(err).Msg("Failed to refresh session correlation ID cookie")
+				}
+			}
+
 			metadata, err := utils.ContextValue(ctx, utils.RequestMetaDataCtxKey)
 			if err != nil || metadata == nil {
 				metadata = utils.NewRequestMetadata(r)
@@ -138,7 +156,7 @@ func WithUser(opts WithUserOpts) Middleware {
 				if err == nil {
 					ctxUser = storedUser
 				} else if err != core.ErrUserNotFound {
-					log.Logger.Error().Err(err).Msg("Failed to get user by ID")
+					log.Logger().Error().Err(err).Msg("Failed to get user by ID")
 					http.Error(w, "Failed to get user", http.StatusInternalServerError)
 					return
 				}
@@ -163,7 +181,7 @@ func WithSpotifyClient() Middleware {
 			if err == nil && user != nil && user.SpotifyToken != "" {
 				_, err := spotifyClient.Reauthenticate(user.SpotifyToken)
 				if err != nil {
-					log.Logger.Error().Err(err).Msg("Failed to reauthenticate Spotify client")
+					log.Logger().Error().Err(err).Msg("Failed to reauthenticate Spotify client")
 				}
 
 			}

@@ -16,7 +16,8 @@ var (
 )
 
 const (
-	CookieAuthorization string = "authorization"
+	CookieAuthorization        string = "authorization"
+	CookieSessionCorrelationId string = "sessionCorrelationId"
 )
 
 type AuthorizationCookie struct {
@@ -78,7 +79,7 @@ func ParseAuthCookie(w http.ResponseWriter, r *http.Request) (*core.UserEntity, 
 	if claims, ok := token.Claims.(jwt.MapClaims); ok {
 		expires := int64(claims["expires"].(float64))
 		if time.Now().Unix() > expires {
-			ClearAuthCookie(w)
+			DeleteCookie(w, r, CookieAuthorization)
 			return nil, ErrTokenExpired
 		}
 
@@ -89,14 +90,25 @@ func ParseAuthCookie(w http.ResponseWriter, r *http.Request) (*core.UserEntity, 
 	}
 }
 
-func ClearAuthCookie(w http.ResponseWriter) {
-	http.SetCookie(w, &http.Cookie{
-		Name:     CookieAuthorization,
-		Value:    "",
-		Path:     "/",
-		MaxAge:   -1,
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteDefaultMode,
-	})
+func DeleteCookie(w http.ResponseWriter, r *http.Request, cookieName string) error {
+	cookie, err := r.Cookie(cookieName)
+	if err != nil {
+		return err
+	}
+
+	cookie.MaxAge = -1
+	http.SetCookie(w, cookie)
+	return nil
+}
+
+func RefreshCookie(w http.ResponseWriter, r *http.Request, cookieName string) error {
+	cookie, err := r.Cookie(cookieName)
+	if err != nil {
+		return err
+	}
+
+	cookie.Expires = time.Now().Add(time.Duration(cookie.MaxAge))
+	http.SetCookie(w, cookie)
+
+	return nil
 }

@@ -3,9 +3,8 @@ package mux
 import (
 	"net/http"
 
-	"github.com/CaribouBlue/mixtape/internal/log"
-
 	"github.com/CaribouBlue/mixtape/internal/core"
+	"github.com/CaribouBlue/mixtape/internal/log/rlog"
 	"github.com/CaribouBlue/mixtape/internal/server/middleware"
 	"github.com/CaribouBlue/mixtape/internal/server/utils"
 	"github.com/CaribouBlue/mixtape/internal/templates"
@@ -93,7 +92,7 @@ func (mux *AuthMux) handleUserSignUp(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusUnprocessableEntity)
 			return
 		} else {
-			log.Logger.Error().Err(err).Msg("Failed to sign up user")
+			rlog.Logger(r).Error().Err(err).Msg("Failed to sign up user")
 			http.Error(w, "Failed to sign up user", http.StatusInternalServerError)
 			return
 		}
@@ -111,14 +110,14 @@ func (mux *AuthMux) handleUserLoginSubmit(w http.ResponseWriter, r *http.Request
 		http.Error(w, "Invalid login", http.StatusUnprocessableEntity)
 		return
 	} else if err != nil {
-		log.Logger.Error().Err(err).Msg("Failed to log in user")
+		rlog.Logger(r).Error().Err(err).Msg("Failed to log in user")
 		http.Error(w, "Failed to log in user", http.StatusInternalServerError)
 		return
 	}
 
 	err = utils.SetAuthCookie(w, u)
 	if err != nil {
-		log.Logger.Error().Err(err).Msg("Failed to set auth cookie")
+		rlog.Logger(r).Error().Err(err).Msg("Failed to set auth cookie")
 		http.Error(w, "Failed to set auth cookie", http.StatusInternalServerError)
 		return
 	}
@@ -129,7 +128,7 @@ func (mux *AuthMux) handleUserLoginSubmit(w http.ResponseWriter, r *http.Request
 func (mux *AuthMux) handleLogin(w http.ResponseWriter, r *http.Request) {
 	u, err := utils.ContextValue(r.Context(), utils.UserCtxKey)
 	if err != nil {
-		log.Logger.Error().Err(err).Msg("Failed to get user from context")
+		rlog.Logger(r).Error().Err(err).Msg("Failed to get user from context")
 		http.Error(w, "Could not get user data", http.StatusUnauthorized)
 		return
 	}
@@ -148,7 +147,7 @@ func (mux *AuthMux) handleLogin(w http.ResponseWriter, r *http.Request) {
 	if u.IsAuthenticatedWithSpotify() {
 		_, err := spotify.Reauthenticate(u.SpotifyToken)
 		if err != nil {
-			log.Logger.Error().Err(err).Msg("Failed to reauthenticate Spotify client")
+			rlog.Logger(r).Error().Err(err).Msg("Failed to reauthenticate Spotify client")
 			http.Error(w, "Failed to authenticate", http.StatusInternalServerError)
 			return
 		}
@@ -162,7 +161,12 @@ func (mux *AuthMux) handleLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (mux *AuthMux) handleLogout(w http.ResponseWriter, r *http.Request) {
-	utils.ClearAuthCookie(w)
+	err := utils.DeleteCookie(w, r, utils.CookieAuthorization)
+	if err != nil {
+		rlog.Logger(r).Error().Err(err).Msg("Failed to delete auth cookie")
+		http.Error(w, "Failed to logout", http.StatusInternalServerError)
+		return
+	}
 	utils.HandleRedirect(w, r, mux.opts.PathPrefix+"/user/login")
 }
 
@@ -185,7 +189,7 @@ func (mux *AuthMux) handleSpotifyAuth(w http.ResponseWriter, r *http.Request) {
 func (mux *AuthMux) handleSpotifyAuthRedirect(w http.ResponseWriter, r *http.Request) {
 	u, err := utils.ContextValue(r.Context(), utils.UserCtxKey)
 	if err != nil {
-		log.Logger.Error().Err(err).Msg("Failed to get user from context")
+		rlog.Logger(r).Error().Err(err).Msg("Failed to get user from context")
 		http.Error(w, "Could not get user data", http.StatusUnauthorized)
 		return
 	}
@@ -223,7 +227,7 @@ func (mux *AuthMux) handleSpotifyAuthRedirect(w http.ResponseWriter, r *http.Req
 	u.SpotifyToken = token.RefreshToken
 	_, err = mux.Services.UserService.AuthenticateSpotify(u.Id, u.SpotifyToken)
 	if err != nil {
-		log.Logger.Error().Err(err).Msg("Failed to authenticate Spotify user")
+		rlog.Logger(r).Error().Err(err).Msg("Failed to authenticate Spotify user")
 		http.Error(w, "Failed to authenticate Spotify", http.StatusInternalServerError)
 		return
 	}

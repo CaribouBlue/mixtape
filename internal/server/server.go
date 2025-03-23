@@ -64,9 +64,7 @@ func NewServer() *http.Server {
 					},
 				},
 				mux.StaticMuxServices{},
-				[]middleware.Middleware{
-					middleware.WithRequestMetadata(),
-				},
+				[]middleware.Middleware{},
 				[]mux.ChildMux{},
 			),
 			mux.NewAuthMux(

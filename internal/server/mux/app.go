@@ -3,7 +3,7 @@ package mux
 import (
 	"net/http"
 
-	"github.com/CaribouBlue/mixtape/internal/log"
+	"github.com/CaribouBlue/mixtape/internal/log/rlog"
 	"github.com/CaribouBlue/mixtape/internal/server/middleware"
 	"github.com/CaribouBlue/mixtape/internal/server/utils"
 	"github.com/CaribouBlue/mixtape/internal/templates"
@@ -39,7 +39,7 @@ func NewAppMux(opts AppMuxOpts, services AppMuxServices, middleware []middleware
 	mux.Handle("/home", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		user, err := utils.ContextValue(r.Context(), utils.UserCtxKey)
 		if err != nil {
-			log.Logger.Error().Err(err).Msg("Failed to get user from context")
+			rlog.Logger(r).Error().Err(err).Msg("Failed to get user from context")
 			http.Error(w, "Could not get user data", http.StatusUnauthorized)
 			return
 		}

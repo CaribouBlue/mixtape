@@ -15,12 +15,12 @@ func main() {
 	s := server.NewServer()
 
 	if config.GetConfigValue(config.ConfEnv) == config.EnvDevelopment {
-		log.SetDefaultLogger(log.Logger.Output(zerolog.ConsoleWriter{Out: os.Stderr}))
-		log.Logger.Warn().Msg("Using development mode")
+		log.SetDefaultLogger(log.Logger().Output(zerolog.ConsoleWriter{Out: os.Stderr}))
+		log.Logger().Warn().Msg("Using development mode")
 	}
 
-	log.Logger.Info().Str("address", s.Addr).Msg("Starting server")
+	log.Logger().Info().Str("address", s.Addr).Msg("Starting server")
 	if err := s.ListenAndServe(); err != nil {
-		log.Logger.Fatal().Err(err).Msg("Failed to start server")
+		log.Logger().Fatal().Err(err).Msg("Failed to start server")
 	}
 }
