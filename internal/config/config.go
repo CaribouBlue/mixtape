@@ -1,11 +1,19 @@
 package config
 
 import (
-	"log"
 	"os"
 	"strings"
 
+	"github.com/CaribouBlue/mixtape/internal/log"
+
 	"github.com/joho/godotenv"
+)
+
+type Env = string
+
+const (
+	EnvProduction  Env = "production"
+	EnvDevelopment Env = "development"
 )
 
 type ConfigProperty struct {
@@ -13,6 +21,7 @@ type ConfigProperty struct {
 	defaultValue string
 	isRequired   bool
 	isSecret     bool
+	validate     func(string) bool
 }
 
 type ConfigPropertyOpt func(*ConfigProperty) *ConfigProperty
@@ -33,8 +42,16 @@ func withIsRequired(isRequired bool) ConfigPropertyOpt {
 	}
 }
 
+func withValidation(validate func(string) bool) ConfigPropertyOpt {
+	return func(prop *ConfigProperty) *ConfigProperty {
+		prop.validate = validate
+		unvalidatedConfigProperties = append(unvalidatedConfigProperties, prop)
+		return prop
+	}
+}
+
 func newConfigProperty(key string, isSecret bool, opts ...ConfigPropertyOpt) ConfigProperty {
-	prop := ConfigProperty{key: key, isSecret: isSecret}
+	prop := ConfigProperty{key: key, isSecret: isSecret, validate: func(string) bool { return true }}
 	for _, opt := range opts {
 		opt(&prop)
 	}
@@ -54,16 +71,20 @@ var (
 	ConfSpotifyRedirectUri  ConfigProperty = newConfigProperty("SPOTIFY_REDIRECT_URI", false, withIsRequired(true))
 	ConfSpotifyScope        ConfigProperty = newConfigProperty("SPOTIFY_SCOPE", false, withIsRequired(true))
 	ConfEnvFiles            ConfigProperty = newConfigProperty("ENV_FILES", false)
+	ConfEnv                 ConfigProperty = newConfigProperty("ENV", false, withDefaultValue(EnvProduction), withValidation(func(value string) bool {
+		return value == EnvProduction || value == EnvDevelopment
+	}))
 )
 
 var requiredConfigProperties = []*ConfigProperty{}
+var unvalidatedConfigProperties = []*ConfigProperty{}
 
 func Load() error {
 	err := godotenv.Load()
 	if err != nil {
-		log.Default().Println("WARN | Unable to load default .env file: ", err)
+		log.Logger.Warn().Msg("Unable to load default .env file")
 	} else {
-		log.Default().Println("INFO | Loaded default .env")
+		log.Logger.Debug().Msg("Loaded default .env")
 	}
 
 	envFilesConfig := GetConfigValue(ConfEnvFiles)
@@ -71,15 +92,22 @@ func Load() error {
 		envFiles := strings.Split(envFilesConfig, ",")
 		err := godotenv.Load(envFiles...)
 		if err != nil {
-			log.Fatalln("Error loading .env files: ", err)
+			log.Logger.Fatal().Err(err).Msg("Error loading additional .env files")
 		} else {
-			log.Default().Println("INFO | Loaded additional .env files:", envFilesConfig)
+			log.Logger.Debug().Str("files", envFilesConfig).Msg("Loaded additional .env files")
 		}
 	}
 
 	for _, prop := range requiredConfigProperties {
 		if GetConfigValue(*prop) == "" {
-			log.Fatalln("Missing required config property:", prop.key)
+			log.Logger.Fatal().Str("property", prop.key).Msg("Missing required config property")
+		}
+	}
+
+	for _, prop := range unvalidatedConfigProperties {
+		isValid := prop.validate(GetConfigValue(*prop))
+		if !isValid {
+			log.Logger.Fatal().Str("property", prop.key).Msg("Invalid config property value")
 		}
 	}
 

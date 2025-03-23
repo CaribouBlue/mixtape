@@ -50,6 +50,7 @@ func createTables(db *storage.SqliteStore) {
 			max_submissions INTEGER,
 			start_at INTEGER,
 			submission_phase_duration INTEGER,
+			submissions_closed_at INTEGER,
 			vote_phase_duration INTEGER,
 			FOREIGN KEY (created_by) REFERENCES ` + storage.TableNameUsers + ` (id)
 		);`,

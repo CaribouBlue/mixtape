@@ -42,6 +42,14 @@ var loadTestDataCmd = &cobra.Command{
 
 var defaultHashedPassword, defaultHashedPasswordErr = core.HashPassword("pwd")
 
+var mockUserAdmin = &core.UserEntity{
+	Username:       "admin",
+	DisplayName:    "admin",
+	HashedPassword: defaultHashedPassword,
+	SpotifyToken:   "",
+	IsAdmin:        true,
+}
+
 var mockUserAlice = &core.UserEntity{
 	Username:       "alice",
 	DisplayName:    "alice",
@@ -78,6 +86,7 @@ func init() {
 
 func CreateUsers(db *storage.SqliteStore) {
 	users := []*core.UserEntity{
+		mockUserAdmin,
 		mockUserAlice,
 		mockUserBob,
 		mockUserJohn,

@@ -35,6 +35,7 @@ package "Session Repo" as session_repo {
         max_submissions: int
         start_at: int
         submission_phase_duration: int
+        submissions_closed_at: int
         vote_phase_duration: int
     }
 

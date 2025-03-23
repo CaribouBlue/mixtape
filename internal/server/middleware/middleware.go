@@ -1,14 +1,14 @@
 package middleware
 
 import (
-	"context"
-	"log"
 	"net/http"
 	"slices"
 
 	"github.com/CaribouBlue/mixtape/internal/core"
+	"github.com/CaribouBlue/mixtape/internal/log"
 	"github.com/CaribouBlue/mixtape/internal/server/utils"
 	"github.com/CaribouBlue/mixtape/internal/spotify"
+	"github.com/rs/zerolog"
 )
 
 type Middleware func(http.Handler) http.Handler
@@ -47,7 +47,17 @@ func WithRequestLogging() Middleware {
 
 			next.ServeHTTP(wrappedWriter, r)
 
-			log.Println(wrappedWriter.statusCode, method, path)
+			var logger *zerolog.Event
+			if wrappedWriter.statusCode >= 500 {
+				logger = log.Logger.Error()
+			} else {
+				logger = log.Logger.Info()
+			}
+			logger.
+				Str("path", path).
+				Str("method", method).
+				Int("status", wrappedWriter.statusCode).
+				Msg("Request completed")
 		})
 	}
 }
@@ -93,12 +103,12 @@ func WithRequestMetadata() Middleware {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 
-			metadata, ok := ctx.Value(utils.RequestMetaDataCtxKey).(utils.RequestMetadata)
-			if !ok {
+			metadata, err := utils.ContextValue(ctx, utils.RequestMetaDataCtxKey)
+			if err != nil || metadata == nil {
 				metadata = utils.NewRequestMetadata(r)
 			}
 
-			ctx = context.WithValue(ctx, utils.RequestMetaDataCtxKey, metadata)
+			ctx = utils.SetContextValue(ctx, utils.RequestMetaDataCtxKey, metadata)
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -115,8 +125,8 @@ func WithUser(opts WithUserOpts) Middleware {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 
-			_, ok := ctx.Value(utils.UserCtxKey).(*core.UserEntity)
-			if ok {
+			user, err := utils.ContextValue(r.Context(), utils.UserCtxKey)
+			if user != nil && err == nil {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -128,13 +138,13 @@ func WithUser(opts WithUserOpts) Middleware {
 				if err == nil {
 					ctxUser = storedUser
 				} else if err != core.ErrUserNotFound {
-					log.Default().Println("Failed to get user by ID:", err)
+					log.Logger.Error().Err(err).Msg("Failed to get user by ID")
 					http.Error(w, "Failed to get user", http.StatusInternalServerError)
 					return
 				}
 			}
 
-			ctx = context.WithValue(ctx, utils.UserCtxKey, ctxUser)
+			ctx = utils.SetContextValue(ctx, utils.UserCtxKey, ctxUser)
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -149,16 +159,16 @@ func WithSpotifyClient() Middleware {
 			spotifyClient := spotify.NewDefaultClient()
 
 			// TODO: handle token updates/invalidation
-			user, ok := ctx.Value(utils.UserCtxKey).(*core.UserEntity)
-			if ok && user != nil && user.SpotifyToken != "" {
+			user, err := utils.ContextValue(r.Context(), utils.UserCtxKey)
+			if err == nil && user != nil && user.SpotifyToken != "" {
 				_, err := spotifyClient.Reauthenticate(user.SpotifyToken)
 				if err != nil {
-					log.Default().Println("Failed to reauthenticate Spotify client:", err)
+					log.Logger.Error().Err(err).Msg("Failed to reauthenticate Spotify client")
 				}
 
 			}
 
-			ctx = context.WithValue(ctx, utils.SpotifyClientCtxKey, spotifyClient)
+			utils.SetContextValue(ctx, utils.SpotifyClientCtxKey, spotifyClient)
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
@@ -175,8 +185,8 @@ func WithEnforcedAuthentication(opts WithEnforcedAuthenticationOpts) Middleware 
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 
-			u, ok := ctx.Value(utils.UserCtxKey).(*core.UserEntity)
-			if !ok || u == nil {
+			u, err := utils.ContextValue(ctx, utils.UserCtxKey)
+			if err != nil || u == nil {
 				http.Error(w, "User not found in context, may need to apply WithUser middleware", http.StatusInternalServerError)
 				return
 			}

@@ -129,7 +129,11 @@ func NewServer() *http.Server {
 								return core.NewSessionService(db, mux.Services.UserService, musicService), nil
 							},
 							MusicServiceInitializer: func(mux *mux.SessionMux, r *http.Request) (*core.MusicService, error) {
-								user := r.Context().Value(utils.UserCtxKey).(*core.UserEntity)
+								user, err := utils.ContextValue(r.Context(), utils.UserCtxKey)
+								if err != nil {
+									return nil, err
+								}
+
 								spotifyClient := spotify.NewDefaultClient()
 
 								// TODO: handle invalid token

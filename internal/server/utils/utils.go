@@ -2,6 +2,9 @@ package utils
 
 import (
 	"encoding/json"
+
+	"github.com/CaribouBlue/mixtape/internal/log"
+
 	"net/http"
 
 	"github.com/a-h/templ"
@@ -22,10 +25,15 @@ func HandleHtmlResponse(r *http.Request, w http.ResponseWriter, component templ.
 }
 
 func HandleRedirect(w http.ResponseWriter, r *http.Request, redirect string) {
-	metadata, ok := r.Context().Value(RequestMetaDataCtxKey).(RequestMetadata)
+	metadata, err := ContextValue(r.Context(), RequestMetaDataCtxKey)
+	if err != nil {
+		log.Logger.Error().Err(err).Msg("Failed to get request metadata")
+		http.Error(w, "Failed to get request metadata for redirect", http.StatusInternalServerError)
+		return
+	}
 
 	var isHtmxRequest bool
-	if !ok {
+	if metadata == nil {
 		isHtmxRequest = false
 	} else {
 		isHtmxRequest = metadata.IsHtmxRequest
@@ -38,5 +46,4 @@ func HandleRedirect(w http.ResponseWriter, r *http.Request, redirect string) {
 	} else {
 		http.Redirect(w, r, redirect, http.StatusFound)
 	}
-
 }
