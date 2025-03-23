@@ -75,6 +75,7 @@ var (
 		return value == EnvProduction || value == EnvDevelopment
 	}))
 	ConfJwtSecret ConfigProperty = newConfigProperty("JWT_SECRET", true, withIsRequired(true))
+	ConfLogFile   ConfigProperty = newConfigProperty("LOG_FILE", false, withDefaultValue("app.log"))
 )
 
 var requiredConfigProperties = []*ConfigProperty{}

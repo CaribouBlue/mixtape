@@ -17,6 +17,16 @@ func main() {
 	if config.GetConfigValue(config.ConfEnv) == config.EnvDevelopment {
 		log.SetDefaultLogger(log.Logger().Output(zerolog.ConsoleWriter{Out: os.Stderr}))
 		log.Logger().Warn().Msg("Using development mode")
+	} else {
+		logFile, _ := os.OpenFile(
+			config.GetConfigValue(config.ConfLogFile),
+			os.O_APPEND|os.O_CREATE|os.O_WRONLY,
+			0664,
+		)
+		defer logFile.Close()
+
+		multi := zerolog.MultiLevelWriter(os.Stdout, logFile)
+		log.SetDefaultLogger(zerolog.New(multi).Level(zerolog.InfoLevel).With().Timestamp().Logger())
 	}
 
 	log.Logger().Info().Str("address", s.Addr).Msg("Starting server")

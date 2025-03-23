@@ -45,15 +45,17 @@ services:
       # So that Traefik can store ACME certs
       - letsencrypt:/letsencrypt
       # Logs
-      - /var/log/traefik:/traefik/logs
+      - /var/log/mixtape:/traefik/logs
   app:
     image: ghcr.io/cariboublue/mixtape:${APP_IMAGE_TAG:-latest}
     volumes:
       - /var/lib/sqlite:/var/lib/sqlite
+      - /var/log/mixtape:/logs
     environment:
       ENV_FILES: /run/secrets/app_secrets
       SPOTIFY_REDIRECT_URI: https://shmoopysworld.com/auth/spotify/redirect
       DB_PATH: /var/lib/sqlite/db.sqlite
+      LOG_PATH: /logs/app.log
     secrets:
       - app_secrets
     labels:
