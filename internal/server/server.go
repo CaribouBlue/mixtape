@@ -50,6 +50,9 @@ func NewServer() *http.Server {
 			UserService: userService,
 		},
 		[]middleware.Middleware{
+			middleware.WithUser(middleware.WithUserOpts{
+				UserService: userService,
+			}),
 			middleware.WithRequestMetadata(),
 			middleware.WithRequestLogging(),
 			middleware.WithCustomNotFoundHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -78,10 +81,6 @@ func NewServer() *http.Server {
 					UserService: userService,
 				},
 				[]middleware.Middleware{
-					middleware.WithUser(middleware.WithUserOpts{
-						DefaultUserId: 6666,
-						UserService:   userService,
-					}),
 					middleware.WithSpotifyClient(),
 					middleware.WithCustomNotFoundHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 						utils.HandleRedirect(w, r, "/auth/login")
@@ -97,10 +96,6 @@ func NewServer() *http.Server {
 				},
 				mux.AppMuxServices{},
 				[]middleware.Middleware{
-					middleware.WithUser(middleware.WithUserOpts{
-						DefaultUserId: 6666,
-						UserService:   userService,
-					}),
 					middleware.WithEnforcedAuthentication(middleware.WithEnforcedAuthenticationOpts{
 						UnauthenticatedRedirectPath: "/auth/login",
 						UserService:                 userService,

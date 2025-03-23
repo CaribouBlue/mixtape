@@ -1,6 +1,7 @@
 package mux
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/CaribouBlue/mixtape/internal/core"
@@ -129,7 +130,7 @@ func (mux *AuthMux) handleLogin(w http.ResponseWriter, r *http.Request) {
 	u, err := utils.ContextValue(r.Context(), utils.UserCtxKey)
 	if err != nil {
 		rlog.Logger(r).Error().Err(err).Msg("Failed to get user from context")
-		http.Error(w, "Could not get user data", http.StatusUnauthorized)
+		http.Error(w, "Failed to login", http.StatusUnauthorized)
 		return
 	}
 
@@ -140,7 +141,11 @@ func (mux *AuthMux) handleLogin(w http.ResponseWriter, r *http.Request) {
 
 	spotify, err := utils.ContextValue(r.Context(), utils.SpotifyClientCtxKey)
 	if err != nil || spotify == nil {
-		http.Error(w, "Failed to get Spotify client", http.StatusInternalServerError)
+		if spotify == nil {
+			err = errors.New("spotify client is nil")
+		}
+		rlog.Logger(r).Error().Err(err).Msg("Failed to get spotify client")
+		http.Error(w, "Failed to login", http.StatusInternalServerError)
 		return
 	}
 
@@ -148,7 +153,7 @@ func (mux *AuthMux) handleLogin(w http.ResponseWriter, r *http.Request) {
 		_, err := spotify.Reauthenticate(u.SpotifyToken)
 		if err != nil {
 			rlog.Logger(r).Error().Err(err).Msg("Failed to reauthenticate Spotify client")
-			http.Error(w, "Failed to authenticate", http.StatusInternalServerError)
+			http.Error(w, "Failed to login", http.StatusInternalServerError)
 			return
 		}
 
@@ -161,12 +166,16 @@ func (mux *AuthMux) handleLogin(w http.ResponseWriter, r *http.Request) {
 }
 
 func (mux *AuthMux) handleLogout(w http.ResponseWriter, r *http.Request) {
-	err := utils.DeleteCookie(w, r, utils.CookieAuthorization)
+	// cookie, _ := r.Cookie(utils.CookieAuthorization)
+	// println("cookie:", cookie, cookie.Expires.String(), cookie.MaxAge)
+
+	err := utils.DeleteCookie(w, r, utils.CookieNameAuthorization)
 	if err != nil {
 		rlog.Logger(r).Error().Err(err).Msg("Failed to delete auth cookie")
 		http.Error(w, "Failed to logout", http.StatusInternalServerError)
 		return
 	}
+
 	utils.HandleRedirect(w, r, mux.opts.PathPrefix+"/user/login")
 }
 

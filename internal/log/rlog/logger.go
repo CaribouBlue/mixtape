@@ -22,6 +22,11 @@ func Logger(r *http.Request) *zerolog.Logger {
 		ctx = ctx.Str("requestCorrelationId", metadata.RequestCorrelationId).Str("sessionCorrelationId", metadata.SessionCorrelationId)
 	}
 
+	user, err := utils.ContextValue(r.Context(), utils.UserCtxKey)
+	if err == nil && user != nil && user.Id != 0 {
+		ctx = ctx.Str("username", user.Username).Bool("isAdmin", user.IsAdmin)
+	}
+
 	logger := ctx.Logger()
 	return &logger
 }

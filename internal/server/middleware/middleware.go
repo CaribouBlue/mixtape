@@ -102,11 +102,11 @@ func WithRequestMetadata() Middleware {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
 
-			sessionIdCookie, err := r.Cookie(utils.CookieSessionCorrelationId)
+			sessionIdCookie, err := r.Cookie(utils.CookieNameSessionCorrelationId)
 			if err != nil || sessionIdCookie == nil || sessionIdCookie.Value == "" {
 				sessionId := uuid.New().String()
 				http.SetCookie(w, &http.Cookie{
-					Name:     utils.CookieSessionCorrelationId,
+					Name:     utils.CookieNameSessionCorrelationId,
 					Value:    sessionId,
 					Path:     "/",
 					MaxAge:   int((time.Hour * 24).Seconds()),
@@ -115,7 +115,7 @@ func WithRequestMetadata() Middleware {
 					SameSite: http.SameSiteDefaultMode,
 				})
 			} else {
-				err := utils.RefreshCookie(w, r, utils.CookieSessionCorrelationId)
+				err := utils.RefreshCookie(w, r, utils.CookieNameSessionCorrelationId)
 				if err != nil {
 					log.Logger().Error().Err(err).Msg("Failed to refresh session correlation ID cookie")
 				}
@@ -134,8 +134,7 @@ func WithRequestMetadata() Middleware {
 }
 
 type WithUserOpts struct {
-	DefaultUserId int64
-	UserService   *core.UserService
+	UserService *core.UserService
 }
 
 func WithUser(opts WithUserOpts) Middleware {
@@ -186,7 +185,7 @@ func WithSpotifyClient() Middleware {
 
 			}
 
-			utils.SetContextValue(ctx, utils.SpotifyClientCtxKey, spotifyClient)
+			ctx = utils.SetContextValue(ctx, utils.SpotifyClientCtxKey, spotifyClient)
 
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})

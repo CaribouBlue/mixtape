@@ -50,7 +50,7 @@ func NewRequestMetadata(r *http.Request) *RequestMetadata {
 	}
 
 	var sessionId string
-	cookie, err := r.Cookie(CookieSessionCorrelationId)
+	cookie, err := r.Cookie(CookieNameSessionCorrelationId)
 	if err == nil {
 		sessionId = cookie.Value
 	}

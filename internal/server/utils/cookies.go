@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/CaribouBlue/mixtape/internal/config"
 	"github.com/CaribouBlue/mixtape/internal/core"
 	jwt "github.com/golang-jwt/jwt/v5"
 )
@@ -15,20 +16,28 @@ var (
 	ErrInvalidToken error = errors.New("invalid token")
 )
 
+type CookieName = string
+
 const (
-	CookieAuthorization        string = "authorization"
-	CookieSessionCorrelationId string = "sessionCorrelationId"
+	CookieNameAuthorization        CookieName = "authorization"
+	CookieNameSessionCorrelationId CookieName = "sessionCorrelationId"
 )
 
-type AuthorizationCookie struct {
-	UserId  int64 `json:"userId"`
-	Expires int64 `json:"expires"`
+func CookieFactory(name CookieName, value string, maxAge int) *http.Cookie {
+	return &http.Cookie{
+		Name:     name,
+		Value:    value,
+		Path:     "/",
+		MaxAge:   maxAge,
+		HttpOnly: true,
+		Secure:   true,
+		SameSite: http.SameSiteDefaultMode,
+	}
 }
-
-const secretKey = "super secret"
 
 func SetAuthCookie(w http.ResponseWriter, u *core.UserEntity) error {
 	expirationDuration := time.Hour * 24
+	secretKey := config.GetConfigValue(config.ConfJwtSecret)
 
 	// Create a new token object, specifying signing method and the claims
 	// you would like it to contain.
@@ -43,21 +52,15 @@ func SetAuthCookie(w http.ResponseWriter, u *core.UserEntity) error {
 		return err
 	}
 
-	http.SetCookie(w, &http.Cookie{
-		Name:     CookieAuthorization,
-		Value:    tokenString,
-		Path:     "/",
-		MaxAge:   int(expirationDuration.Seconds()),
-		HttpOnly: true,
-		Secure:   true,
-		SameSite: http.SameSiteDefaultMode,
-	})
+	http.SetCookie(w, CookieFactory(CookieNameAuthorization, tokenString, int(expirationDuration.Seconds())))
 
 	return nil
 }
 
 func ParseAuthCookie(w http.ResponseWriter, r *http.Request) (*core.UserEntity, error) {
-	cookie, err := r.Cookie(CookieAuthorization)
+	secretKey := config.GetConfigValue(config.ConfJwtSecret)
+
+	cookie, err := r.Cookie(CookieNameAuthorization)
 	if err != nil {
 		return nil, err
 	}
@@ -79,7 +82,7 @@ func ParseAuthCookie(w http.ResponseWriter, r *http.Request) (*core.UserEntity, 
 	if claims, ok := token.Claims.(jwt.MapClaims); ok {
 		expires := int64(claims["expires"].(float64))
 		if time.Now().Unix() > expires {
-			DeleteCookie(w, r, CookieAuthorization)
+			DeleteCookie(w, r, CookieNameAuthorization)
 			return nil, ErrTokenExpired
 		}
 
@@ -91,13 +94,7 @@ func ParseAuthCookie(w http.ResponseWriter, r *http.Request) (*core.UserEntity, 
 }
 
 func DeleteCookie(w http.ResponseWriter, r *http.Request, cookieName string) error {
-	cookie, err := r.Cookie(cookieName)
-	if err != nil {
-		return err
-	}
-
-	cookie.MaxAge = -1
-	http.SetCookie(w, cookie)
+	http.SetCookie(w, CookieFactory(cookieName, "", -1))
 	return nil
 }
 
@@ -107,8 +104,6 @@ func RefreshCookie(w http.ResponseWriter, r *http.Request, cookieName string) er
 		return err
 	}
 
-	cookie.Expires = time.Now().Add(time.Duration(cookie.MaxAge))
-	http.SetCookie(w, cookie)
-
+	http.SetCookie(w, CookieFactory(cookieName, cookie.Value, cookie.MaxAge))
 	return nil
 }

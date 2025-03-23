@@ -74,6 +74,7 @@ var (
 	ConfEnv                 ConfigProperty = newConfigProperty("ENV", false, withDefaultValue(EnvProduction), withValidation(func(value string) bool {
 		return value == EnvProduction || value == EnvDevelopment
 	}))
+	ConfJwtSecret ConfigProperty = newConfigProperty("JWT_SECRET", true, withIsRequired(true))
 )
 
 var requiredConfigProperties = []*ConfigProperty{}
