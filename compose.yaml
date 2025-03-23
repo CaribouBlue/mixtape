@@ -50,12 +50,12 @@ services:
     image: ghcr.io/cariboublue/mixtape:${APP_IMAGE_TAG:-latest}
     volumes:
       - /var/lib/sqlite:/var/lib/sqlite
-      - /var/log/mixtape:/logs
+      - /var/log/mixtape:/app/logs
     environment:
       ENV_FILES: /run/secrets/app_secrets
       SPOTIFY_REDIRECT_URI: https://shmoopysworld.com/auth/spotify/redirect
       DB_PATH: /var/lib/sqlite/db.sqlite
-      LOG_PATH: /logs/app.log
+      LOG_FILE_PATH: /app/logs/app.log
     secrets:
       - app_secrets
     labels:

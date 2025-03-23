@@ -74,8 +74,8 @@ var (
 	ConfEnv                 ConfigProperty = newConfigProperty("ENV", false, withDefaultValue(EnvProduction), withValidation(func(value string) bool {
 		return value == EnvProduction || value == EnvDevelopment
 	}))
-	ConfJwtSecret ConfigProperty = newConfigProperty("JWT_SECRET", true, withIsRequired(true))
-	ConfLogFile   ConfigProperty = newConfigProperty("LOG_FILE", false, withDefaultValue("app.log"))
+	ConfJwtSecret   ConfigProperty = newConfigProperty("JWT_SECRET", true, withIsRequired(true))
+	ConfLogFilePath ConfigProperty = newConfigProperty("LOG_FILE_PATH", false, withDefaultValue("app.log"))
 )
 
 var requiredConfigProperties = []*ConfigProperty{}

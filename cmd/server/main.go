@@ -19,7 +19,7 @@ func main() {
 		log.Logger().Warn().Msg("Using development mode")
 	} else {
 		logFile, _ := os.OpenFile(
-			config.GetConfigValue(config.ConfLogFile),
+			config.GetConfigValue(config.ConfLogFilePath),
 			os.O_APPEND|os.O_CREATE|os.O_WRONLY,
 			0664,
 		)
