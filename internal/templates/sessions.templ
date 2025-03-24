@@ -21,28 +21,30 @@ templ UserSessions(sessions []core.SessionDto) {
 						class={ fmt.Sprintf("cursor-pointer %s", ClassAttrSessionEntryPoint) }
 						style="transition: all 200ms ease-out"
 					>
-						<td>
-							@requestSpinner(SpinnerOpts{Size: SpinnerSizeXs}) {
-								if session.CurrentPlayer.IsJoinedSession() {
-									<div class="tooltip" data-tip="joined">
-										<span class="indicator-item badge badge-xs badge-success"></span>
-									</div>
-								} else if session.Phase() == core.SubmissionPhase {
-									<div class="tooltip" data-tip="open">
-										<span class="indicator-item badge badge-xs badge-info"></span>
-									</div>
+						<td class="grid grid-cols-1 md:grid-cols-3 gap-2">
+							<div class="font-medium">
+								@requestSpinner(SpinnerOpts{Size: SpinnerSizeXs}) {
+									if session.CurrentPlayer.IsJoinedSession() {
+										<div class="tooltip" data-tip="joined">
+											<span class="indicator-item badge badge-xs badge-success"></span>
+										</div>
+									} else if session.Phase() == core.SubmissionPhase {
+										<div class="tooltip" data-tip="open">
+											<span class="indicator-item badge badge-xs badge-info"></span>
+										</div>
+									}
+									{ session.Name }
 								}
-								{ session.Name }
+							</div>
+							<div class="text-base-content/70">{ string(session.Phase()) } phase</div>
+							if session.Phase() != core.ResultPhase {
+								<div class="text-base-content/70">
+									<span
+										hx-get={ fmt.Sprintf("/app/session/%d/phase-duration", session.Id) }
+										hx-trigger="load, every 1m"
+									></span> remaining
+								</div>
 							}
-						</td>
-						<td class="flex gap-2">
-							<div class="badge badge-outline w-40">{ string(session.Phase()) } phase</div>
-						</td>
-						<td>
-							<div
-								hx-get={ fmt.Sprintf("/app/session/%d/phase-duration", session.Id) }
-								hx-trigger="load, every 1m"
-							></div>
 						</td>
 					</tr>
 				}

@@ -17,7 +17,7 @@ templ Root(props RootProps) {
 			<link href="/static/css/output.css" rel="stylesheet" type="text/css"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1"/>
 		</head>
-		<body class="w-screen h-screen flex flex-col items-center">
+		<body class="w-screen h-screen min-w-96 flex flex-col items-center">
 			@Header(props.IsAuthenticated)
 			@AppContainer() {
 				{ children... }
