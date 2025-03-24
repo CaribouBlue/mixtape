@@ -28,31 +28,32 @@ templ SessionPage(s core.SessionDto) {
 			<div class="col-span-full">
 				@SessionTimeline(s)
 			</div>
-			<div class="col-span-full grid grid-cols-subgrid gap-4">
+			<div class="col-span-full">
 				@CollapsibleCard("Players", s.Phase() == core.SubmissionPhase) {
-					<div class="overflow-x-auto">
+					<div class="">
 						<table class="table">
-							<thead>
-								<tr></tr>
-							</thead>
-							<tbody>
+							<tbody class="grid grid-cols-[min-content_1fr] gap-4">
 								for _, player := range *s.Players {
-									<tr>
-										<td class="flex items-center gap-2">
-											if player.PlayerId == s.CurrentPlayer.PlayerId {
-												@PersonIcon(NewIconProps())
-											}
-											if player.PlayerId == s.CreatedBy {
-												@HouseIcon(NewIconProps())
-											}
-											{ player.DisplayName }
-										</td>
-										<td>
-											if player.IsSubmissionsFinalized {
-												<div class="badge badge-success badge-outline">
-													finalized submissions
-												</div>
-											}
+									<tr class="col-span-full grid grid-cols-subgrid">
+										<td class="col-span-full grid grid-cols-subgrid">
+											<div class="flex items-center gap-2">
+												if player.PlayerId == s.CurrentPlayer.PlayerId {
+													@PersonIcon(NewIconProps())
+												}
+												if player.PlayerId == s.CreatedBy {
+													@HouseIcon(NewIconProps())
+												}
+												{ player.DisplayName }
+											</div>
+											<div class="flex flex-wrap items-center gap-2">
+												if player.IsSubmissionsFinalized {
+													<div class="badge badge-info badge-outline whitespace-nowrap">
+														<div class="tooltip" data-tip="Finalized Submissions">
+															@EnvelopeWithCheckIcon(NewIconProps(withClass("fill-info")))
+														</div>
+													</div>
+												}
+											</div>
 										</td>
 									</tr>
 								}
@@ -253,7 +254,7 @@ templ CandidateSubmissionSearchResults(candidates []core.CandidateDto) {
 				@error.stop="error = $event.detail?.data"
 				x-effect="error && setTimeout(() => error = '', 2000)"
 			>
-				<td class="w-0">
+				<td>
 					<div
 						role="alert"
 						class="alert alert-error absolute left-0"
@@ -282,10 +283,12 @@ templ CandidateSubmissionSearchResults(candidates []core.CandidateDto) {
 						hx-target="closest tr"
 						hx-target-422="previous span"
 						class="btn"
-					>Add</button>
+					>
+						@PlusIcon(NewIconProps())
+					</button>
 				</td>
-				<td>
-					<div class="flex items-center gap-2">
+				<td class="grid grid-cols-1 md:grid-cols-3 md:gap-2">
+					<div class="flex items-center gap-2 font-medium">
 						<a
 							href={ templ.SafeURL(candidate.Track.Url) }
 							target="_blank"
@@ -296,28 +299,28 @@ templ CandidateSubmissionSearchResults(candidates []core.CandidateDto) {
 							@ExplicitIcon()
 						}
 					</div>
-				</td>
-				<td>
-					<a
-						href={ templ.SafeURL(candidate.Track.Album.Url) }
-						target="_blank"
-					>
-						{ candidate.Track.Album.Name }
-					</a>
-				</td>
-				<td>
-					for i, artist := range candidate.Track.Artists {
+					<div class="text-base-content/70">
 						<a
-							href={ templ.SafeURL(artist.Url) }
+							href={ templ.SafeURL(candidate.Track.Album.Url) }
 							target="_blank"
 						>
-							if i < len(candidate.Track.Artists)-1 {
-								{ artist.Name + ", " }
-							} else {
-								{ artist.Name }
-							}
+							{ candidate.Track.Album.Name }
 						</a>
-					}
+					</div>
+					<div class="text-base-content/70">
+						for i, artist := range candidate.Track.Artists {
+							<a
+								href={ templ.SafeURL(artist.Url) }
+								target="_blank"
+							>
+								if i < len(candidate.Track.Artists)-1 {
+									{ artist.Name + ", " }
+								} else {
+									{ artist.Name }
+								}
+							</a>
+						}
+					</div>
 				</td>
 			</tr>
 		}
@@ -351,18 +354,22 @@ templ FinalizeSubmissionsButton(sessionId int64, isSubmissionsFinalized bool) {
 templ SubmissionItem(candidate core.CandidateDto, isFinalized bool) {
 	<tr>
 		if !isFinalized {
-			<td class="w-0">
-				<button
-					hx-delete={ fmt.Sprintf("/app/session/%d/candidate/%d", candidate.SessionId, candidate.Id) }
-					hx-target="closest tr"
-					hx-swap="delete"
-					hx-disabled-elt="this"
-					class="btn"
-				>Remove</button>
+			<td>
+				<div>
+					<button
+						hx-delete={ fmt.Sprintf("/app/session/%d/candidate/%d", candidate.SessionId, candidate.Id) }
+						hx-target="closest tr"
+						hx-swap="delete"
+						hx-disabled-elt="this"
+						class="btn"
+					>
+						@TrashCanIcon(NewIconProps())
+					</button>
+				</div>
 			</td>
 		}
-		<td>
-			<div class="flex items-center gap-2">
+		<td class="grid grid-cols-1 md:grid-cols-3 md:gap-2">
+			<div class="flex items-center gap-2 font-medium">
 				<a
 					href={ templ.SafeURL(candidate.Track.Url) }
 					target="_blank"
@@ -373,28 +380,28 @@ templ SubmissionItem(candidate core.CandidateDto, isFinalized bool) {
 					@ExplicitIcon()
 				}
 			</div>
-		</td>
-		<td>
-			<a
-				href={ templ.SafeURL(candidate.Track.Album.Url) }
-				target="_blank"
-			>
-				{ candidate.Track.Album.Name }
-			</a>
-		</td>
-		<td>
-			for i, artist := range candidate.Track.Artists {
+			<div class="text-base-content/70">
 				<a
-					href={ templ.SafeURL(artist.Url) }
+					href={ templ.SafeURL(candidate.Track.Album.Url) }
 					target="_blank"
 				>
-					if i < len(candidate.Track.Artists)-1 {
-						{ artist.Name + ", " }
-					} else {
-						{ artist.Name }
-					}
+					{ candidate.Track.Album.Name }
 				</a>
-			}
+			</div>
+			<div class="text-base-content/70">
+				for i, artist := range candidate.Track.Artists {
+					<a
+						href={ templ.SafeURL(artist.Url) }
+						target="_blank"
+					>
+						if i < len(candidate.Track.Artists)-1 {
+							{ artist.Name + ", " }
+						} else {
+							{ artist.Name }
+						}
+					</a>
+				}
+			</div>
 		</td>
 	</tr>
 }

@@ -2680,6 +2680,11 @@ html {
   min-width: 24rem;
 }
 
+.min-w-fit {
+  min-width: -moz-fit-content;
+  min-width: fit-content;
+}
+
 .max-w-screen-xl {
   max-width: 1280px;
 }
@@ -2713,6 +2718,10 @@ html {
   grid-template-columns: repeat(1, minmax(0, 1fr));
 }
 
+.grid-cols-\[min-content_1fr\] {
+  grid-template-columns: min-content 1fr;
+}
+
 .grid-cols-subgrid {
   grid-template-columns: subgrid;
 }
@@ -2727,6 +2736,10 @@ html {
 
 .flex-col {
   flex-direction: column;
+}
+
+.flex-wrap {
+  flex-wrap: wrap;
 }
 
 .items-center {
@@ -2777,6 +2790,10 @@ html {
   overflow-x: auto;
 }
 
+.whitespace-nowrap {
+  white-space: nowrap;
+}
+
 .rounded-2xl {
   border-radius: 1rem;
 }
@@ -2798,6 +2815,10 @@ html {
 .bg-primary {
   --tw-bg-opacity: 1;
   background-color: var(--fallback-p,oklch(var(--p)/var(--tw-bg-opacity, 1)));
+}
+
+.fill-info {
+  fill: var(--fallback-in,oklch(var(--in)/1));
 }
 
 .stroke-current {
@@ -2916,6 +2937,10 @@ html {
 @media (min-width: 768px) {
   .md\:grid-cols-3 {
     grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .md\:gap-2 {
+    gap: 0.5rem;
   }
 }
 

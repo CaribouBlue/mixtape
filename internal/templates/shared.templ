@@ -53,7 +53,7 @@ templ CollapsibleCard(title string, isDefaultOpen bool) {
 	<div
 		x-data={ fmt.Sprintf("{isOpen: %t}", isDefaultOpen) }
 		x-bind:class="isOpen ? 'grid-rows-[max-content_1fr] gap-4' : 'grid-rows-[max-content_0fr] gap-0'"
-		class="transition-all collapsible-card grid border rounded-2xl overflow-hidden"
+		class="transition-all collapsible-card grid grid-cols-1 border rounded-2xl overflow-hidden"
 	>
 		<div
 			@click="isOpen = !isOpen"
