@@ -198,7 +198,7 @@ templ SubmissionPhaseView(s core.SessionDto) {
 				fmt.Sprintf("@%s.document", serverUtils.EventNewSubmission): "submissionCount++",
 				fmt.Sprintf("@%s.document", serverUtils.EventDeleteSubmission): "submissionCount--",
 			}... }
-			class="col-span-full grid grid-cols-subgrid gap-4 p-4 border rounded-2xl"
+			class="col-span-full flex flex-col gap-4 p-4 border rounded-2xl"
 		>
 			<h2
 				class="text-lg"
