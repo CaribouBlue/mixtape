@@ -1479,10 +1479,6 @@ html {
     --btn-color: var(--fallback-p);
   }
 
-  .btn-success {
-    --btn-color: var(--fallback-su);
-  }
-
   .btn-error {
     --btn-color: var(--fallback-er);
   }
@@ -1542,19 +1538,9 @@ html {
     --btn-color: var(--p);
   }
 
-  .btn-success {
-    --btn-color: var(--su);
-  }
-
   .btn-error {
     --btn-color: var(--er);
   }
-}
-
-.btn-success {
-  --tw-text-opacity: 1;
-  color: var(--fallback-suc,oklch(var(--suc)/var(--tw-text-opacity)));
-  outline-color: var(--fallback-su,oklch(var(--su)/1));
 }
 
 .btn-error {
@@ -2819,6 +2805,10 @@ html {
 
 .fill-info {
   fill: var(--fallback-in,oklch(var(--in)/1));
+}
+
+.fill-red-500 {
+  fill: #ef4444;
 }
 
 .stroke-current {

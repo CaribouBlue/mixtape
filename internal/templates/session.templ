@@ -492,7 +492,7 @@ templ CandidateBallot(candidate core.CandidateDto, canVote bool) {
 			<td>
 				<div
 					role="alert"
-					class="alert alert-error absolute left-0"
+					class="alert alert-error absolute left-0 flex"
 					x-show="!!error"
 					x-transition
 				>
@@ -518,10 +518,10 @@ templ CandidateBallot(candidate core.CandidateDto, canVote bool) {
 						hx-target-422="previous span"
 						hx-swap="outerHTML"
 						hx-disabled-elt="this"
-						class="btn btn-wide btn-success"
+						class="btn"
 					>
 						@requestSpinner(SpinnerOpts{Size: SpinnerSizeXs}) {
-							@CheckIcon()
+							@HeartFilledIcon(NewIconProps(withClass("fill-red-500")))
 						}
 					</button>
 				} else {
@@ -531,17 +531,17 @@ templ CandidateBallot(candidate core.CandidateDto, canVote bool) {
 						hx-target-422="previous span"
 						hx-swap="outerHTML"
 						hx-disabled-elt="this"
-						class="btn btn-wide"
+						class="btn"
 					>
 						@requestSpinner(SpinnerOpts{Size: SpinnerSizeXs}) {
-							Vote
+							@HeartIcon(NewIconProps())
 						}
 					</button>
 				}
 			</td>
 		}
-		<td>
-			<div class="flex items-center gap-2">
+		<td class="grid grid-cols-1 md:grid-cols-3 md:gap-2">
+			<div class="flex items-center gap-2 text-medium">
 				<a
 					href={ templ.SafeURL(candidate.Track.Url) }
 					target="_blank"
@@ -552,28 +552,28 @@ templ CandidateBallot(candidate core.CandidateDto, canVote bool) {
 					@ExplicitIcon()
 				}
 			</div>
-		</td>
-		<td>
-			<a
-				href={ templ.SafeURL(candidate.Track.Album.Url) }
-				target="_blank"
-			>
-				{ candidate.Track.Album.Name }
-			</a>
-		</td>
-		<td>
-			for i, artist := range candidate.Track.Artists {
+			<div class="text-base-content/70">
 				<a
-					href={ templ.SafeURL(artist.Url) }
+					href={ templ.SafeURL(candidate.Track.Album.Url) }
 					target="_blank"
 				>
-					if i < len(candidate.Track.Artists)-1 {
-						{ artist.Name + ", " }
-					} else {
-						{ artist.Name }
-					}
+					{ candidate.Track.Album.Name }
 				</a>
-			}
+			</div>
+			<div class="text-base-content/70">
+				for i, artist := range candidate.Track.Artists {
+					<a
+						href={ templ.SafeURL(artist.Url) }
+						target="_blank"
+					>
+						if i < len(candidate.Track.Artists)-1 {
+							{ artist.Name + ", " }
+						} else {
+							{ artist.Name }
+						}
+					</a>
+				}
+			</div>
 		</td>
 	</tr>
 }
