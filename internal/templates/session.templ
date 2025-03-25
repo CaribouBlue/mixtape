@@ -634,13 +634,17 @@ func PlaceDisplayText(place int) string {
 templ Result(result core.CandidateDto) {
 	<tr>
 		<td
-			class="w-0 text-center"
+			class="text-center"
 		>
 			{ PlaceDisplayText(result.Place) }
 		</td>
-		<td>{ fmt.Sprint(result.Nominator.DisplayName) }</td>
 		<td>
-			<div class="flex items-center gap-2">
+			<p class="break-all min-w-20">
+				{ fmt.Sprint(result.Nominator.DisplayName) }
+			</p>
+		</td>
+		<td class="grid grid-cols-1 md:grid-cols-3 md:gap-2">
+			<div class="flex items-center gap-2 font-medium">
 				<a
 					href={ templ.SafeURL(result.Track.Url) }
 					target="_blank"
@@ -651,28 +655,28 @@ templ Result(result core.CandidateDto) {
 					@ExplicitIcon()
 				}
 			</div>
-		</td>
-		<td>
-			<a
-				href={ templ.SafeURL(result.Track.Album.Url) }
-				target="_blank"
-			>
-				{ result.Track.Album.Name }
-			</a>
-		</td>
-		<td>
-			for i, artist := range result.Track.Artists {
+			<div class="text-base-content/70">
 				<a
-					href={ templ.SafeURL(artist.Url) }
+					href={ templ.SafeURL(result.Track.Album.Url) }
 					target="_blank"
 				>
-					if i < len(result.Track.Artists)-1 {
-						{ artist.Name + ", " }
-					} else {
-						{ artist.Name }
-					}
+					{ result.Track.Album.Name }
 				</a>
-			}
+			</div>
+			<div class="text-base-content/70">
+				for i, artist := range result.Track.Artists {
+					<a
+						href={ templ.SafeURL(artist.Url) }
+						target="_blank"
+					>
+						if i < len(result.Track.Artists)-1 {
+							{ artist.Name + ", " }
+						} else {
+							{ artist.Name }
+						}
+					</a>
+				}
+			</div>
 		</td>
 	</tr>
 }
