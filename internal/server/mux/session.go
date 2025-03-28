@@ -7,7 +7,6 @@ import (
 	"strconv"
 
 	"github.com/CaribouBlue/mixtape/internal/core"
-	"github.com/CaribouBlue/mixtape/internal/log/rlog"
 	"github.com/CaribouBlue/mixtape/internal/server/middleware"
 	"github.com/CaribouBlue/mixtape/internal/server/utils"
 	serverUtils "github.com/CaribouBlue/mixtape/internal/server/utils"
@@ -65,15 +64,13 @@ func NewSessionMux(opts SessionMuxOpts, services SessionMuxServices, mw []middle
 
 			mux.Services.musicService, err = mux.Services.MusicServiceInitializer(mux, r)
 			if err != nil {
-				rlog.Logger(r).Error().Err(err).Msg("Failed to init music service")
-				http.Error(w, "Failed to init mux", http.StatusInternalServerError)
+				serverUtils.HandleErrorResponse(w, "Failed to init mux", http.StatusInternalServerError, r, err)
 				return
 			}
 
 			mux.Services.sessionService, err = mux.Services.SessionServiceInitializer(mux, r)
 			if err != nil {
-				rlog.Logger(r).Error().Err(err).Msg("Failed to init session service")
-				http.Error(w, "Failed to init mux", http.StatusInternalServerError)
+				serverUtils.HandleErrorResponse(w, "Failed to init mux", http.StatusInternalServerError, r, err)
 				return
 			}
 
@@ -106,14 +103,13 @@ func NewSessionMux(opts SessionMuxOpts, services SessionMuxServices, mw []middle
 func (mux *SessionMux) handlePageSessions(w http.ResponseWriter, r *http.Request) {
 	user, err := utils.ContextValue(r.Context(), utils.UserCtxKey)
 	if err != nil {
-		rlog.Logger(r).Error().Err(err).Msg("Failed to get user from context")
-		http.Error(w, "Could not get user data", http.StatusUnauthorized)
+		serverUtils.HandleErrorResponse(w, "Could not get user data", http.StatusUnauthorized, r, err)
 		return
 	}
 
 	sessions, err := mux.Services.sessionService.GetSessionsListForUser(user.Id)
 	if err != nil {
-		http.Error(w, "Failed to get sessions", http.StatusInternalServerError)
+		serverUtils.HandleErrorResponse(w, "Failed to get sessions", http.StatusInternalServerError, r, err)
 		return
 	}
 
@@ -124,14 +120,13 @@ func (mux *SessionMux) handlePageSessions(w http.ResponseWriter, r *http.Request
 func (mux *SessionMux) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 	user, err := utils.ContextValue(r.Context(), utils.UserCtxKey)
 	if err != nil {
-		rlog.Logger(r).Error().Err(err).Msg("Failed to get user from context")
-		http.Error(w, "Could not get user data", http.StatusUnauthorized)
+		serverUtils.HandleErrorResponse(w, "Could not get user data", http.StatusUnauthorized, r, err)
 		return
 	}
 
 	err = r.ParseForm()
 	if err != nil {
-		http.Error(w, "Failed to parse form", http.StatusBadRequest)
+		serverUtils.HandleErrorResponse(w, "Failed to parse form", http.StatusBadRequest, r, err)
 		return
 	}
 
@@ -139,7 +134,7 @@ func (mux *SessionMux) handleCreateSession(w http.ResponseWriter, r *http.Reques
 
 	session, err := mux.Services.sessionService.CreateSession(core.NewSessionEntity(name, user.Id))
 	if err != nil {
-		http.Error(w, "Failed to create session", http.StatusInternalServerError)
+		serverUtils.HandleErrorResponse(w, "Failed to create session", http.StatusInternalServerError, r, err)
 		return
 	}
 
@@ -149,13 +144,12 @@ func (mux *SessionMux) handleCreateSession(w http.ResponseWriter, r *http.Reques
 func (mux *SessionMux) handlePageSessionMaker(w http.ResponseWriter, r *http.Request) {
 	user, err := utils.ContextValue(r.Context(), utils.UserCtxKey)
 	if err != nil {
-		rlog.Logger(r).Error().Err(err).Msg("Failed to get user from context")
-		http.Error(w, "Could not get user data", http.StatusUnauthorized)
+		serverUtils.HandleErrorResponse(w, "Could not get user data", http.StatusUnauthorized, r, err)
 		return
 	}
 
 	if !user.IsAdmin {
-		http.Error(w, "Forbidden", http.StatusForbidden)
+		serverUtils.HandleErrorResponse(w, "Forbidden", http.StatusForbidden, r, err)
 		return
 	}
 
@@ -165,21 +159,19 @@ func (mux *SessionMux) handlePageSessionMaker(w http.ResponseWriter, r *http.Req
 func (mux *SessionMux) handlePageSession(w http.ResponseWriter, r *http.Request) {
 	user, err := utils.ContextValue(r.Context(), utils.UserCtxKey)
 	if err != nil {
-		rlog.Logger(r).Error().Err(err).Msg("Failed to get user from context")
-		http.Error(w, "Could not get user data", http.StatusUnauthorized)
+		serverUtils.HandleErrorResponse(w, "Could not get user data", http.StatusUnauthorized, r, err)
 		return
 	}
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
-		http.Error(w, "Invalid session ID", http.StatusBadRequest)
+		serverUtils.HandleErrorResponse(w, "Invalid session ID", http.StatusBadRequest, r, err)
 		return
 	}
 
 	sessionView, err := mux.Services.sessionService.GetSessionView(sessionId, user.Id)
 	if err != nil {
-		rlog.Logger(r).Error().Err(err).Msg("Failed to get session view")
-		http.Error(w, "Failed to get session view", http.StatusInternalServerError)
+		serverUtils.HandleErrorResponse(w, "Failed to get session view", http.StatusInternalServerError, r, err)
 		return
 	}
 
@@ -190,7 +182,7 @@ func (mux *SessionMux) handlePageSession(w http.ResponseWriter, r *http.Request)
 func (mux *SessionMux) handleSearchSubmissions(w http.ResponseWriter, r *http.Request) {
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
-		http.Error(w, "Invalid session ID", http.StatusBadRequest)
+		serverUtils.HandleErrorResponse(w, "Invalid session ID", http.StatusBadRequest, r, err)
 		return
 	}
 
@@ -199,7 +191,7 @@ func (mux *SessionMux) handleSearchSubmissions(w http.ResponseWriter, r *http.Re
 
 	submissions, err := mux.Services.sessionService.SearchCandidateSubmissions(sessionId, query)
 	if err != nil {
-		http.Error(w, "Failed to search tracks", http.StatusInternalServerError)
+		serverUtils.HandleErrorResponse(w, "Failed to search tracks", http.StatusInternalServerError, r, err)
 		return
 	}
 
@@ -209,14 +201,13 @@ func (mux *SessionMux) handleSearchSubmissions(w http.ResponseWriter, r *http.Re
 func (mux *SessionMux) handleSubmitCandidate(w http.ResponseWriter, r *http.Request) {
 	user, err := utils.ContextValue(r.Context(), utils.UserCtxKey)
 	if err != nil {
-		rlog.Logger(r).Error().Err(err).Msg("Failed to get user from context")
-		http.Error(w, "Could not get user data", http.StatusUnauthorized)
+		serverUtils.HandleErrorResponse(w, "Could not get user data", http.StatusUnauthorized, r, err)
 		return
 	}
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
-		http.Error(w, "Invalid session ID", http.StatusBadRequest)
+		serverUtils.HandleErrorResponse(w, "Invalid session ID", http.StatusBadRequest, r, err)
 		return
 	}
 
@@ -225,19 +216,19 @@ func (mux *SessionMux) handleSubmitCandidate(w http.ResponseWriter, r *http.Requ
 
 	submission, err := mux.Services.sessionService.SubmitCandidate(sessionId, user.Id, trackId)
 	if err == core.ErrNoSubmissionsLeft {
-		http.Error(w, "No submissions left", http.StatusUnprocessableEntity)
+		serverUtils.HandleErrorResponse(w, "No submissions left", http.StatusUnprocessableEntity, r, err)
 		return
 	} else if err == core.ErrDuplicateSubmission {
-		http.Error(w, "This song was already submitted", http.StatusUnprocessableEntity)
+		serverUtils.HandleErrorResponse(w, "This song was already submitted", http.StatusUnprocessableEntity, r, err)
 		return
 	} else if err != nil {
-		http.Error(w, "Failed to add submission", http.StatusInternalServerError)
+		serverUtils.HandleErrorResponse(w, "Failed to add submission", http.StatusInternalServerError, r, err)
 		return
 	}
 
 	session, err := mux.Services.sessionService.GetSessionView(sessionId, user.Id)
 	if err != nil {
-		http.Error(w, "Failed to get session view", http.StatusInternalServerError)
+		serverUtils.HandleErrorResponse(w, "Failed to get session view", http.StatusInternalServerError, r, err)
 		return
 	}
 
@@ -248,26 +239,25 @@ func (mux *SessionMux) handleSubmitCandidate(w http.ResponseWriter, r *http.Requ
 func (mux *SessionMux) handleJoinSession(w http.ResponseWriter, r *http.Request) {
 	user, err := utils.ContextValue(r.Context(), utils.UserCtxKey)
 	if err != nil {
-		rlog.Logger(r).Error().Err(err).Msg("Failed to get user from context")
-		http.Error(w, "Could not get user data", http.StatusUnauthorized)
+		serverUtils.HandleErrorResponse(w, "Could not get user data", http.StatusUnauthorized, r, err)
 		return
 	}
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
-		http.Error(w, "Invalid session ID", http.StatusBadRequest)
+		serverUtils.HandleErrorResponse(w, "Invalid session ID", http.StatusBadRequest, r, err)
 		return
 	}
 
 	_, err = mux.Services.sessionService.JoinSession(sessionId, user.Id)
 	if err != nil {
-		http.Error(w, "Failed to join session", http.StatusInternalServerError)
+		serverUtils.HandleErrorResponse(w, "Failed to join session", http.StatusInternalServerError, r, err)
 		return
 	}
 
 	sessionView, err := mux.Services.sessionService.GetSessionView(sessionId, user.Id)
 	if err != nil {
-		http.Error(w, "Failed to get session view", http.StatusInternalServerError)
+		serverUtils.HandleErrorResponse(w, "Failed to get session view", http.StatusInternalServerError, r, err)
 		return
 	}
 
@@ -277,26 +267,25 @@ func (mux *SessionMux) handleJoinSession(w http.ResponseWriter, r *http.Request)
 func (mux *SessionMux) handleFinalizeSubmissions(w http.ResponseWriter, r *http.Request) {
 	user, err := utils.ContextValue(r.Context(), utils.UserCtxKey)
 	if err != nil {
-		rlog.Logger(r).Error().Err(err).Msg("Failed to get user from context")
-		http.Error(w, "Could not get user data", http.StatusUnauthorized)
+		serverUtils.HandleErrorResponse(w, "Could not get user data", http.StatusUnauthorized, r, err)
 		return
 	}
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
-		http.Error(w, "Invalid session ID", http.StatusBadRequest)
+		serverUtils.HandleErrorResponse(w, "Invalid session ID", http.StatusBadRequest, r, err)
 		return
 	}
 
 	err = mux.Services.sessionService.FinalizePlayerSubmissions(sessionId, user.Id)
 	if err != nil {
-		http.Error(w, "Failed to finalize submissions", http.StatusInternalServerError)
+		serverUtils.HandleErrorResponse(w, "Failed to finalize submissions", http.StatusInternalServerError, r, err)
 		return
 	}
 
 	sessionView, err := mux.Services.sessionService.GetSessionView(sessionId, user.Id)
 	if err != nil {
-		http.Error(w, "Failed to get session view", http.StatusInternalServerError)
+		serverUtils.HandleErrorResponse(w, "Failed to get session view", http.StatusInternalServerError, r, err)
 		return
 	}
 
@@ -306,20 +295,19 @@ func (mux *SessionMux) handleFinalizeSubmissions(w http.ResponseWriter, r *http.
 func (mux *SessionMux) handleCreatePlayerPlaylist(w http.ResponseWriter, r *http.Request) {
 	user, err := utils.ContextValue(r.Context(), utils.UserCtxKey)
 	if err != nil {
-		rlog.Logger(r).Error().Err(err).Msg("Failed to get user from context")
-		http.Error(w, "Could not get user data", http.StatusUnauthorized)
+		serverUtils.HandleErrorResponse(w, "Could not get user data", http.StatusUnauthorized, r, err)
 		return
 	}
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
-		http.Error(w, "Invalid session ID", http.StatusBadRequest)
+		serverUtils.HandleErrorResponse(w, "Invalid session ID", http.StatusBadRequest, r, err)
 		return
 	}
 
 	player, err := mux.Services.sessionService.CreatePlayerPlaylist(sessionId, user.Id)
 	if err != nil {
-		http.Error(w, "Failed to create player playlist", http.StatusInternalServerError)
+		serverUtils.HandleErrorResponse(w, "Failed to create player playlist", http.StatusInternalServerError, r, err)
 		return
 	}
 
@@ -329,13 +317,13 @@ func (mux *SessionMux) handleCreatePlayerPlaylist(w http.ResponseWriter, r *http
 func (mux *SessionMux) handleGetPhaseDuration(w http.ResponseWriter, r *http.Request) {
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
-		http.Error(w, "Invalid session ID", http.StatusBadRequest)
+		serverUtils.HandleErrorResponse(w, "Invalid session ID", http.StatusBadRequest, r, err)
 		return
 	}
 
 	session, err := mux.Services.sessionService.GetSessionData(sessionId)
 	if err != nil {
-		http.Error(w, "Failed to get session", http.StatusInternalServerError)
+		serverUtils.HandleErrorResponse(w, "Failed to get session", http.StatusInternalServerError, r, err)
 		return
 	}
 
@@ -345,32 +333,31 @@ func (mux *SessionMux) handleGetPhaseDuration(w http.ResponseWriter, r *http.Req
 func (mux *SessionMux) handleRemoveCandidate(w http.ResponseWriter, r *http.Request) {
 	user, err := utils.ContextValue(r.Context(), utils.UserCtxKey)
 	if err != nil {
-		rlog.Logger(r).Error().Err(err).Msg("Failed to get user from context")
-		http.Error(w, "Could not get user data", http.StatusUnauthorized)
+		serverUtils.HandleErrorResponse(w, "Could not get user data", http.StatusUnauthorized, r, err)
 		return
 	}
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
-		http.Error(w, "Invalid session ID", http.StatusBadRequest)
+		serverUtils.HandleErrorResponse(w, "Invalid session ID", http.StatusBadRequest, r, err)
 		return
 	}
 
 	candidateId, err := strconv.ParseInt(r.PathValue("candidateId"), 10, 64)
 	if err != nil {
-		http.Error(w, "Invalid candidate ID", http.StatusBadRequest)
+		serverUtils.HandleErrorResponse(w, "Invalid candidate ID", http.StatusBadRequest, r, err)
 		return
 	}
 
 	err = mux.Services.sessionService.RemoveCandidate(sessionId, user.Id, candidateId)
 	if err != nil {
-		http.Error(w, "Failed to delete submission", http.StatusInternalServerError)
+		serverUtils.HandleErrorResponse(w, "Failed to delete submission", http.StatusInternalServerError, r, err)
 		return
 	}
 
 	session, err := mux.Services.sessionService.GetSessionView(sessionId, user.Id)
 	if err != nil {
-		http.Error(w, "Failed to get session view", http.StatusInternalServerError)
+		serverUtils.HandleErrorResponse(w, "Failed to get session view", http.StatusInternalServerError, r, err)
 		return
 	}
 
@@ -381,32 +368,30 @@ func (mux *SessionMux) handleRemoveCandidate(w http.ResponseWriter, r *http.Requ
 func (mux *SessionMux) handleCreateCandidateVote(w http.ResponseWriter, r *http.Request) {
 	user, err := utils.ContextValue(r.Context(), utils.UserCtxKey)
 	if err != nil {
-		rlog.Logger(r).Error().Err(err).Msg("Failed to get user from context")
-		http.Error(w, "Could not get user data", http.StatusUnauthorized)
+		serverUtils.HandleErrorResponse(w, "Could not get user data", http.StatusUnauthorized, r, err)
 		return
 	}
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
-		http.Error(w, "Invalid session ID", http.StatusBadRequest)
+		serverUtils.HandleErrorResponse(w, "Invalid session ID", http.StatusBadRequest, r, err)
 		return
 	}
 
 	r.ParseForm()
 	candidateId, err := strconv.ParseInt(r.PathValue("candidateId"), 10, 64)
 	if err != nil {
-		rlog.Logger(r).Error().Err(err).Msg("Failed to parse candidate ID")
-		http.Error(w, "Invalid candidate ID", http.StatusBadRequest)
+		serverUtils.HandleErrorResponse(w, "Invalid candidate ID", http.StatusBadRequest, r, err)
 		return
 	}
 
 	candidate, err := mux.Services.sessionService.VoteForCandidate(sessionId, user.Id, candidateId)
 	if err == core.ErrNoVotesLeft {
 		w.Header().Add("HX-Reswap", "innerHTML")
-		http.Error(w, "No votes left", http.StatusUnprocessableEntity)
+		serverUtils.HandleErrorResponse(w, "No votes left", http.StatusUnprocessableEntity, r, err)
 		return
 	} else if err != nil {
-		http.Error(w, "Failed to add vote", http.StatusInternalServerError)
+		serverUtils.HandleErrorResponse(w, "Failed to add vote", http.StatusInternalServerError, r, err)
 		return
 	}
 
@@ -417,26 +402,25 @@ func (mux *SessionMux) handleCreateCandidateVote(w http.ResponseWriter, r *http.
 func (mux *SessionMux) handleDeleteCandidateVote(w http.ResponseWriter, r *http.Request) {
 	user, err := utils.ContextValue(r.Context(), utils.UserCtxKey)
 	if err != nil {
-		rlog.Logger(r).Error().Err(err).Msg("Failed to get user from context")
-		http.Error(w, "Could not get user data", http.StatusUnauthorized)
+		serverUtils.HandleErrorResponse(w, "Could not get user data", http.StatusUnauthorized, r, err)
 		return
 	}
 
 	sessionId, err := strconv.ParseInt(r.PathValue("sessionId"), 10, 64)
 	if err != nil {
-		http.Error(w, "Invalid session ID", http.StatusBadRequest)
+		serverUtils.HandleErrorResponse(w, "Invalid session ID", http.StatusBadRequest, r, err)
 		return
 	}
 
 	candidateId, err := strconv.ParseInt(r.PathValue("candidateId"), 10, 64)
 	if err != nil {
-		http.Error(w, "Invalid candidate ID", http.StatusBadRequest)
+		serverUtils.HandleErrorResponse(w, "Invalid candidate ID", http.StatusBadRequest, r, err)
 		return
 	}
 
 	candidate, err := mux.Services.sessionService.RemoveVoteForCandidate(sessionId, user.Id, candidateId)
 	if err != nil {
-		http.Error(w, "Failed to remove vote", http.StatusInternalServerError)
+		serverUtils.HandleErrorResponse(w, "Failed to remove vote", http.StatusInternalServerError, r, err)
 		return
 	}
 

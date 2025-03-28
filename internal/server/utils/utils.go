@@ -5,8 +5,14 @@ import (
 
 	"net/http"
 
+	"github.com/CaribouBlue/mixtape/internal/log/rlog"
 	"github.com/a-h/templ"
 )
+
+func HandleErrorResponse(w http.ResponseWriter, msg string, statusCode int, r *http.Request, err error) {
+	rlog.Logger(r).Error().Err(err).Msg(msg)
+	http.Error(w, msg, statusCode)
+}
 
 func HandleJsonResponse(w http.ResponseWriter, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
