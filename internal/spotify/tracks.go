@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	netUrl "net/url"
 )
@@ -116,11 +117,18 @@ func getTrack(opts GetTrackRequestOptions) (*Track, error) {
 		return &track, err
 	}
 
+	defer resp.Body.Close()
+
 	if resp.StatusCode != http.StatusOK {
-		return &track, fmt.Errorf("failed to search Spotify")
+		bodyBytes, err := io.ReadAll(resp.Body)
+		var body string
+		if err != nil {
+			body = ""
+		}
+		body = string(bodyBytes)
+		return &track, fmt.Errorf("failed to get Spotify track with %s: %s", resp.Status, body)
 	}
 
-	defer resp.Body.Close()
 	err = json.NewDecoder(resp.Body).Decode(&track)
 	if err != nil {
 		return &track, err

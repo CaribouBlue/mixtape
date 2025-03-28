@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	netUrl "net/url"
 	"strconv"
@@ -405,11 +406,18 @@ func getSearchResult(opts GetSearchResultRequestOptions) (*SearchResult, error) 
 		return &searchRequest, err
 	}
 
+	defer resp.Body.Close()
+
 	if resp.StatusCode != http.StatusOK {
-		return &searchRequest, fmt.Errorf("failed to search Spotify")
+		bodyBytes, err := io.ReadAll(resp.Body)
+		var body string
+		if err != nil {
+			body = ""
+		}
+		body = string(bodyBytes)
+		return &searchRequest, fmt.Errorf("failed to search Spotify with %s: %s", resp.Status, body)
 	}
 
-	defer resp.Body.Close()
 	err = json.NewDecoder(resp.Body).Decode(&searchRequest)
 	if err != nil {
 		return &searchRequest, err
