@@ -5,7 +5,6 @@ import (
 	"net/http"
 
 	"github.com/CaribouBlue/mixtape/internal/core"
-	"github.com/CaribouBlue/mixtape/internal/log/rlog"
 	"github.com/CaribouBlue/mixtape/internal/server/middleware"
 	"github.com/CaribouBlue/mixtape/internal/server/response"
 	"github.com/CaribouBlue/mixtape/internal/server/utils"
@@ -94,8 +93,7 @@ func (mux *AuthMux) handleUserSignUp(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusUnprocessableEntity)
 			return
 		} else {
-			rlog.Logger(r).Error().Err(err).Msg("Failed to sign up user")
-			http.Error(w, "Failed to sign up user", http.StatusInternalServerError)
+			response.HandleErrorResponse(w, "Failed to sign up user", http.StatusInternalServerError, r, err)
 			return
 		}
 	}
@@ -109,18 +107,16 @@ func (mux *AuthMux) handleUserLoginSubmit(w http.ResponseWriter, r *http.Request
 	password := r.FormValue("password")
 	u, err := mux.Services.UserService.LoginUser(username, password)
 	if err == core.ErrUserNotFound || err == core.ErrIncorrectPassword {
-		http.Error(w, "Invalid login", http.StatusUnprocessableEntity)
+		response.HandleErrorResponse(w, "Invalid login", http.StatusUnprocessableEntity, r, err)
 		return
 	} else if err != nil {
-		rlog.Logger(r).Error().Err(err).Msg("Failed to log in user")
-		http.Error(w, "Failed to log in user", http.StatusInternalServerError)
+		response.HandleErrorResponse(w, "Failed to log in user", http.StatusInternalServerError, r, err)
 		return
 	}
 
 	err = utils.SetAuthCookie(w, u)
 	if err != nil {
-		rlog.Logger(r).Error().Err(err).Msg("Failed to set auth cookie")
-		http.Error(w, "Failed to set auth cookie", http.StatusInternalServerError)
+		response.HandleErrorResponse(w, "Failed to set auth cookie", http.StatusInternalServerError, r, err)
 		return
 	}
 
@@ -130,8 +126,7 @@ func (mux *AuthMux) handleUserLoginSubmit(w http.ResponseWriter, r *http.Request
 func (mux *AuthMux) handleLogin(w http.ResponseWriter, r *http.Request) {
 	u, err := utils.ContextValue(r.Context(), utils.UserCtxKey)
 	if err != nil {
-		rlog.Logger(r).Error().Err(err).Msg("Failed to get user from context")
-		http.Error(w, "Failed to login", http.StatusUnauthorized)
+		response.HandleErrorResponse(w, "Failed to login", http.StatusUnauthorized, r, err)
 		return
 	}
 
@@ -145,16 +140,14 @@ func (mux *AuthMux) handleLogin(w http.ResponseWriter, r *http.Request) {
 		if spotify == nil {
 			err = errors.New("spotify client is nil")
 		}
-		rlog.Logger(r).Error().Err(err).Msg("Failed to get spotify client")
-		http.Error(w, "Failed to login", http.StatusInternalServerError)
+		response.HandleErrorResponse(w, "Failed to login", http.StatusInternalServerError, r, err)
 		return
 	}
 
 	if u.IsAuthenticatedWithSpotify() {
 		_, err := spotify.Reauthenticate(u.SpotifyToken)
 		if err != nil {
-			rlog.Logger(r).Error().Err(err).Msg("Failed to reauthenticate Spotify client")
-			http.Error(w, "Failed to login", http.StatusInternalServerError)
+			response.HandleErrorResponse(w, "Failed to login", http.StatusInternalServerError, r, err)
 			return
 		}
 
@@ -172,8 +165,7 @@ func (mux *AuthMux) handleLogout(w http.ResponseWriter, r *http.Request) {
 
 	err := utils.DeleteCookie(w, r, utils.CookieNameAuthorization)
 	if err != nil {
-		rlog.Logger(r).Error().Err(err).Msg("Failed to delete auth cookie")
-		http.Error(w, "Failed to logout", http.StatusInternalServerError)
+		response.HandleErrorResponse(w, "Failed to logout", http.StatusInternalServerError, r, err)
 		return
 	}
 
@@ -183,13 +175,13 @@ func (mux *AuthMux) handleLogout(w http.ResponseWriter, r *http.Request) {
 func (mux *AuthMux) handleSpotifyAuth(w http.ResponseWriter, r *http.Request) {
 	spotify, err := utils.ContextValue(r.Context(), utils.SpotifyClientCtxKey)
 	if err != nil || spotify == nil {
-		http.Error(w, "Failed to get Spotify client", http.StatusInternalServerError)
+		response.HandleErrorResponse(w, "Failed to get Spotify client", http.StatusInternalServerError, r, err)
 		return
 	}
 
 	userAuthUrl, err := spotify.GetUserAuthUrl()
 	if err != nil {
-		http.Error(w, "Failed to get user auth url", http.StatusInternalServerError)
+		response.HandleErrorResponse(w, "Failed to get user auth url", http.StatusInternalServerError, r, err)
 		return
 	}
 
@@ -199,46 +191,54 @@ func (mux *AuthMux) handleSpotifyAuth(w http.ResponseWriter, r *http.Request) {
 func (mux *AuthMux) handleSpotifyAuthRedirect(w http.ResponseWriter, r *http.Request) {
 	u, err := utils.ContextValue(r.Context(), utils.UserCtxKey)
 	if err != nil {
-		rlog.Logger(r).Error().Err(err).Msg("Failed to get user from context")
-		http.Error(w, "Could not get user data", http.StatusUnauthorized)
+		response.HandleErrorResponse(w, "Could not get user data", http.StatusUnauthorized, r, err)
 		return
 	}
 
 	u, err = mux.Services.UserService.GetUserById(u.Id)
 	if err != nil {
-		http.Error(w, "Failed to get user", http.StatusInternalServerError)
+		response.HandleErrorResponse(w, "Failed to get user", http.StatusInternalServerError, r, err)
 		return
 	}
 
 	spotify, err := utils.ContextValue(r.Context(), utils.SpotifyClientCtxKey)
 	if err != nil || spotify == nil {
-		http.Error(w, "Failed to get Spotify client", http.StatusInternalServerError)
+		response.HandleErrorResponse(w, "Failed to get Spotify client", http.StatusInternalServerError, r, err)
 		return
 	}
 
 	code := r.URL.Query().Get("code")
 	if code == "" {
-		http.Error(w, "Code not found in request", http.StatusBadRequest)
+		response.HandleErrorResponse(w, "Code not found in request", http.StatusBadRequest, r, err)
 		return
 	}
 
 	state := r.URL.Query().Get("state")
 	if state == "" {
-		http.Error(w, "State not found in request", http.StatusBadRequest)
+		response.HandleErrorResponse(w, "State not found in request", http.StatusBadRequest, r, err)
 		return
 	}
 
 	token, err := spotify.Authenticate(code)
 	if err != nil {
-		http.Error(w, "Failed to get new access token", http.StatusBadRequest)
+		response.HandleErrorResponse(w, "Failed to get new access token", http.StatusBadRequest, r, err)
 		return
 	}
 
+	if u.SpotifyEmail == "" {
+		profile, err := spotify.GetCurrentUserProfile()
+		if err != nil {
+			response.HandleErrorResponse(w, "Failed to get Spotify profile", http.StatusInternalServerError, r, err)
+			return
+		}
+
+		u.SpotifyEmail = profile.Email
+	}
+
 	u.SpotifyToken = token.RefreshToken
-	_, err = mux.Services.UserService.AuthenticateSpotify(u.Id, u.SpotifyToken)
+	_, err = mux.Services.UserService.AuthenticateSpotify(u.Id, u.SpotifyToken, u.SpotifyEmail)
 	if err != nil {
-		rlog.Logger(r).Error().Err(err).Msg("Failed to authenticate Spotify user")
-		http.Error(w, "Failed to authenticate Spotify", http.StatusInternalServerError)
+		response.HandleErrorResponse(w, "Failed to authenticate Spotify", http.StatusInternalServerError, r, err)
 		return
 	}
 

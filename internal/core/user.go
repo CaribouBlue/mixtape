@@ -23,6 +23,7 @@ type UserEntity struct {
 	Username       string
 	DisplayName    string
 	SpotifyToken   string
+	SpotifyEmail   string
 	HashedPassword []byte
 	IsAdmin        bool
 }
@@ -40,7 +41,7 @@ type UserRepository interface {
 	GetUserById(userId int64) (*UserEntity, error)
 	GetUserByUsername(username string) (*UserEntity, error)
 	GetAllUsers() (*[]UserEntity, error)
-	UpdateUserSpotifyToken(userId int64, spotifyToken string) (*UserEntity, error)
+	UpdateUserSpotifyInfo(userId int64, spotifyToken string, spotifyEmail string) (*UserEntity, error)
 }
 
 type UserService struct {
@@ -110,8 +111,8 @@ func (s *UserService) LoginUser(username string, password string) (*UserEntity, 
 	return user, nil
 }
 
-func (s *UserService) AuthenticateSpotify(userId int64, spotifyToken string) (*UserEntity, error) {
-	user, err := s.userRepository.UpdateUserSpotifyToken(userId, spotifyToken)
+func (s *UserService) AuthenticateSpotify(userId int64, spotifyToken string, spotifyEmail string) (*UserEntity, error) {
+	user, err := s.userRepository.UpdateUserSpotifyInfo(userId, spotifyToken, spotifyEmail)
 	if err != nil {
 		return nil, err
 	}

@@ -20,6 +20,7 @@ package "User Repo" as user_repo {
         username: string
         display_name: string
         spotify_token: string
+        spotify_email: string
         hashed_password: string
         is_admin: bool
     }

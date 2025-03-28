@@ -96,11 +96,12 @@ func (store *SqliteStore) CreateUser(user *core.UserEntity) (*core.UserEntity, e
 
 func (store *SqliteStore) GetUserById(userId int64) (*core.UserEntity, error) {
 	user := &core.UserEntity{}
-	query := "SELECT id, username, display_name, spotify_token, is_admin FROM " + TableNameUsers + " WHERE id = ?"
+	query := "SELECT id, username, display_name, spotify_token, spotify_email, is_admin FROM " + TableNameUsers + " WHERE id = ?"
 	row := store.db.QueryRow(query, userId)
 	var spotifyToken sql.NullString
+	var spotifyEmail sql.NullString
 	var isAdmin sql.NullBool
-	err := row.Scan(&user.Id, &user.Username, &user.DisplayName, &spotifyToken, &isAdmin)
+	err := row.Scan(&user.Id, &user.Username, &user.DisplayName, &spotifyToken, &spotifyEmail, &isAdmin)
 	if err == sql.ErrNoRows {
 		return nil, nil // User not found
 	} else if err != nil {
@@ -109,17 +110,19 @@ func (store *SqliteStore) GetUserById(userId int64) (*core.UserEntity, error) {
 
 	user.IsAdmin = isAdmin.Bool
 	user.SpotifyToken = spotifyToken.String
+	user.SpotifyEmail = spotifyEmail.String
 
 	return user, nil
 }
 
 func (store *SqliteStore) GetUserByUsername(username string) (*core.UserEntity, error) {
 	user := &core.UserEntity{}
-	query := "SELECT id, username, display_name, hashed_password, spotify_token, is_admin FROM " + TableNameUsers + " WHERE username = ?"
+	query := "SELECT id, username, display_name, hashed_password, spotify_token, spotify_email, is_admin FROM " + TableNameUsers + " WHERE username = ?"
 	row := store.db.QueryRow(query, username)
 	var spotifyToken sql.NullString
+	var spotifyEmail sql.NullString
 	var isAdmin sql.NullBool
-	err := row.Scan(&user.Id, &user.Username, &user.DisplayName, &user.HashedPassword, &spotifyToken, &isAdmin)
+	err := row.Scan(&user.Id, &user.Username, &user.DisplayName, &user.HashedPassword, &spotifyToken, &spotifyEmail, &isAdmin)
 	if err == sql.ErrNoRows {
 		return nil, nil // User not found
 	} else if err != nil {
@@ -128,6 +131,7 @@ func (store *SqliteStore) GetUserByUsername(username string) (*core.UserEntity, 
 
 	user.IsAdmin = isAdmin.Bool
 	user.SpotifyToken = spotifyToken.String
+	user.SpotifyEmail = spotifyEmail.String
 
 	return user, nil
 }
@@ -157,9 +161,9 @@ func (store *SqliteStore) GetAllUsers() (*[]core.UserEntity, error) {
 	return &users, nil
 }
 
-func (store *SqliteStore) UpdateUserSpotifyToken(userId int64, spotifyToken string) (*core.UserEntity, error) {
-	query := "UPDATE " + TableNameUsers + " SET spotify_token = ? WHERE id = ?"
-	_, err := store.Exec(query, spotifyToken, userId)
+func (store *SqliteStore) UpdateUserSpotifyInfo(userId int64, spotifyToken string, spotifyEmail string) (*core.UserEntity, error) {
+	query := "UPDATE " + TableNameUsers + " SET spotify_token = ?, spotify_email = ? WHERE id = ?"
+	_, err := store.Exec(query, spotifyToken, spotifyEmail, userId)
 	if err != nil {
 		return nil, err
 	}

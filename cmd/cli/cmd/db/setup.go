@@ -40,6 +40,7 @@ func createTables(db *storage.SqliteStore) {
 			display_name TEXT,
 			hashed_password TEXT,
 			spotify_token TEXT,
+			spotify_email TEXT,
 			is_admin INTEGER DEFAULT (0)
 		);`,
 		`CREATE TABLE IF NOT EXISTS ` + storage.TableNameSessions + ` (
