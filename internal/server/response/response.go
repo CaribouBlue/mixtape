@@ -1,4 +1,4 @@
-package utils
+package response
 
 import (
 	"encoding/json"
@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/CaribouBlue/mixtape/internal/log/rlog"
+	"github.com/CaribouBlue/mixtape/internal/server/utils"
 	"github.com/a-h/templ"
 )
 
@@ -29,7 +30,7 @@ func HandleHtmlResponse(r *http.Request, w http.ResponseWriter, component templ.
 }
 
 func HandleRedirect(w http.ResponseWriter, r *http.Request, redirect string) error {
-	metadata, err := ContextValue(r.Context(), RequestMetaDataCtxKey)
+	metadata, err := utils.ContextValue(r.Context(), utils.RequestMetaDataCtxKey)
 	if err != nil {
 		return err
 

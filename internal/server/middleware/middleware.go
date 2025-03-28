@@ -8,6 +8,7 @@ import (
 	"github.com/CaribouBlue/mixtape/internal/core"
 	"github.com/CaribouBlue/mixtape/internal/log"
 	"github.com/CaribouBlue/mixtape/internal/log/rlog"
+	"github.com/CaribouBlue/mixtape/internal/server/response"
 	"github.com/CaribouBlue/mixtape/internal/server/utils"
 	"github.com/CaribouBlue/mixtape/internal/spotify"
 	"github.com/google/uuid"
@@ -215,7 +216,7 @@ func WithEnforcedAuthentication(opts WithEnforcedAuthenticationOpts) Middleware 
 			}
 
 			if !isAuthenticated {
-				utils.HandleRedirect(w, r, opts.UnauthenticatedRedirectPath)
+				response.HandleRedirect(w, r, opts.UnauthenticatedRedirectPath)
 				return
 			}
 

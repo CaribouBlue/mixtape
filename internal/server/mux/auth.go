@@ -7,6 +7,7 @@ import (
 	"github.com/CaribouBlue/mixtape/internal/core"
 	"github.com/CaribouBlue/mixtape/internal/log/rlog"
 	"github.com/CaribouBlue/mixtape/internal/server/middleware"
+	"github.com/CaribouBlue/mixtape/internal/server/response"
 	"github.com/CaribouBlue/mixtape/internal/server/utils"
 	"github.com/CaribouBlue/mixtape/internal/templates"
 )
@@ -55,11 +56,11 @@ func NewAuthMux(opts AuthMuxOpts, services AuthMuxServices, middleware []middlew
 }
 
 func (mux *AuthMux) handleUserLoginPage(w http.ResponseWriter, r *http.Request) {
-	utils.HandleHtmlResponse(r, w, templates.UserLoginPage())
+	response.HandleHtmlResponse(r, w, templates.UserLoginPage())
 }
 
 func (mux *AuthMux) handleUserSignUpPage(w http.ResponseWriter, r *http.Request) {
-	utils.HandleHtmlResponse(r, w, templates.UserSignUpPage())
+	response.HandleHtmlResponse(r, w, templates.UserSignUpPage())
 }
 
 func (mux *AuthMux) handleUserSignUp(w http.ResponseWriter, r *http.Request) {
@@ -79,17 +80,17 @@ func (mux *AuthMux) handleUserSignUp(w http.ResponseWriter, r *http.Request) {
 
 		if err == core.ErrIncorrectAccessCode {
 			userSignUpFormOpts.AccessCodeError = "Invalid access code"
-			utils.HandleHtmlResponse(r, w, templates.UserSignUpForm(userSignUpFormOpts))
+			response.HandleHtmlResponse(r, w, templates.UserSignUpForm(userSignUpFormOpts))
 			w.WriteHeader(http.StatusUnprocessableEntity)
 			return
 		} else if err == core.ErrUsernameAlreadyExists {
 			userSignUpFormOpts.UsernameError = "Username already exists"
-			utils.HandleHtmlResponse(r, w, templates.UserSignUpForm(userSignUpFormOpts))
+			response.HandleHtmlResponse(r, w, templates.UserSignUpForm(userSignUpFormOpts))
 			w.WriteHeader(http.StatusUnprocessableEntity)
 			return
 		} else if err == core.ErrPasswordsDoNotMatch {
 			userSignUpFormOpts.ConfirmPasswordError = "Passwords do not match"
-			utils.HandleHtmlResponse(r, w, templates.UserSignUpForm(userSignUpFormOpts))
+			response.HandleHtmlResponse(r, w, templates.UserSignUpForm(userSignUpFormOpts))
 			w.WriteHeader(http.StatusUnprocessableEntity)
 			return
 		} else {
@@ -123,7 +124,7 @@ func (mux *AuthMux) handleUserLoginSubmit(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	utils.HandleRedirect(w, r, mux.opts.PathPrefix+"/login")
+	response.HandleRedirect(w, r, mux.opts.PathPrefix+"/login")
 }
 
 func (mux *AuthMux) handleLogin(w http.ResponseWriter, r *http.Request) {
@@ -135,7 +136,7 @@ func (mux *AuthMux) handleLogin(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if u.Id == 0 {
-		utils.HandleRedirect(w, r, mux.opts.PathPrefix+"/user/login")
+		response.HandleRedirect(w, r, mux.opts.PathPrefix+"/user/login")
 		return
 	}
 
@@ -157,10 +158,10 @@ func (mux *AuthMux) handleLogin(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		utils.HandleRedirect(w, r, mux.opts.LoginSuccessPath)
+		response.HandleRedirect(w, r, mux.opts.LoginSuccessPath)
 		return
 	} else {
-		utils.HandleRedirect(w, r, mux.opts.PathPrefix+"/spotify")
+		response.HandleRedirect(w, r, mux.opts.PathPrefix+"/spotify")
 		return
 	}
 }
@@ -176,7 +177,7 @@ func (mux *AuthMux) handleLogout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	utils.HandleRedirect(w, r, mux.opts.PathPrefix+"/user/login")
+	response.HandleRedirect(w, r, mux.opts.PathPrefix+"/user/login")
 }
 
 func (mux *AuthMux) handleSpotifyAuth(w http.ResponseWriter, r *http.Request) {
@@ -192,7 +193,7 @@ func (mux *AuthMux) handleSpotifyAuth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	utils.HandleRedirect(w, r, userAuthUrl)
+	response.HandleRedirect(w, r, userAuthUrl)
 }
 
 func (mux *AuthMux) handleSpotifyAuthRedirect(w http.ResponseWriter, r *http.Request) {
@@ -241,5 +242,5 @@ func (mux *AuthMux) handleSpotifyAuthRedirect(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	utils.HandleRedirect(w, r, mux.opts.PathPrefix+"/login")
+	response.HandleRedirect(w, r, mux.opts.PathPrefix+"/login")
 }

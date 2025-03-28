@@ -10,6 +10,7 @@ import (
 	"github.com/CaribouBlue/mixtape/internal/mail"
 	"github.com/CaribouBlue/mixtape/internal/server/middleware"
 	"github.com/CaribouBlue/mixtape/internal/server/mux"
+	"github.com/CaribouBlue/mixtape/internal/server/response"
 	"github.com/CaribouBlue/mixtape/internal/server/utils"
 	"github.com/CaribouBlue/mixtape/internal/spotify"
 	"github.com/CaribouBlue/mixtape/internal/storage"
@@ -83,7 +84,7 @@ func NewServer() *http.Server {
 				[]middleware.Middleware{
 					middleware.WithSpotifyClient(),
 					middleware.WithCustomNotFoundHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-						utils.HandleRedirect(w, r, "/auth/login")
+						response.HandleRedirect(w, r, "/auth/login")
 					})),
 				},
 				[]mux.ChildMux{},
@@ -102,7 +103,7 @@ func NewServer() *http.Server {
 					}),
 					middleware.WithSpotifyClient(),
 					middleware.WithCustomNotFoundHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-						utils.HandleRedirect(w, r, "/app/home")
+						response.HandleRedirect(w, r, "/app/home")
 					})),
 				},
 				[]mux.ChildMux{

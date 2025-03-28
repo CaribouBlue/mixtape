@@ -5,7 +5,7 @@ import (
 
 	"github.com/CaribouBlue/mixtape/internal/core"
 	"github.com/CaribouBlue/mixtape/internal/server/middleware"
-	"github.com/CaribouBlue/mixtape/internal/server/utils"
+	"github.com/CaribouBlue/mixtape/internal/server/response"
 )
 
 type RootMux struct {
@@ -36,7 +36,7 @@ func NewRootMux(opts RootMuxOpts, services RootMuxServices, middleware []middlew
 	}
 
 	mux.Handle("/{$}", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		utils.HandleRedirect(w, r, "/app")
+		response.HandleRedirect(w, r, "/app")
 	}))
 
 	return mux
