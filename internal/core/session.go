@@ -383,7 +383,7 @@ func (s *SessionService) GetSessionView(sessionId, userId int64) (*SessionDto, e
 				return nil, err
 			}
 
-			ballotCandidates = append(submittedCandidates, *candidateDto)
+			ballotCandidates = append(ballotCandidates, *candidateDto)
 		}
 	}
 
