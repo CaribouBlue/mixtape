@@ -82,6 +82,8 @@ services:
     stdin_open: true
     volumes:
       - /var/lib/sqlite:/var/lib/sqlite
+    command:
+      - bash
     deploy:
       replicas: 1
 volumes:
