@@ -54,7 +54,7 @@ services:
     environment:
       ENV_FILES: /run/secrets/app_secrets
       SPOTIFY_REDIRECT_URI: https://shmoopysworld.com/auth/spotify/redirect
-      DB_PATH: /var/lib/sqlite/db.sqlite
+      DB_PATH: ${APP_DB_PATH:-/var/lib/sqlite/db.sqlite}
       LOG_FILE_PATH: /app/logs/app.log
     secrets:
       - app_secrets
@@ -77,15 +77,11 @@ services:
     deploy:
       replicas: 2
   tools:
-    build:
-      context: .
-      dockerfile: dockerfile.tools
-      args:
-        DB_PATH: /var/lib/sqlite/db.sqlite
+    image: ghcr.io/cariboublue/mixtape-tools:${APP_IMAGE_TAG:-latest}
+    tty: true
+    stdin_open: true
     volumes:
       - /var/lib/sqlite:/var/lib/sqlite
-    command:
-      - sleep infinity
     deploy:
       replicas: 1
 volumes:

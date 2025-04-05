@@ -10,7 +10,10 @@ permissions:
 
 env:
   CONTAINER_REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
+  APP_IMAGE_NAME: ${{ github.repository }}
+  TOOLS_IMAGE_NAME: ${{ github.repository }}-tools
+  COMMIT_URL: github.com/${{ github.repository }}/tree/${{ github.sha }}
+  APP_DB_PATH: /var/lib/sqlite/db.sqlite
   STACK_NAME: mixtape
   DEPLOY_USER: deploy
   DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
@@ -51,11 +54,11 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Generate image metadata
-        id: meta
+      - name: Generate app image metadata
+        id: appMeta
         uses: docker/metadata-action@v5.6.1
         with:
-          images: ${{ env.CONTAINER_REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.CONTAINER_REGISTRY }}/${{ env.APP_IMAGE_NAME }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr
@@ -64,15 +67,41 @@ jobs:
             type=sha,format=long
             type=raw,value=latest,enable={{is_default_branch}}
           labels: |
-            org.opencontainers.image.description=Mixtape application image built from github.com/${{ env.IMAGE_NAME }}/tree/${{ github.sha }}
+            org.opencontainers.image.description=Mixtape application image built from ${{env.COMMIT_URL}}
 
       - name: Build and push app image
         uses: docker/build-push-action@v6.14.0
         with:
           context: .
           push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.appMeta.outputs.tags }}
+          labels: ${{ steps.appMeta.outputs.labels }}
+
+      - name: Generate tools image metadata
+        id: toolsMeta
+        uses: docker/metadata-action@v5.6.1
+        with:
+          images: ${{ env.CONTAINER_REGISTRY }}/${{ env.TOOLS_IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,format=long
+            type=raw,value=latest,enable={{is_default_branch}}
+          labels: |
+            org.opencontainers.image.description=Mixtape application image built from ${{env.COMMIT_URL}}
+
+      - name: Build and push tools image
+        uses: docker/build-push-action@v6.14.0
+        with:
+          context: .
+          file: dockerfile.tools
+          build-args: |
+            DB_PATH=${{env.APP_DB_PATH}}
+          push: true
+          tags: ${{ steps.toolsMeta.outputs.tags }}
+          labels: ${{ steps.toolsMeta.outputs.labels }}
 
   deploy-app:
     runs-on: ubuntu-latest
@@ -90,6 +119,7 @@ jobs:
           echo 'APP_IMAGE_TAG=sha-${{ github.sha }}' >> ./envfile
           echo 'ACME_EMAIL=${{ env.ACME_EMAIL }}' >> ./envfile
           echo 'TRAEFIK_AUTH_USERS=${{ env.TRAEFIK_AUTH_USERS }}' >> ./envfile
+          echo 'APP_DB_PATH=${{env.APP_DB_PATH}}'>> ./envfile
 
       - name: Deploy app stack
         uses: cssnr/stack-deploy-action@v1
