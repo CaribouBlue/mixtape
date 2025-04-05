@@ -76,11 +76,18 @@ services:
       # - traefik.http.middlewares.app-ratelimiter.ratelimit.average=20
     deploy:
       replicas: 2
-  sqlite:
-    image: keinos/sqlite3
+  tools:
+    build:
+      context: .
+      dockerfile: dockerfile.tools
+      args:
+        DB_PATH: /var/lib/sqlite/db.sqlite
     volumes:
       - /var/lib/sqlite:/var/lib/sqlite
-    command: sleep infinity
+    command:
+      - sleep infinity
+    deploy:
+      replicas: 1
 volumes:
   letsencrypt:
 secrets:
